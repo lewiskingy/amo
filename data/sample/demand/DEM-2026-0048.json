@@ -1,0 +1,17 @@
+{
+  "id": "DEM-2026-0048",
+  "title": "Analytics Platform Data Product Enablement",
+  "status": "Analysis / Design",
+  "priority": "Medium",
+  "service": "Design",
+  "businessArea": "Data & Analytics",
+  "health": "Green",
+  "source": {"type": "SharePoint", "id": "FD-4072", "url": "https://sharepoint.example/frontdoor/4072"},
+  "triage": {"architectureImpact": "High", "complexity": "Medium", "romDays": 22, "summary": "New data-product patterns and platform capabilities required.", "dependencies": ["Data Office", "Analytics Platform"]},
+  "workPackage": {"objective": "Define reference architecture for governed data products.", "scope": "Data product boundaries, metadata, access and publishing patterns.", "outOfScope": "Individual product implementation.", "architectureOwner": "USR-006", "targetStart": "2026-10-15", "targetEnd": "2027-01-15", "governance": "Data Architecture Forum", "executionEstimateDays": 24, "requiredInputs": ["Data strategy", "Platform capability roadmap"], "dependencies": ["Data Office", "Analytics Engineering"]},
+  "azureDevOps": {"id": 19021, "type": "Feature", "url": "https://dev.azure.com/example/_workitems/edit/19021", "state": "Active"},
+  "deliverables": [{"id": "DEL-0048-01", "type": "HLD", "title": "Data Product Enablement HLD", "status": "Draft", "libraryUrl": "https://sharepoint.example/architecture/HLD/DataProductEnablement"}],
+  "version": 1,
+  "modifiedAt": "2026-08-19T15:30:00+01:00",
+  "modifiedBy": "USR-006"
+}
