@@ -1,0 +1,10 @@
+{
+  "id": "USR-002",
+  "name": "Ben Carter",
+  "role": "Solution Architect",
+  "fte": 1.0,
+  "active": true,
+  "email": "ben.carter@example.com",
+  "skills": ["Payments", "Cloud", "Platforms"],
+  "version": 1
+}
