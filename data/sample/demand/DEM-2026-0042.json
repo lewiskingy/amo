@@ -1,0 +1,17 @@
+{
+  "id": "DEM-2026-0042",
+  "title": "Customer Identity Modernisation",
+  "status": "Analysis / Design",
+  "priority": "High",
+  "service": "Design",
+  "businessArea": "Customer",
+  "health": "Amber",
+  "source": {"type": "SharePoint", "id": "FD-3921", "url": "https://sharepoint.example/frontdoor/3921"},
+  "triage": {"architectureImpact": "High", "complexity": "Large", "romDays": 30, "summary": "Material changes to identity, authentication and customer profile architecture.", "dependencies": ["Security", "Digital Platform"]},
+  "workPackage": {"objective": "Define target architecture for customer identity and authentication.", "scope": "Identity platform, authentication flows, customer profile boundaries and migration approach.", "outOfScope": "Detailed IAM implementation configuration.", "architectureOwner": "USR-001", "targetStart": "2026-09-01", "targetEnd": "2026-11-30", "governance": "Architecture Review Board", "executionEstimateDays": 34, "requiredInputs": ["Business requirements", "Security NFRs", "Current IAM design"], "dependencies": ["Security Architecture", "Digital Platform Team"]},
+  "azureDevOps": {"id": 18742, "type": "Feature", "url": "https://dev.azure.com/example/_workitems/edit/18742", "state": "Active"},
+  "deliverables": [{"id": "DEL-0042-01", "type": "HLD", "title": "Customer Identity HLD", "status": "Draft", "libraryUrl": "https://sharepoint.example/architecture/HLD/CustomerIdentity"}, {"id": "DEL-0042-02", "type": "KDD", "title": "Authentication Pattern", "status": "Review", "libraryUrl": "https://sharepoint.example/architecture/KDD/AuthPattern"}],
+  "version": 2,
+  "modifiedAt": "2026-08-18T16:40:00+01:00",
+  "modifiedBy": "USR-001"
+}
