@@ -1,0 +1,10 @@
+{
+  "id": "USR-001",
+  "name": "Aisha Khan",
+  "role": "Lead Solution Architect",
+  "fte": 1.0,
+  "active": true,
+  "email": "aisha.khan@example.com",
+  "skills": ["Solution Architecture", "Identity", "Integration"],
+  "version": 1
+}
