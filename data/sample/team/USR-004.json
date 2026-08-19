@@ -1,0 +1,10 @@
+{
+  "id": "USR-004",
+  "name": "Daniel Reed",
+  "role": "Enterprise Architect",
+  "fte": 0.6,
+  "active": true,
+  "email": "daniel.reed@example.com",
+  "skills": ["Enterprise Architecture", "Data", "Governance"],
+  "version": 1
+}
