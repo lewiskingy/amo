@@ -1,0 +1,8 @@
+Id,WorkItemType,Title,State,ArchitectureDemandId
+18742,Feature,Customer Identity Modernisation,Active,DEM-2026-0042
+18811,Feature,Payments Platform Upgrade,Active,DEM-2026-0043
+18892,Epic,Enterprise Data Retention Policy,New,DEM-2026-0044
+18933,Epic,Digital Experience Replatform,Active,DEM-2026-0045
+18984,Feature,Cloud Landing Zone Extension,Resolved,DEM-2026-0046
+19021,Feature,Analytics Platform Data Product Enablement,Active,DEM-2026-0048
+19111,Feature,Architecture Standards Cleanup,New,
