@@ -1,0 +1,17 @@
+{
+  "id": "DEM-2026-0044",
+  "title": "Enterprise Data Retention Policy",
+  "status": "Mobilising",
+  "priority": "Medium",
+  "service": "Consultancy",
+  "businessArea": "Enterprise",
+  "health": "Green",
+  "source": {"type": "SharePoint", "id": "FD-3988", "url": "https://sharepoint.example/frontdoor/3988"},
+  "triage": {"architectureImpact": "Medium", "complexity": "Small", "romDays": 8, "summary": "Architecture guidance required to interpret policy across platforms.", "dependencies": ["Data Office"]},
+  "workPackage": {"objective": "Provide architecture guidance and identify platform implications.", "scope": "Retention patterns, platform implications and decision points.", "outOfScope": "Policy authoring.", "architectureOwner": "USR-004", "targetStart": "2026-10-01", "targetEnd": "2026-10-31", "governance": "N/A", "executionEstimateDays": 7, "requiredInputs": ["Approved retention policy", "System inventory"], "dependencies": ["Data Office", "Platform Owners"]},
+  "azureDevOps": {"id": 18892, "type": "Epic", "url": "https://dev.azure.com/example/_workitems/edit/18892", "state": "New"},
+  "deliverables": [{"id": "DEL-0044-01", "type": "KDD", "title": "Retention Implementation Approach", "status": "Not Started", "libraryUrl": "https://sharepoint.example/architecture/KDD/RetentionApproach"}],
+  "version": 1,
+  "modifiedAt": "2026-08-16T14:20:00+01:00",
+  "modifiedBy": "USR-004"
+}
