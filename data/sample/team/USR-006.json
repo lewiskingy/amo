@@ -1,0 +1,10 @@
+{
+  "id": "USR-006",
+  "name": "Farah Malik",
+  "role": "Data Architect",
+  "fte": 0.8,
+  "active": true,
+  "email": "farah.malik@example.com",
+  "skills": ["Data Architecture", "Retention", "Analytics"],
+  "version": 1
+}
