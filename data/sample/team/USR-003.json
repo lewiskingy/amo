@@ -1,0 +1,10 @@
+{
+  "id": "USR-003",
+  "name": "Chloe Martin",
+  "role": "Solution Architect",
+  "fte": 0.8,
+  "active": true,
+  "email": "chloe.martin@example.com",
+  "skills": ["Cloud", "Security", "Assurance"],
+  "version": 1
+}
