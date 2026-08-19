@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "applicationName": "Architecture Operations Hub",
+  "planningMonths": ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
+  "statuses": ["Ready / Committed", "Mobilising", "Analysis / Design", "Review & Socialise", "Governance", "Complete"],
+  "services": ["Consultancy", "Design", "Assurance"],
+  "priorities": ["Critical", "High", "Medium", "Low"],
+  "healthStates": ["Green", "Amber", "Red"],
+  "defaultFteWarningThreshold": 0.85,
+  "defaultFteOverallocationThreshold": 1.0
+}
