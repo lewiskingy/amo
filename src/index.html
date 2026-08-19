@@ -1,1 +1,235 @@
-PLACEHOLDER
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Architecture Operations Hub — MVP v2</title>
+<style>
+:root{
+  --bg:#f4f7fb;--panel:#fff;--ink:#172033;--muted:#667085;--line:#d8e0ec;
+  --accent:#2f57d6;--accent2:#193a9a;--soft:#eef3ff;--good:#1b7f5a;
+  --good-bg:#e9f7f1;--warn:#9a6700;--warn-bg:#fff7df;--bad:#b42318;
+  --bad-bg:#fff0ee;--purple:#6f42c1;--shadow:0 12px 30px rgba(28,40,73,.08);--radius:16px
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh} button,input,select,textarea{font:inherit} a{color:inherit}
+.app{display:grid;grid-template-columns:252px 1fr;min-height:100vh}
+.sidebar{background:#14214d;color:white;padding:22px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{font-weight:800;font-size:1.15rem;line-height:1.2;margin-bottom:6px}
+.brand-sub{font-size:.82rem;color:#c8d3ff;margin-bottom:24px}
+.nav-btn{display:flex;width:100%;align-items:center;gap:10px;padding:11px 12px;border:0;background:transparent;color:#dfe6ff;border-radius:10px;text-align:left;cursor:pointer;margin:3px 0}
+.nav-btn:hover,.nav-btn.active{background:#243a82;color:#fff}.nav-dot{width:8px;height:8px;border-radius:50%;background:#8da4ff}
+.sidebar-foot{margin-top:28px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);font-size:.78rem;color:#b7c4ef}
+.main{min-width:0}.topbar{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:16px 24px;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.page-title{font-weight:800;font-size:1.2rem}.top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:1px solid var(--line);background:#fff;color:#25304a;border-radius:10px;padding:9px 12px;cursor:pointer}.btn:hover{border-color:#b9c6df;background:#fafcff}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent2)}
+.btn.success{background:var(--good);border-color:var(--good);color:#fff}.btn:disabled{opacity:.45;cursor:not-allowed}
+.content{padding:24px 26px 50px}.view{display:none}.view.active{display:block}
+.workspace-banner{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:#fbfcff;font-size:.84rem}
+.workspace-state{display:flex;align-items:center;gap:8px}.state-dot{width:9px;height:9px;border-radius:50%;background:#98a2b3}.state-dot.connected{background:var(--good)}.state-dot.dirty{background:#d88a00}
+.hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin-bottom:18px}.hero h1{margin:0 0 6px;font-size:2rem;letter-spacing:-.03em}.hero p{margin:0;color:var(--muted)}
+.grid{display:grid;gap:16px}.grid.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.kpi-label{font-size:.83rem;color:var(--muted);margin-bottom:6px}.kpi-value{font-size:1.9rem;font-weight:800;letter-spacing:-.03em}.kpi-sub{font-size:.8rem;color:var(--muted);margin-top:4px}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:24px 0 10px}.section-title h2{font-size:1.15rem;margin:0}
+.table-wrap{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:860px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}th{background:#f7f9fc;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:#526079;position:sticky;top:0}
+tr:hover td{background:#fbfcff}tr:last-child td{border-bottom:0}
+.pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:.74rem;font-weight:700;white-space:nowrap}.pill.blue{background:var(--soft);color:var(--accent2)}.pill.green{background:var(--good-bg);color:var(--good)}.pill.amber{background:var(--warn-bg);color:var(--warn)}.pill.red{background:var(--bad-bg);color:var(--bad)}.pill.purple{background:#f2ebff;color:var(--purple)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px}.filters input,.filters select,.field input,.field select,.field textarea{border:1px solid var(--line);background:white;border-radius:9px;padding:8px 10px;color:#26324b;width:100%}
+.field textarea{min-height:88px;resize:vertical}.muted{color:var(--muted)}.flex{display:flex;gap:10px;align-items:center}.split{display:grid;grid-template-columns:1.1fr .9fr;gap:16px}
+.bar{height:9px;background:#edf1f7;border-radius:999px;overflow:hidden}.bar>span{display:block;height:100%;background:var(--accent);border-radius:999px}.bar.good>span{background:var(--good)}.bar.warn>span{background:#d88a00}.bar.bad>span{background:var(--bad)}
+.resource-grid{display:grid;grid-template-columns:220px repeat(6,minmax(95px,1fr));min-width:900px}.resource-grid>div{padding:10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff}.resource-grid .head{background:#f7f9fc;font-size:.78rem;font-weight:800;color:#526079}.resource-grid .person{font-weight:700;background:#fbfcff}.resource-grid .cell{text-align:center}
+.alloc{display:inline-flex;min-width:48px;justify-content:center;padding:4px 7px;border-radius:7px;font-weight:700;font-size:.8rem}.alloc.ok{background:var(--good-bg);color:var(--good)}.alloc.warn{background:var(--warn-bg);color:var(--warn)}.alloc.bad{background:var(--bad-bg);color:var(--bad)}
+.roadmap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;padding:14px}.road-row{display:grid;grid-template-columns:220px 1fr;align-items:center;gap:14px;margin:11px 0}.road-title{font-weight:700;font-size:.9rem}
+.timeline{display:grid;grid-template-columns:repeat(6,1fr);height:30px;position:relative;background:repeating-linear-gradient(to right,transparent 0,transparent calc(16.666% - 1px),#e8edf5 calc(16.666% - 1px),#e8edf5 16.666%)}.roadbar{align-self:center;height:16px;border-radius:999px;background:linear-gradient(90deg,#345bd7,#6d87ed);box-shadow:0 3px 8px rgba(47,87,214,.18)}
+.timeline-head{display:grid;grid-template-columns:220px repeat(6,1fr);gap:14px;font-size:.77rem;color:var(--muted);margin-bottom:4px}.timeline-head span{text-align:center}.timeline-head span:first-child{text-align:left}
+.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.detail-block{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fff}.detail-block h3{margin:0 0 10px;font-size:.98rem}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:6px 10px;font-size:.88rem}.kv div:nth-child(odd){color:var(--muted)}.list-clean{list-style:none;padding:0;margin:0}.list-clean li{padding:7px 0;border-bottom:1px solid var(--line)}.list-clean li:last-child{border-bottom:0}
+.notice{padding:12px 14px;border:1px solid #c9d5f2;background:#f3f6ff;border-radius:10px;color:#30457f;font-size:.88rem}.notice.good{border-color:#b8e6d2;background:var(--good-bg);color:var(--good)}.notice.warn{border-color:#ead48f;background:var(--warn-bg);color:#6d4a00}.notice.bad{border-color:#f0beb9;background:var(--bad-bg);color:var(--bad)}
+.empty{padding:30px;text-align:center;color:var(--muted)}.clickable{cursor:pointer}small.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f4f6fa;padding:2px 5px;border-radius:5px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field label{display:block;font-size:.78rem;font-weight:700;color:#526079;margin-bottom:5px}.field.full{grid-column:1/-1}
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(12,19,38,.5);z-index:50;place-items:center;padding:20px}.modal-backdrop.open{display:grid}.modal{background:#fff;border-radius:16px;width:min(720px,100%);max-height:88vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.22);padding:22px}.modal h2{margin-top:0}
+.log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.78rem;background:#101828;color:#d0d5dd;border-radius:10px;padding:12px;max-height:260px;overflow:auto;white-space:pre-wrap}
+@media(max-width:1100px){.grid.kpis{grid-template-columns:repeat(2,1fr)}.split{grid-template-columns:1fr}}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{position:static;height:auto}.sidebar nav{display:grid;grid-template-columns:repeat(2,1fr)}.topbar{position:static}.grid.kpis{grid-template-columns:1fr}.detail-grid,.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.hero{align-items:flex-start;flex-direction:column}.workspace-banner{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand">Architecture Operations Hub</div>
+  <div class="brand-sub">Browser workspace MVP v2</div>
+  <nav>
+    <button class="nav-btn active" data-view="dashboard"><span class="nav-dot"></span>Dashboard</button>
+    <button class="nav-btn" data-view="demand"><span class="nav-dot"></span>Demand</button>
+    <button class="nav-btn" data-view="resource"><span class="nav-dot"></span>Resource Plan</button>
+    <button class="nav-btn" data-view="roadmap"><span class="nav-dot"></span>Roadmap</button>
+    <button class="nav-btn" data-view="team"><span class="nav-dot"></span>Team</button>
+    <button class="nav-btn" data-view="data"><span class="nav-dot"></span>Workspace</button>
+  </nav>
+  <div class="sidebar-foot">
+    <div><strong>Storage adapter:</strong> Folder JSON</div>
+    <div style="margin-top:6px">One file per demand, team member and allocation.</div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="page-title" id="pageTitle">Dashboard</div>
+    <div class="top-actions">
+      <button class="btn" id="openWorkspaceBtn">Open Workspace Folder</button>
+      <button class="btn success" id="saveWorkspaceBtn" disabled>Save Workspace</button>
+      <button class="btn" id="exportBtn">Export Snapshot</button>
+      <button class="btn primary" id="newDemandBtn">New Demand</button>
+    </div>
+  </div>
+
+  <div class="workspace-banner">
+    <div class="workspace-state"><span class="state-dot" id="stateDot"></span><span id="workspaceState">Using embedded demo data — no folder open</span></div>
+    <div class="muted" id="recordSummary"></div>
+  </div>
+
+  <div class="content">
+    <section id="dashboard" class="view active">
+      <div class="hero"><div><h1>Architecture portfolio at a glance</h1><p>Demand, capacity, work package status, and delivery health in one place.</p></div><div class="pill blue" id="datasetPill">Embedded demo</div></div>
+      <div class="grid kpis" id="kpiGrid"></div>
+      <div class="split" style="margin-top:16px">
+        <div class="card"><div class="section-title" style="margin-top:0"><h2>Capacity outlook</h2><span class="muted">Planning horizon</span></div><div id="capacityList"></div></div>
+        <div class="card"><div class="section-title" style="margin-top:0"><h2>Attention required</h2></div><ul class="list-clean" id="attentionList"></ul></div>
+      </div>
+      <div class="section-title"><h2>Recently active demand</h2><button class="btn" data-jump="demand">Open demand register</button></div>
+      <div class="table-wrap"><table id="recentDemandTable"></table></div>
+    </section>
+
+    <section id="demand" class="view">
+      <div class="hero"><div><h1>Demand Register</h1><p>Accepted Architecture demand from triage through completion.</p></div></div>
+      <div class="filters">
+        <input id="searchDemand" placeholder="Search demand..." />
+        <select id="statusFilter"><option value="">All stages</option></select>
+        <select id="serviceFilter"><option value="">All services</option></select>
+        <select id="ownerFilter"><option value="">All owners</option></select>
+      </div>
+      <div class="table-wrap"><table id="demandTable"></table></div>
+      <div id="demandDetail" style="margin-top:16px"></div>
+    </section>
+
+    <section id="resource" class="view">
+      <div class="hero"><div><h1>Resource Plan</h1><p>Monthly FTE allocation by team member and accepted Architecture demand.</p></div></div>
+      <div class="notice">This view is portfolio-focused. Detailed delivery status remains in Azure DevOps.</div>
+      <div class="section-title"><h2>Team allocation</h2><span class="muted">100% = fully allocated</span></div>
+      <div class="table-wrap"><div id="resourceGrid"></div></div>
+    </section>
+
+    <section id="roadmap" class="view">
+      <div class="hero"><div><h1>Roadmap</h1><p>Architecture work packages and forecast delivery windows.</p></div></div>
+      <div class="roadmap"><div class="timeline-head" id="timelineHead"></div><div id="roadmapRows"></div></div>
+    </section>
+
+    <section id="team" class="view">
+      <div class="hero"><div><h1>Team</h1><p>Architecture capacity and allocation summary.</p></div></div>
+      <div class="table-wrap"><table id="teamTable"></table></div>
+    </section>
+
+    <section id="data" class="view">
+      <div class="hero"><div><h1>Workspace</h1><p>Folder-backed JSON storage and adapter status.</p></div></div>
+      <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+        <div class="card">
+          <h2 style="margin-top:0">Folder contract</h2>
+          <pre style="overflow:auto;background:#f6f8fc;padding:14px;border-radius:10px;border:1px solid var(--line)">architecture-ops/
+├─ workspace.json
+├─ demand/
+│  └─ DEM-*.json
+├─ team/
+│  └─ USR-*.json
+├─ allocations/
+│  └─ ALLOC-*.json
+├─ config/
+│  ├─ settings.json
+│  └─ schema.json
+└─ imports/
+   ├─ sharepoint/
+   └─ azdo/</pre>
+        </div>
+        <div class="card">
+          <h2 style="margin-top:0">Adapter behaviour</h2>
+          <ul>
+            <li>Open the root workspace folder.</li>
+            <li>Validate <code>workspace.json</code>.</li>
+            <li>Load each entity folder into memory.</li>
+            <li>Edit records in the UI.</li>
+            <li>Save creates or overwrites individual record JSON files.</li>
+            <li>Configuration files are preserved and workspace metadata is updated.</li>
+          </ul>
+          <div id="browserSupportNotice" class="notice"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="section-title" style="margin-top:0"><h2>Workspace details</h2><span id="dirtyBadge" class="pill green">Clean</span></div>
+        <div id="workspaceDetails" class="kv"></div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="section-title" style="margin-top:0"><h2>Activity log</h2><button class="btn" id="clearLogBtn">Clear</button></div>
+        <div class="log" id="activityLog"></div>
+      </div>
+    </section>
+  </div>
+</main>
+</div>
+
+<div class="modal-backdrop" id="newDemandModal">
+  <div class="modal">
+    <h2>Create Demand</h2>
+    <p class="muted">Creates a new local demand record. Save Workspace writes it to the open folder.</p>
+    <div class="form-grid">
+      <div class="field"><label>Demand ID</label><input id="newId" /></div>
+      <div class="field"><label>Title</label><input id="newTitle" /></div>
+      <div class="field"><label>Priority</label><select id="newPriority"></select></div>
+      <div class="field"><label>Service</label><select id="newService"></select></div>
+      <div class="field"><label>Status</label><select id="newStatus"></select></div>
+      <div class="field"><label>Architecture Owner</label><select id="newOwner"></select></div>
+      <div class="field full"><label>Scope</label><textarea id="newScope"></textarea></div>
+    </div>
+    <div class="flex" style="justify-content:flex-end;margin-top:18px"><button class="btn" id="cancelNewBtn">Cancel</button><button class="btn primary" id="createNewBtn">Create</button></div>
+  </div>
+</div>
+
+<script>
+const DEMO_DB={schemaVersion:1,workspace:{type:"architecture-operations-hub",name:"Embedded Demo Workspace",schemaVersion:1,workspaceId:"DEMO"},settings:{planningMonths:["2026-09","2026-10","2026-11","2026-12","2027-01","2027-02"],statuses:["Ready / Committed","Mobilising","Analysis / Design","Review & Socialise","Governance","Complete"],services:["Consultancy","Design","Assurance"],priorities:["Critical","High","Medium","Low"]},team:[{id:"USR-001",name:"Aisha Khan",role:"Lead Solution Architect",fte:1,active:true},{id:"USR-002",name:"Ben Carter",role:"Solution Architect",fte:1,active:true},{id:"USR-003",name:"Chloe Martin",role:"Solution Architect",fte:.8,active:true},{id:"USR-004",name:"Daniel Reed",role:"Enterprise Architect",fte:.6,active:true},{id:"USR-005",name:"Eva Lewis",role:"Solution Architect",fte:1,active:true}],demand:[{id:"DEM-2026-0042",title:"Customer Identity Modernisation",priority:"High",service:"Design",status:"Analysis / Design",businessArea:"Customer",source:{type:"SharePoint",id:"FD-3921",url:"#"},triage:{architectureImpact:"High",complexity:"Large",romDays:30},workPackage:{scope:"Define target architecture for customer identity and authentication.",architectureOwner:"USR-001",targetStart:"2026-09-01",targetEnd:"2026-11-30",governance:"Architecture Review Board"},azureDevOps:{id:18742,type:"Feature",url:"#"},deliverables:[{type:"HLD",title:"Customer Identity HLD",status:"Draft",libraryUrl:"#"}],health:"Amber"},{id:"DEM-2026-0043",title:"Payments Platform Upgrade",priority:"High",service:"Design",status:"Review & Socialise",businessArea:"Payments",source:{type:"SharePoint",id:"FD-3940",url:"#"},triage:{architectureImpact:"Medium",complexity:"Medium",romDays:18},workPackage:{scope:"Architecture support for upgrade and migration sequencing.",architectureOwner:"USR-002",targetStart:"2026-09-15",targetEnd:"2026-12-15",governance:"Technology Design Authority"},azureDevOps:{id:18811,type:"Feature",url:"#"},deliverables:[{type:"HLD Lite",title:"Payments Upgrade HLD Lite",status:"Review",libraryUrl:"#"}],health:"Green"},{id:"DEM-2026-0047",title:"CRM Integration Rationalisation",priority:"Low",service:"Consultancy",status:"Ready / Committed",businessArea:"Sales",source:{type:"SharePoint",id:"FD-4050",url:"#"},triage:{architectureImpact:"Low",complexity:"Small",romDays:5},workPackage:{scope:"Review integration options and recommend rationalisation path.",architectureOwner:null,targetStart:"2027-01-01",targetEnd:"2027-01-31",governance:"N/A"},azureDevOps:{id:null,type:null,url:null},deliverables:[],health:"Red"}],allocations:[{id:"ALLOC-2026-0001",demandId:"DEM-2026-0042",teamMemberId:"USR-001",forecast:{"2026-09":.5,"2026-10":.6,"2026-11":.4}},{id:"ALLOC-2026-0002",demandId:"DEM-2026-0043",teamMemberId:"USR-002",forecast:{"2026-09":.4,"2026-10":.5,"2026-11":.4,"2026-12":.3}}],configFiles:{}};
+let db=structuredClone(DEMO_DB),workspaceHandle=null,dirty=false,selectedDemandId=null,activity=[];
+const $=id=>document.getElementById(id),clone=x=>structuredClone(x),months=()=>db.settings?.planningMonths?.length?db.settings.planningMonths:["2026-09","2026-10","2026-11","2026-12","2027-01","2027-02"],monthLabel=m=>new Date(m+"-01T00:00:00").toLocaleDateString("en-GB",{month:"short",year:"2-digit"}),person=id=>db.team.find(x=>x.id===id),demandById=id=>db.demand.find(x=>x.id===id),ownerName=d=>d.workPackage?.architectureOwner?(person(d.workPackage.architectureOwner)?.name||"Unknown"):"Unallocated";
+function log(msg){activity.unshift(`${new Date().toLocaleTimeString()}  ${msg}`);activity=activity.slice(0,100);$("activityLog").textContent=activity.join("\n")}
+function markDirty(reason="Changes not saved"){dirty=true;updateWorkspaceBanner();log(reason)}function markClean(){dirty=false;updateWorkspaceBanner()}
+function updateWorkspaceBanner(){const dot=$("stateDot"),label=$("workspaceState"),badge=$("dirtyBadge");dot.className="state-dot"+(workspaceHandle?" connected":"")+(dirty?" dirty":"");label.textContent=workspaceHandle?`${db.workspace?.name||workspaceHandle.name}${dirty?" — unsaved changes":""}`:`Using embedded demo data — no folder open${dirty?" — unsaved changes":""}`;badge.textContent=dirty?"Unsaved":"Clean";badge.className=`pill ${dirty?"amber":"green"}`;$("saveWorkspaceBtn").disabled=!workspaceHandle;$("datasetPill").textContent=workspaceHandle?"Folder workspace":"Embedded demo";$("recordSummary").textContent=`${db.demand.length} demand · ${db.team.length} team · ${db.allocations.length} allocations`;renderWorkspaceDetails()}
+function renderWorkspaceDetails(){const support="showDirectoryPicker" in window;$("browserSupportNotice").className=`notice ${support?"good":"bad"}`;$("browserSupportNotice").textContent=support?"Folder read/write API detected in this browser.":"Folder read/write API is not available in this browser. Use a supported Chromium-based browser for the folder adapter.";const w=db.workspace||{};$("workspaceDetails").innerHTML=`<div>Workspace</div><div>${w.name||"—"}</div><div>Workspace ID</div><div>${w.workspaceId||"—"}</div><div>Schema version</div><div>${w.schemaVersion??db.schemaVersion??"—"}</div><div>Folder</div><div>${workspaceHandle?.name||"Not opened"}</div><div>Status</div><div>${dirty?"Unsaved changes":"Clean"}</div>`}
+async function readJsonFile(fileHandle){const file=await fileHandle.getFile();return JSON.parse(await file.text())}
+async function readNamedJson(dirHandle,name,required=false){try{const fh=await dirHandle.getFileHandle(name);return await readJsonFile(fh)}catch(err){if(required)throw new Error(`Required file '${name}' not found or invalid.`);return null}}
+async function readEntityFolder(rootHandle,folderName){const dir=await rootHandle.getDirectoryHandle(folderName);const records=[];for await(const[name,handle]of dir.entries()){if(handle.kind==="file"&&name.toLowerCase().endsWith(".json")){try{records.push(await readJsonFile(handle))}catch(err){throw new Error(`Cannot parse ${folderName}/${name}: ${err.message}`)}}}return records}
+async function readConfigFolder(rootHandle){const result={};try{const dir=await rootHandle.getDirectoryHandle("config");for await(const[name,handle]of dir.entries()){if(handle.kind==="file"&&name.toLowerCase().endsWith(".json"))result[name]=await readJsonFile(handle)}}catch(err){log("No config folder found; defaults retained.")}return result}
+async function ensureReadWritePermission(handle){if(!handle)return false;const opts={mode:"readwrite"};if(handle.queryPermission&&await handle.queryPermission(opts)==="granted")return true;if(handle.requestPermission&&await handle.requestPermission(opts)==="granted")return true;return false}
+async function writeJson(dirHandle,filename,data){const fh=await dirHandle.getFileHandle(filename,{create:true});const writable=await fh.createWritable();await writable.write(JSON.stringify(data,null,2)+"\n");await writable.close()}
+async function saveEntityRecords(rootHandle,folderName,records){const dir=await rootHandle.getDirectoryHandle(folderName,{create:true});for(const rec of records){if(!rec.id)throw new Error(`Cannot save ${folderName} record without id.`);await writeJson(dir,`${rec.id}.json`,rec)}}
+async function openWorkspace(){if(!("showDirectoryPicker"in window)){alert("This browser does not support folder read/write access. Please use a supported Chromium-based browser.");return}try{const handle=await window.showDirectoryPicker({mode:"readwrite"});log(`Selected folder: ${handle.name}`);const workspace=await readNamedJson(handle,"workspace.json",true);if(workspace.type!=="architecture-operations-hub")throw new Error("workspace.json is not an Architecture Operations Hub workspace.");const[demand,team,allocations,configFiles]=await Promise.all([readEntityFolder(handle,"demand"),readEntityFolder(handle,"team"),readEntityFolder(handle,"allocations"),readConfigFolder(handle)]);const settings=configFiles["settings.json"]||clone(DEMO_DB.settings);workspaceHandle=handle;db={schemaVersion:workspace.schemaVersion||1,workspace,settings,team,demand,allocations,configFiles};selectedDemandId=null;markClean();log(`Loaded ${demand.length} demand, ${team.length} team, ${allocations.length} allocation records.`);refreshAll()}catch(err){if(err?.name==="AbortError"){log("Open workspace cancelled.");return}console.error(err);alert(`Could not open workspace:\n${err.message}`);log(`ERROR opening workspace: ${err.message}`)}}
+async function saveWorkspace(){if(!workspaceHandle){alert("Open a workspace folder first.");return}try{const permitted=await ensureReadWritePermission(workspaceHandle);if(!permitted)throw new Error("Read/write permission was not granted.");const now=new Date().toISOString();db.workspace.modifiedAt=now;db.workspace.schemaVersion=db.workspace.schemaVersion||db.schemaVersion||1;await writeJson(workspaceHandle,"workspace.json",db.workspace);await Promise.all([saveEntityRecords(workspaceHandle,"demand",db.demand),saveEntityRecords(workspaceHandle,"team",db.team),saveEntityRecords(workspaceHandle,"allocations",db.allocations)]);if(db.settings){const configDir=await workspaceHandle.getDirectoryHandle("config",{create:true});await writeJson(configDir,"settings.json",db.settings);if(db.configFiles?.["schema.json"])await writeJson(configDir,"schema.json",db.configFiles["schema.json"])}markClean();log(`Workspace saved successfully at ${new Date().toLocaleTimeString()}.`);alert("Workspace saved successfully.")}catch(err){console.error(err);alert(`Could not save workspace:\n${err.message}`);log(`ERROR saving workspace: ${err.message}`)}}
+const healthPill=h=>`<span class="pill ${h==="Green"?"green":h==="Amber"?"amber":"red"}">${h||"—"}</span>`,servicePill=s=>`<span class="pill ${s==="Design"?"blue":s==="Consultancy"?"purple":"green"}">${s||"—"}</span>`,statusPill=s=>{const c=(s||"").includes("Governance")?"amber":(s||"").includes("Complete")?"green":(s||"").includes("Review")?"purple":"blue";return `<span class="pill ${c}">${s||"—"}</span>`};
+function allocationForMemberMonth(memberId,month){return db.allocations.filter(a=>a.teamMemberId===memberId).reduce((sum,a)=>sum+(Number(a.forecast?.[month])||0),0)}function allocatedFteMonth(month){return db.team.reduce((s,t)=>s+allocationForMemberMonth(t.id,month),0)}function availableFte(){return db.team.filter(t=>t.active!==false).reduce((s,t)=>s+(Number(t.fte)||0),0)}function activeDemand(){return db.demand.filter(d=>d.status!=="Complete")}
+function renderDashboard(){const total=activeDemand().length,unallocated=activeDemand().filter(d=>!d.workPackage?.architectureOwner).length,governance=activeDemand().filter(d=>(d.status||"").includes("Governance")).length,conflicts=db.team.reduce((n,t)=>n+months().filter(m=>allocationForMemberMonth(t.id,m)>(Number(t.fte)||0)).length,0);const kpis=[["Active demand",total,"Accepted Architecture demand"],["Unallocated",unallocated,"Needs resource decision"],["In governance",governance,"Awaiting formal outcome"],["Capacity conflicts",conflicts,"Person-month over-allocation"]];$("kpiGrid").innerHTML=kpis.map(k=>`<div class="card"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-sub">${k[2]}</div></div>`).join("");const teamFte=availableFte();$("capacityList").innerHTML=months().map(m=>{const used=allocatedFteMonth(m),pct=teamFte?Math.round((used/teamFte)*100):0,cls=pct>100?"bad":pct>85?"warn":"good";return `<div style="margin:12px 0"><div class="flex" style="justify-content:space-between"><strong>${monthLabel(m)}</strong><span>${used.toFixed(1)} / ${teamFte.toFixed(1)} FTE (${pct}%)</span></div><div class="bar ${cls}" style="margin-top:6px"><span style="width:${Math.min(pct,100)}%"></span></div></div>`}).join("");const attention=[];db.demand.filter(d=>d.status!=="Complete"&&!d.workPackage?.architectureOwner).forEach(d=>attention.push(`<li><strong>${d.id}</strong> — ${d.title}<br><span class="muted">Accepted demand has no Architecture owner.</span></li>`));db.team.forEach(t=>months().forEach(m=>{const used=allocationForMemberMonth(t.id,m);if(used>(Number(t.fte)||0))attention.push(`<li><strong>${t.name}</strong> — ${monthLabel(m)}<br><span class="muted">Allocated ${Math.round(used*100)}% against ${Math.round((Number(t.fte)||0)*100)}% available FTE.</span></li>`)}));$("attentionList").innerHTML=(attention.length?attention:["<li>No current allocation issues.</li>"]).slice(0,6).join("");renderDemandTable("recentDemandTable",db.demand.slice(0,5),false)}
+function renderDemandTable(id,rows,clickable=true){$(id).innerHTML=`<thead><tr><th>ID</th><th>Demand</th><th>Priority</th><th>Service</th><th>Stage</th><th>Owner</th><th>ROM</th><th>ADO</th><th>Health</th></tr></thead><tbody>${rows.map(d=>`<tr ${clickable?`class="clickable" data-demand-id="${d.id}"`:""}><td><small class="code">${d.id}</small></td><td><strong>${d.title}</strong></td><td>${d.priority||"—"}</td><td>${servicePill(d.service)}</td><td>${statusPill(d.status)}</td><td>${ownerName(d)}</td><td>${d.triage?.romDays??"—"}d</td><td>${d.azureDevOps?.id?`${d.azureDevOps.type||"Item"} #${d.azureDevOps.id}`:"—"}</td><td>${healthPill(d.health)}</td></tr>`).join("")}</tbody>`;if(clickable)$(id).querySelectorAll("[data-demand-id]").forEach(tr=>tr.addEventListener("click",()=>showDemandDetail(tr.dataset.demandId)))}
+function populateFilters(){const val=id=>$(id).value,old={status:val("statusFilter"),service:val("serviceFilter"),owner:val("ownerFilter")},statuses=[...new Set(db.demand.map(d=>d.status).filter(Boolean))].sort(),services=[...new Set(db.demand.map(d=>d.service).filter(Boolean))].sort();$("statusFilter").innerHTML='<option value="">All stages</option>'+statuses.map(x=>`<option>${x}</option>`).join("");$("serviceFilter").innerHTML='<option value="">All services</option>'+services.map(x=>`<option>${x}</option>`).join("");$("ownerFilter").innerHTML='<option value="">All owners</option><option value="unallocated">Unallocated</option>'+db.team.map(x=>`<option value="${x.id}">${x.name}</option>`).join("");$("statusFilter").value=old.status;$("serviceFilter").value=old.service;$("ownerFilter").value=old.owner}
+function filterDemand(){const q=$("searchDemand").value.toLowerCase(),status=$("statusFilter").value,service=$("serviceFilter").value,owner=$("ownerFilter").value,rows=db.demand.filter(d=>{const ownerMatch=!owner||(owner==="unallocated"?!d.workPackage?.architectureOwner:d.workPackage?.architectureOwner===owner);return(!q||`${d.id} ${d.title}`.toLowerCase().includes(q))&&(!status||d.status===status)&&(!service||d.service===service)&&ownerMatch});renderDemandTable("demandTable",rows,true)}
+function showDemandDetail(id){selectedDemandId=id;const d=demandById(id);if(!d)return;const allocations=db.allocations.filter(a=>a.demandId===id);$("demandDetail").innerHTML=`<div class="card"><div class="section-title" style="margin-top:0"><div><h2>${d.title}</h2><div class="muted">${d.id}</div></div><div>${healthPill(d.health)} ${statusPill(d.status)}</div></div><div class="detail-grid"><div class="detail-block"><h3>Source &amp; Triage</h3><div class="kv"><div>Front Door</div><div>${d.source?.id||"—"}</div><div>Impact</div><div>${d.triage?.architectureImpact||"—"}</div><div>Complexity</div><div>${d.triage?.complexity||"—"}</div><div>ROM</div><div>${d.triage?.romDays??"—"} days</div><div>Service</div><div>${d.service||"—"}</div></div></div><div class="detail-block"><h3>Work Package</h3><div class="form-grid"><div class="field"><label>Status</label><select id="editStatus">${(db.settings?.statuses||[]).map(x=>`<option ${x===d.status?"selected":""}>${x}</option>`).join("")}</select></div><div class="field"><label>Priority</label><select id="editPriority">${(db.settings?.priorities||[]).map(x=>`<option ${x===d.priority?"selected":""}>${x}</option>`).join("")}</select></div><div class="field"><label>Owner</label><select id="editOwner"><option value="">Unallocated</option>${db.team.map(t=>`<option value="${t.id}" ${t.id===d.workPackage?.architectureOwner?"selected":""}>${t.name}</option>`).join("")}</select></div><div class="field"><label>Health</label><select id="editHealth">${["Green","Amber","Red"].map(x=>`<option ${x===d.health?"selected":""}>${x}</option>`).join("")}</select></div><div class="field"><label>Target Start</label><input type="date" id="editStart" value="${d.workPackage?.targetStart||""}"></div><div class="field"><label>Target End</label><input type="date" id="editEnd" value="${d.workPackage?.targetEnd||""}"></div><div class="field full"><label>Refined Scope</label><textarea id="editScope">${d.workPackage?.scope||""}</textarea></div></div><div class="flex" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="applyDemandEdits">Apply Changes</button></div></div><div class="detail-block"><h3>Azure DevOps</h3>${d.azureDevOps?.id?`<p><strong>${d.azureDevOps.type||"Item"} #${d.azureDevOps.id}</strong></p><p class="muted">${d.azureDevOps.state||"Linked execution work item"}</p>`:`<p class="muted">No ADO work item linked yet.</p>`}</div><div class="detail-block"><h3>Deliverables</h3><ul class="list-clean">${(d.deliverables||[]).map(x=>`<li><strong>${x.type}</strong> — ${x.title}<br><span class="muted">${x.status}</span></li>`).join("")||"<li>No deliverables recorded.</li>"}</ul></div><div class="detail-block" style="grid-column:1/-1"><h3>Resource allocation</h3>${allocations.length?allocations.map(a=>`<div style="margin:10px 0"><strong>${person(a.teamMemberId)?.name||a.teamMemberId}</strong> — ${Object.entries(a.forecast||{}).map(([m,v])=>`${monthLabel(m)} ${Math.round(v*100)}%`).join(" · ")}</div>`).join(""):`<p class="muted">No allocation recorded.</p>`}</div></div></div>`;$("applyDemandEdits").addEventListener("click",applyDemandEdits)}
+function applyDemandEdits(){const d=demandById(selectedDemandId);if(!d)return;d.status=$("editStatus").value;d.priority=$("editPriority").value;d.health=$("editHealth").value;d.workPackage=d.workPackage||{};d.workPackage.architectureOwner=$("editOwner").value||null;d.workPackage.targetStart=$("editStart").value;d.workPackage.targetEnd=$("editEnd").value;d.workPackage.scope=$("editScope").value;d.version=(Number(d.version)||0)+1;d.modifiedAt=new Date().toISOString();markDirty(`Updated ${d.id}.`);refreshAll();showDemandDetail(d.id)}
+function renderResource(){let cells=`<div class="resource-grid" style="grid-template-columns:220px repeat(${months().length},minmax(95px,1fr))"><div class="head">Team Member</div>${months().map(m=>`<div class="head">${monthLabel(m)}</div>`).join("")}`;db.team.forEach(t=>{cells+=`<div class="person">${t.name}<br><span class="muted" style="font-weight:400">${t.role||""} · ${Math.round((Number(t.fte)||0)*100)}%</span></div>`;months().forEach(m=>{const v=allocationForMemberMonth(t.id,m),pct=Math.round(v*100),cap=Math.round((Number(t.fte)||0)*100),cls=pct>cap?"bad":pct>=cap*.85?"warn":"ok";cells+=`<div class="cell"><span class="alloc ${cls}">${pct}%</span></div>`})});cells+="</div>";$("resourceGrid").innerHTML=cells}
+function renderRoadmap(){$("timelineHead").style.gridTemplateColumns=`220px repeat(${months().length},1fr)`;$("timelineHead").innerHTML=`<span>Demand</span>${months().map(m=>`<span>${monthLabel(m)}</span>`).join("")}`;const startWindow=new Date(months()[0]+"-01T00:00:00"),last=months()[months().length-1],[y,mo]=last.split("-").map(Number),endWindow=new Date(y,mo,1),total=endWindow-startWindow;$("roadmapRows").innerHTML=db.demand.map(d=>{const s=new Date((d.workPackage?.targetStart||months()[0]+"-01")+"T00:00:00"),e=new Date((d.workPackage?.targetEnd||months()[0]+"-28")+"T00:00:00"),left=Math.max(0,Math.min(1,(s-startWindow)/total))*100,width=Math.max(2,Math.min(100-left,((e-s)/total)*100));return `<div class="road-row"><div class="road-title">${d.title}<div class="muted" style="font-weight:400">${ownerName(d)}</div></div><div class="timeline" style="grid-template-columns:repeat(${months().length},1fr)"><div class="roadbar" style="grid-column:1/-1;position:absolute;left:${left}%;width:${width}%"></div></div></div>`}).join("")}
+function renderTeam(){$("teamTable").innerHTML=`<thead><tr><th>Name</th><th>Role</th><th>Base FTE</th>${months().slice(0,3).map(m=>`<th>${monthLabel(m)}</th>`).join("")}<th>Status</th></tr></thead><tbody>${db.team.map(t=>`<tr><td><strong>${t.name}</strong></td><td>${t.role||"—"}</td><td>${Math.round((Number(t.fte)||0)*100)}%</td>${months().slice(0,3).map(m=>`<td>${Math.round(allocationForMemberMonth(t.id,m)*100)}%</td>`).join("")}<td>${t.active!==false?'<span class="pill green">Active</span>':'<span class="pill red">Inactive</span>'}</td></tr>`).join("")}</tbody>`}
+function refreshAll(){populateFilters();renderDashboard();filterDemand();renderResource();renderRoadmap();renderTeam();updateWorkspaceBanner();if(selectedDemandId&&demandById(selectedDemandId))showDemandDetail(selectedDemandId);else $("demandDetail").innerHTML=""}
+function switchView(id){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===id));document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.view===id));$("pageTitle").textContent={dashboard:"Dashboard",demand:"Demand",resource:"Resource Plan",roadmap:"Roadmap",team:"Team",data:"Workspace"}[id]||"Architecture Operations Hub"}
+function exportSnapshot(){const snapshot={schemaVersion:db.schemaVersion,workspace:db.workspace,settings:db.settings,demand:db.demand,team:db.team,allocations:db.allocations},blob=new Blob([JSON.stringify(snapshot,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="architecture-ops-snapshot.json";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),500);log("Exported JSON snapshot.")}
+function openNewDemand(){const year=new Date().getFullYear(),nums=db.demand.map(d=>Number((d.id||"").match(/(\d+)$/)?.[1]||0)),next=String(Math.max(0,...nums)+1).padStart(4,"0");$("newId").value=`DEM-${year}-${next}`;$("newTitle").value="";$("newScope").value="";$("newPriority").innerHTML=(db.settings?.priorities||["High","Medium","Low"]).map(x=>`<option>${x}</option>`).join("");$("newService").innerHTML=(db.settings?.services||["Consultancy","Design","Assurance"]).map(x=>`<option>${x}</option>`).join("");$("newStatus").innerHTML=(db.settings?.statuses||["Ready / Committed"]).map(x=>`<option>${x}</option>`).join("");$("newOwner").innerHTML='<option value="">Unallocated</option>'+db.team.map(t=>`<option value="${t.id}">${t.name}</option>`).join("");$("newDemandModal").classList.add("open")}
+function createDemand(){const id=$("newId").value.trim(),title=$("newTitle").value.trim();if(!id||!title){alert("Demand ID and title are required.");return}if(demandById(id)){alert("That Demand ID already exists.");return}db.demand.push({id,title,priority:$("newPriority").value,service:$("newService").value,status:$("newStatus").value,businessArea:"",source:{type:"SharePoint",id:"",url:""},triage:{architectureImpact:"",complexity:"",romDays:null},workPackage:{scope:$("newScope").value,architectureOwner:$("newOwner").value||null,targetStart:"",targetEnd:"",governance:""},azureDevOps:{id:null,type:null,url:null,state:null},deliverables:[],health:"Green",version:1,modifiedAt:new Date().toISOString()});$("newDemandModal").classList.remove("open");markDirty(`Created ${id}.`);refreshAll();switchView("demand");showDemandDetail(id)}
+document.querySelectorAll(".nav-btn").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.view)));document.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click",()=>switchView(b.dataset.jump)));$("openWorkspaceBtn").addEventListener("click",openWorkspace);$("saveWorkspaceBtn").addEventListener("click",saveWorkspace);$("exportBtn").addEventListener("click",exportSnapshot);$("newDemandBtn").addEventListener("click",openNewDemand);$("cancelNewBtn").addEventListener("click",()=>$("newDemandModal").classList.remove("open"));$("createNewBtn").addEventListener("click",createDemand);$("clearLogBtn").addEventListener("click",()=>{activity=[];$("activityLog").textContent=""});["searchDemand","statusFilter","serviceFilter","ownerFilter"].forEach(id=>$(id).addEventListener("input",filterDemand));window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue=""}});log("Application started with embedded demo data.");refreshAll();
+</script>
+</body>
+</html>
