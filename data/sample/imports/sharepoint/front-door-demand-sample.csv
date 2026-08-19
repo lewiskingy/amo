@@ -1,0 +1,9 @@
+FrontDoorId,Title,BusinessArea,BusinessPriority,ArchitectureTriageStatus,ArchitectureImpact,Complexity,ROMDays
+FD-3921,Customer Identity Modernisation,Customer,High,Accepted,High,Large,30
+FD-3940,Payments Platform Upgrade,Payments,High,Accepted,Medium,Medium,18
+FD-3988,Enterprise Data Retention Policy,Enterprise,Medium,Accepted,Medium,Small,8
+FD-4011,Digital Experience Replatform,Digital,Critical,Accepted,High,Large,45
+FD-4032,Cloud Landing Zone Extension,Technology Platforms,Medium,Accepted,Medium,Medium,12
+FD-4050,CRM Integration Rationalisation,Sales,Low,Accepted,Low,Small,5
+FD-4072,Analytics Platform Data Product Enablement,Data & Analytics,Medium,Accepted,High,Medium,22
+FD-4105,New Mobile App Discovery,Digital,Medium,Triaged - New,Medium,Small,6
