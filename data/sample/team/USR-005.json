@@ -1,0 +1,10 @@
+{
+  "id": "USR-005",
+  "name": "Eva Lewis",
+  "role": "Solution Architect",
+  "fte": 1.0,
+  "active": true,
+  "email": "eva.lewis@example.com",
+  "skills": ["Digital", "CRM", "Integration"],
+  "version": 1
+}
