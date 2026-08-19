@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "recordTypes": {
+    "demand": {"idPrefix": "DEM-", "required": ["id", "title", "status", "priority", "service", "source", "triage", "workPackage", "deliverables"]},
+    "team": {"idPrefix": "USR-", "required": ["id", "name", "role", "fte", "active"]},
+    "allocation": {"idPrefix": "ALLOC-", "required": ["id", "demandId", "teamMemberId", "forecast"]}
+  }
+}
