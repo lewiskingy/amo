@@ -1,0 +1,9 @@
+{
+  "id": "IDEA-2026-0001",
+  "raisedBy": "Aisha Khan",
+  "raisedDate": "2026-08-20",
+  "title": "Add reusable saved views",
+  "description": "Allow users to save commonly used filters and sorts on Demand and Allocations so recurring management views can be reopened quickly.",
+  "status": "New",
+  "version": 1
+}
