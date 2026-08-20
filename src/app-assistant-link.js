@@ -3,6 +3,14 @@
   const SETTING_KEY='assistantUrl';
   const normalizedUrl=v=>String(v||'').trim();
 
+  function placeAssistantLink(nav,link){
+    const readme=nav.querySelector('[data-view="readme"]');
+    const anchor=document.getElementById('primaryNavAnchor');
+    if(readme){nav.insertBefore(link,readme.nextSibling);return}
+    if(anchor){nav.insertBefore(link,anchor.nextSibling);return}
+    nav.prepend(link)
+  }
+
   function renderAssistantNav(){
     const nav=document.querySelector('.sidebar nav');if(!nav)return;
     nav.querySelector('[data-amo-assistant]')?.remove();
@@ -13,7 +21,7 @@
     link.href=url;link.target='_blank';link.rel='noopener noreferrer';
     link.title='Open AMO Assistant in a new window';
     link.innerHTML='<span class="amo-assistant-launch" aria-hidden="true">↗</span><span>AMO Assistant</span>';
-    nav.prepend(link)
+    placeAssistantLink(nav,link)
   }
 
   function appendAssistantConfigCard(){
@@ -23,7 +31,7 @@
     if(configState.editing&&configState.draft&&!Object.prototype.hasOwnProperty.call(configState.draft,SETTING_KEY))configState.draft[SETTING_KEY]=normalizedUrl(db.settings?.[SETTING_KEY]);
     const value=configState.editing?normalizedUrl(configState.draft?.[SETTING_KEY]):normalizedUrl(db.settings?.[SETTING_KEY]);
     const card=document.createElement('div');card.className='card config-card amo-assistant-config';
-    card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>AMO Assistant</h2><p class="muted config-description">Optional external link shown at the top of the navigation. Leave blank to hide the menu item.</p></div></div><div class="config-list"><div class="config-row">${configState.editing?`<input class="cell-input" id="configAmoAssistantUrl" type="url" value="${escHtml(value)}" placeholder="https://…">`:(value?`<a href="${escHtml(value)}" target="_blank" rel="noopener noreferrer">${escHtml(value)}</a>`:'<span class="muted">Not configured — menu item hidden.</span>')}</div></div>`;
+    card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>AMO Assistant</h2><p class="muted config-description">Optional external link shown immediately below README in the navigation. Leave blank to hide the menu item.</p></div></div><div class="config-list"><div class="config-row">${configState.editing?`<input class="cell-input" id="configAmoAssistantUrl" type="url" value="${escHtml(value)}" placeholder="https://…">`:(value?`<a href="${escHtml(value)}" target="_blank" rel="noopener noreferrer">${escHtml(value)}</a>`:'<span class="muted">Not configured — menu item hidden.</span>')}</div></div>`;
     grid.appendChild(card);
     document.getElementById('configAmoAssistantUrl')?.addEventListener('input',e=>{configState.draft[SETTING_KEY]=e.target.value})
   }
