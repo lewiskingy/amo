@@ -5,6 +5,8 @@
   "priority": "High",
   "service": "Design",
   "businessArea": "Customer",
+  "initiative": "Customer Modernisation Programme",
+  "costCentreOrProjectCode": "CC-4100",
   "health": "Amber",
   "source": {"type": "SharePoint", "id": "FD-3921", "url": "https://sharepoint.example/frontdoor/3921"},
   "triage": {"architectureImpact": "High", "complexity": "Large", "romDays": 30, "summary": "Material changes to identity, authentication and customer profile architecture.", "dependencies": ["Security", "Digital Platform"]},
