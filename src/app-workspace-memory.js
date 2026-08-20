@@ -80,8 +80,9 @@ async function chooseDifferentWorkspace(){
   renderRememberedWorkspace()
 }
 
-/* Current open action prefers the remembered workspace; explicit Choose Different always invokes the native picker. */
+/* Current open action prefers the remembered workspace only when no workspace is already connected. */
 openWorkspace=async function(){
+  if(workspaceHandle){await chooseDifferentWorkspace();return}
   if(rememberedWorkspaceHandle){const ok=await reconnectRememberedWorkspace({requestPermission:true});if(ok)return}
   await chooseDifferentWorkspace()
 };
@@ -98,14 +99,13 @@ function renderRememberedWorkspace(){
   let card=document.getElementById('rememberedWorkspaceCard');
   if(!card){card=document.createElement('div');card.id='rememberedWorkspaceCard';card.className='card';card.style.marginTop='16px';const first=section.querySelector('.card');first?.before(card)}
   if(!rememberedWorkspaceHandle){card.innerHTML='<div class="section-title" style="margin-top:0"><div><h2>Default Workspace</h2><p class="muted">No folder is remembered in this browser yet.</p></div><button class="btn" id="chooseWorkspaceMemory">Choose Workspace</button></div>';document.getElementById('chooseWorkspaceMemory')?.addEventListener('click',chooseDifferentWorkspace);return}
-  card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Default Workspace</h2><p class="muted">The folder handle is stored locally in this browser's IndexedDB. Workspace files remain in the original folder.</p></div><div class="toolbar"><button class="btn" id="reconnectWorkspaceMemory">Reconnect</button><button class="btn" id="chooseWorkspaceMemory">Choose Different</button><button class="btn danger" id="forgetWorkspaceMemory">Forget</button></div></div><div class="mini-stat"><span>Remembered folder</span><strong>${escHtml(rememberedWorkspaceHandle.name||'Workspace')}</strong></div><div class="mini-stat"><span>Current connection</span><strong>${workspaceHandle===rememberedWorkspaceHandle?'Connected':workspaceHandle?escHtml(workspaceHandle.name):'Not connected'}</strong></div><div class="muted" id="rememberedWorkspacePermission" style="margin-top:10px">Checking browser permission…</div>`;
+  card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Default Workspace</h2><p class="muted">The folder handle is stored locally in this browser's IndexedDB. Workspace files remain in the original folder.</p></div><div class="toolbar"><button class="btn" id="reconnectWorkspaceMemory">Reconnect</button><button class="btn" id="chooseWorkspaceMemory">Choose Different</button><button class="btn danger" id="forgetWorkspaceMemory">Forget</button></div></div><div class="mini-stat"><span>Remembered folder</span><strong>${escHtml(rememberedWorkspaceHandle.name||'Workspace')}</strong></div><div class="mini-stat"><span>Current connection</span><strong>${workspaceHandle?escHtml(workspaceHandle.name):'Not connected'}</strong></div><div class="muted" id="rememberedWorkspacePermission" style="margin-top:10px">Checking browser permission…</div>`;
   document.getElementById('reconnectWorkspaceMemory')?.addEventListener('click',()=>reconnectRememberedWorkspace({requestPermission:true}));
   document.getElementById('chooseWorkspaceMemory')?.addEventListener('click',chooseDifferentWorkspace);
   document.getElementById('forgetWorkspaceMemory')?.addEventListener('click',async()=>{if(confirm('Forget the remembered workspace on this browser? This does not delete any workspace files.'))await workspaceHandleForget()});
   handlePermission(rememberedWorkspaceHandle).then(p=>{const el=document.getElementById('rememberedWorkspacePermission');if(el)el.textContent=p==='granted'?'Browser permission is currently granted; AMO can reconnect automatically.':p==='prompt'?'The folder is remembered; the browser will ask you to reconnect when needed.':'Browser access is currently denied; choose the workspace again if reconnect is unavailable.'}).catch(()=>{})
 }
 
-/* Any successful native folder selection becomes the remembered/default workspace. */
 const memoryUpdateBanner=updateBanner;
 updateBanner=function(){memoryUpdateBanner();renderRememberedWorkspace()};
 
