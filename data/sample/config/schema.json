@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
   "recordTypes": {
-    "demand": {"idPrefix": "DEM-", "required": ["id", "title", "businessArea", "status", "priority", "service", "source", "triage", "workPackage", "deliverables"]},
-    "team": {"idPrefix": "USR-", "required": ["id", "name", "role", "fte", "active"]},
+    "demand": {"idPrefix": "DEM-", "required": ["id", "teamId", "title", "businessArea", "status", "priority", "service", "source", "triage", "workPackage", "deliverables"]},
+    "team": {"idPrefix": "USR-", "required": ["id", "teamId", "name", "role", "fte", "active"]},
     "allocation": {"idPrefix": "ALLOC-", "required": ["id", "demandId", "teamMemberId", "forecast"]},
     "idea": {"idPrefix": "IDEA-", "required": ["id", "raisedBy", "raisedDate", "title", "description", "status"]},
     "statusReport": {"idPrefix": "SR-", "required": ["id", "status", "reportingDate", "publishedAt", "entries"]}
-  }
+  },
+  "workspace": {"required": ["department"]},
+  "config": {"required": ["teams"]}
 }
