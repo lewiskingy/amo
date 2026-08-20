@@ -1,5 +1,6 @@
 /* Page-title hierarchy and organisational scope heading polish. */
 (function initUiPolish(){
+  const css=document.createElement('link');css.rel='stylesheet';css.href='app-ui-polish.css';document.head.appendChild(css);
   const scopedViews=new Set(['dashboard','demand','allocations','resource','roadmap','status-report','status-history','team']);
 
   function scopeHeadingForView(viewId){
@@ -17,24 +18,24 @@
     top?.classList.add('page-title-primary');
   }
 
+  function applyRoadmapThemeVars(){
+    const months=typeof planningMonths==='function'?planningMonths():[];
+    const step=months.length?`${100/months.length}%`:'8.333%';
+    document.querySelectorAll('[data-roadmap-track]').forEach(el=>el.style.setProperty('--roadmap-step',step));
+  }
+
   const baseSwitchViewPolish=switchView;
-  switchView=function(id){
-    baseSwitchViewPolish(id);
-    applyPageHierarchy();
-  };
+  switchView=function(id){baseSwitchViewPolish(id);applyPageHierarchy();applyRoadmapThemeVars()};
 
   const baseRefreshAllPolish=refreshAll;
-  refreshAll=function(){
-    baseRefreshAllPolish();
-    applyPageHierarchy();
-  };
+  refreshAll=function(){baseRefreshAllPolish();applyPageHierarchy();applyRoadmapThemeVars()};
 
-  /* The Team View selector changes scope without necessarily switching page. */
   const baseRenderScopePolish=renderScopeSelector;
-  renderScopeSelector=function(){
-    baseRenderScopePolish();
-    applyPageHierarchy();
-  };
+  renderScopeSelector=function(){baseRenderScopePolish();applyPageHierarchy()};
+
+  const baseRenderRoadmapPolish=renderRoadmap;
+  renderRoadmap=function(){const result=baseRenderRoadmapPolish();applyRoadmapThemeVars();return result};
 
   applyPageHierarchy();
+  applyRoadmapThemeVars();
 })();
