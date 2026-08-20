@@ -31,10 +31,11 @@
     modal.classList.add('status-modal');modal.classList.toggle('status-modal-maximized',statusModalMaximized);
     if(title)title.textContent=modalReportTitle(statusModalReport,statusModalScope);
     if(subtitle)subtitle.textContent=statusModalReport.status==='Published'?`${statusModalReport.id} · ${statusModalReport.reportingDate||''}`:'Preview of the current working draft';
-    body.innerHTML=`<div class="status-modal-toolbar"><label class="status-scope-control"><span>Scope</span><select id="statusModalScope">${scopeOptions(statusModalScope)}</select></label><div class="status-modal-actions"><button class="btn" id="statusPrintTop">Print / Save PDF</button><button class="btn" id="statusMaximize">${statusModalMaximized?'Restore':'Maximize'}</button></div></div><div id="statusModalReportContent">${scopedNarrative(statusModalReport,statusModalScope)}</div>`;
+    body.innerHTML=`<div class="status-modal-toolbar"><label class="status-scope-control"><span>Scope</span><select id="statusModalScope">${scopeOptions(statusModalScope)}</select></label><div class="status-modal-actions"><button class="btn" id="statusPrintTop">Print / Save PDF</button><button class="btn" id="statusOpenWindow">Open in New Window</button><button class="btn" id="statusMaximize">${statusModalMaximized?'Restore':'Maximize'}</button></div></div><div id="statusModalReportContent">${scopedNarrative(statusModalReport,statusModalScope)}</div>`;
     actions.innerHTML='<button class="btn" id="closeStatusReport">Close</button>';
     $('statusModalScope')?.addEventListener('change',e=>{statusModalScope=e.target.value;renderStatusModal()});
-    $('statusPrintTop')?.addEventListener('click',()=>printStatusReportStyled(statusModalReport,statusModalScope));
+    $('statusPrintTop')?.addEventListener('click',()=>openStandaloneStatusReport(statusModalReport,statusModalScope,true));
+    $('statusOpenWindow')?.addEventListener('click',()=>openStandaloneStatusReport(statusModalReport,statusModalScope,false));
     $('statusMaximize')?.addEventListener('click',()=>{statusModalMaximized=!statusModalMaximized;renderStatusModal()});
     $('closeStatusReport')?.addEventListener('click',closeStatusReportEnhanced)
   }
@@ -57,14 +58,22 @@
     const styles=[...document.querySelectorAll('style')].map(s=>`<style>${s.textContent}</style>`).join('');
     return links+styles
   }
-  function printStatusReportStyled(report,scope){
-    const win=window.open('','_blank');if(!win){alert('The browser blocked the print window. Allow pop-ups for this page and try again.');return}
+  function standaloneReportHeader(report,scope){
+    const title=modalReportTitle(report,scope),published=report.status==='Published',date=report.reportingDate||'',publishedText=published&&report.publishedAt?` · Published ${new Date(report.publishedAt).toLocaleString()}`:'';
+    return `<header class="standalone-report-header"><h1>${escHtml(title)}</h1><div class="standalone-report-meta">${escHtml(date)}${publishedText?escHtml(publishedText):''}${published&&report.id?` · ${escHtml(report.id)}`:''}</div></header>`
+  }
+  function standaloneReportDocument(report,scope){
     const theme=document.documentElement.dataset.theme||'light',title=modalReportTitle(report,scope),html=scopedNarrative(report,scope);
+    return `<!DOCTYPE html><html data-theme="${escHtml(theme)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(title)}</title>${absoluteStylesForPrint()}<style>body{margin:0;padding:24px;background:var(--bg);color:var(--ink)}.standalone-report-shell{max-width:1200px;margin:0 auto}.standalone-report-header{margin:0 0 22px;padding:0 0 16px;border-bottom:1px solid var(--line)}.standalone-report-header h1{margin:0 0 8px;font-size:2rem;line-height:1.15;color:var(--ink)}.standalone-report-meta{color:var(--muted);font-size:.9rem}.standalone-report-shell>.report-card{max-width:none;margin:0}.standalone-report-shell>.report-card>.section-title:first-child{display:none}.status-modal-toolbar,.modal-actions,.btn{display:none!important}@media print{html,body{background:#fff!important;color:#111!important}.standalone-report-header{border-color:#d0d5dd!important}.standalone-report-header h1{color:#111!important}.standalone-report-meta{color:#475467!important}.report-card{background:#fff!important;color:#111!important;border-color:#d0d5dd!important;box-shadow:none!important}.report-entry{border-color:#d0d5dd!important}.report-entry-head{background:#f7f9fc!important;color:#111!important}.report-narrative,.report-narrative h4,.muted{color:#475467!important}.report-narrative p,.report-entry strong,.section-title h2,.section-title h3{color:#111!important}.card{background:#fff!important;color:#111!important;border-color:#d0d5dd!important}.bar{background:#e9edf3!important}a{color:#175cd3!important}@page{margin:12mm}}</style></head><body><main class="standalone-report-shell">${standaloneReportHeader(report,scope)}${html}</main></body></html>`
+  }
+  function openStandaloneStatusReport(report,scope,autoPrint=false){
+    const win=window.open('','_blank');if(!win){alert('The browser blocked the report window. Allow pop-ups for this page and try again.');return}
     win.document.open();
-    win.document.write(`<!DOCTYPE html><html data-theme="${escHtml(theme)}"><head><meta charset="utf-8"><title>${escHtml(title)}</title>${absoluteStylesForPrint()}<style>body{margin:0;padding:24px;background:var(--bg);color:var(--ink)}.report-card{max-width:1200px;margin:0 auto}.status-modal-toolbar,.modal-actions,.btn{display:none!important}@media print{html,body{background:#fff!important;color:#111!important}.report-card{background:#fff!important;color:#111!important;border-color:#d0d5dd!important;box-shadow:none!important}.report-entry{border-color:#d0d5dd!important}.report-entry-head{background:#f7f9fc!important;color:#111!important}.report-narrative,.report-narrative h4,.muted{color:#475467!important}.report-narrative p,.report-entry strong,.section-title h2,.section-title h3{color:#111!important}.card{background:#fff!important;color:#111!important;border-color:#d0d5dd!important}.bar{background:#e9edf3!important}a{color:#175cd3!important}@page{margin:12mm}}</style></head><body>${html}</body></html>`);
+    win.document.write(standaloneReportDocument(report,scope));
     win.document.close();
+    if(!autoPrint)return;
     const doPrint=()=>{try{win.focus();win.print()}catch(e){}};
-    if(win.document.readyState==='complete')setTimeout(doPrint,200);else win.addEventListener('load',()=>setTimeout(doPrint,200),{once:true})
+    if(win.document.readyState==='complete')setTimeout(doPrint,250);else win.addEventListener('load',()=>setTimeout(doPrint,250),{once:true})
   }
 
   /* Always build Preview with all Department entries/snapshots underneath; modal scope controls presentation. */
