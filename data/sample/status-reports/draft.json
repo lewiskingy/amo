@@ -1,0 +1,21 @@
+{
+  "id": "DRAFT",
+  "status": "Draft",
+  "reportingDate": "2026-08-20",
+  "entries": [
+    {
+      "demandId": "DEM-2026-0042",
+      "rag": "Amber",
+      "statusUpdate": "Target architecture is progressing through design review with the main identity boundaries agreed.",
+      "achievements": "Authentication pattern drafted and initial security review completed.",
+      "issues": "Migration sequencing still depends on confirmation from the Digital Platform team."
+    },
+    {
+      "demandId": "DEM-2026-0043",
+      "rag": "Green",
+      "statusUpdate": "Payments upgrade design has moved into wider socialisation.",
+      "achievements": "HLD Lite completed for review.",
+      "issues": ""
+    }
+  ]
+}
