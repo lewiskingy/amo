@@ -16,6 +16,20 @@ Demand can link to two external process records: **Demand Source** for the Share
 
 The browser attempts to populate a blank Demand Source display title when the URL loses focus. It checks Open Graph title, Twitter title, the first page heading and the HTML title. This only works when the remote site permits browser cross-origin reads. Authenticated SharePoint commonly blocks this with CORS, so the display title remains manually editable.
 
+### Service workflows
+
+Demand Status is constrained by the selected Architecture Service. New Demand starts as **Triage / Triage** and can then be classified into Consultancy, Assurance, Design or Strategy.
+
+The default workflows are:
+
+- **Triage:** Triage, Prioritisation, Accepted, Rejected, Closed.
+- **Consultancy:** Assessment, Prioritisation, Mobilisation, In Progress, Review, Complete, On Hold, Cancelled.
+- **Assurance:** Assessment, Prioritisation, Mobilisation, Assurance Review, Findings / Remediation, Governance / Approval, Complete, On Hold, Cancelled.
+- **Design:** Assessment, Prioritisation, Mobilisation, Discovery, Analysis / Design, Socialisation / Review, Approval, Governance, Complete, On Hold, Cancelled.
+- **Strategy:** Assessment, Prioritisation, Mobilisation, Discovery, Analysis, Strategy Development, Socialisation / Review, Approval, Governance, Complete, On Hold, Cancelled.
+
+These are ordered permitted states, not a rigid transition engine. Users may move between any status configured for the selected Service. Changing Service resets an incompatible Status to the first configured stage for the new Service.
+
 ## Allocations and Resource Plan
 
 Allocations are Demand + Team Member records with percentage allocations across configured Planning Months. The **Work** column links to the Demand's Azure DevOps Work Item. Resource Plan is a read-only dashboard over allocations and its allocation detail also links to Work Items.
@@ -36,7 +50,9 @@ Ideas is an improvement backlog stored under `ideas/` using the normal Create, V
 
 ## Configuration
 
-Config maintains controlled reference data including Business Areas, Initiatives, Services, Demand Statuses, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area.
+Config maintains controlled reference data including Business Areas, Initiatives, Services, Service Workflows, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area.
+
+Service Workflows are maintained alongside Service Offerings. The flat `statuses` value in `settings.json` is derived automatically as the union of configured workflow states for compatibility with existing filters and older workspace data.
 
 ## Backups and Autosave
 
