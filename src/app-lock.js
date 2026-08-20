@@ -3,7 +3,8 @@ const WORKSPACE_LOCK_FILE='.lock.json';
 const LOCK_HEARTBEAT_MS=60000;
 const LOCK_STALE_MS=15*60*1000;
 const AMO_USER_KEY='amo.workspaceUser';
-const AMO_APPEARANCE_KEY='amo.appearance';
+const AMO_THEME_KEY='amo.theme';
+const LEGACY_AMO_APPEARANCE_KEY='amo.appearance';
 let workspaceLock=null,lockHeartbeatTimer=null,lockReplay=false;
 const lockSessionId=(crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
@@ -34,9 +35,14 @@ function isEditEndControl(target){const b=target.closest('button');if(!b)return 
 async function guardedReplay(button,oneShot=false){if(!await acquireWorkspaceLock())return;lockReplay=true;button.click();lockReplay=false;if(oneShot)setTimeout(()=>flushThenReleaseLock('Write transaction completed').catch(err=>log(`ERROR finalising edit lock: ${err.message}`)),0)}
 document.addEventListener('click',async e=>{if(lockReplay)return;const b=e.target.closest('button');if(!b)return;if(isEditStartControl(e.target)&&workspaceHandle&&!lockOwnedByUs()){e.preventDefault();e.stopImmediatePropagation();try{await guardedReplay(b,isOneShotWriteControl(e.target))}catch(err){lockReplay=false;alert(`Could not acquire edit lock: ${err.message}`);log(`ERROR acquiring lock: ${err.message}`)}return}if(isOneShotWriteControl(e.target)&&lockOwnedByUs()){setTimeout(()=>flushThenReleaseLock('Write transaction completed').catch(err=>log(`ERROR finalising edit lock: ${err.message}`)),0);return}if(isEditEndControl(e.target)&&lockOwnedByUs())setTimeout(()=>flushThenReleaseLock('Edit transaction completed').catch(err=>log(`ERROR finalising edit lock: ${err.message}`)),0)},true);
 document.addEventListener('dblclick',async e=>{if(lockReplay||!workspaceHandle||lockOwnedByUs())return;const tr=e.target.closest('#allocationTable tbody tr[data-aid]');if(!tr)return;const aid=tr.dataset.aid||'';if(!/^(owner:|placeholder:|draft:)/.test(aid))return;e.preventDefault();e.stopImmediatePropagation();try{if(await acquireWorkspaceLock()){lockReplay=true;tr.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true,view:window}));lockReplay=false}}catch(err){lockReplay=false;alert(`Could not acquire edit lock: ${err.message}`)}},true);
-/* The quick appearance toggle is deliberately browser-local in multi-user mode. */
-document.addEventListener('click',e=>{const b=e.target.closest('#themeToggle');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const next=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=next;try{localStorage.setItem(AMO_APPEARANCE_KEY,next)}catch(_){}b.textContent=next==='dark'?'☀':'☾';b.title=next==='dark'?'Switch to light mode':'Switch to dark mode';b.setAttribute('aria-label',b.title)},true);
-try{const savedAppearance=localStorage.getItem(AMO_APPEARANCE_KEY);if(savedAppearance==='dark'||savedAppearance==='light')document.documentElement.dataset.theme=savedAppearance}catch(_){}
+
+/* Theme is a browser/device preference, not shared workspace configuration. */
+function systemPreferredTheme(){try{return window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}catch(_){return'light'}}
+function storedThemePreference(){try{const current=localStorage.getItem(AMO_THEME_KEY);if(current==='dark'||current==='light')return current;const legacy=localStorage.getItem(LEGACY_AMO_APPEARANCE_KEY);if(legacy==='dark'||legacy==='light'){localStorage.setItem(AMO_THEME_KEY,legacy);localStorage.removeItem(LEGACY_AMO_APPEARANCE_KEY);return legacy}}catch(_){}return null}
+function applyTheme(theme,persist=false){const next=theme==='dark'?'dark':'light';document.documentElement.dataset.theme=next;if(persist){try{localStorage.setItem(AMO_THEME_KEY,next);localStorage.removeItem(LEGACY_AMO_APPEARANCE_KEY)}catch(_){}}const b=document.getElementById('themeToggle');if(b){b.textContent=next==='dark'?'☀':'☾';b.title=next==='dark'?'Switch to light mode':'Switch to dark mode';b.setAttribute('aria-label',b.title)}return next}
+applyTheme(storedThemePreference()||systemPreferredTheme(),false);
+document.addEventListener('click',e=>{const b=e.target.closest('#themeToggle');if(!b)return;e.preventDefault();e.stopImmediatePropagation();applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark',true)},true);
+
 /* Observe lock when a workspace opens; opening is always read-only and never acquires a lock. */
 const lockOpenWorkspace=openWorkspace;openWorkspace=async function(){await lockOpenWorkspace();if(!workspaceHandle)return;workspaceLock=await readWorkspaceLock();if(workspaceLock&&lockIsStale(workspaceLock))log(`Stale workspace lock detected for ${workspaceLock.userDisplayName||workspaceLock.userId||'unknown user'}.`);renderLockStatus()};const lockOpenBtn=document.getElementById('openWorkspaceBtn');if(lockOpenBtn)lockOpenBtn.onclick=()=>openWorkspace();
 const lockUpdateBanner=updateBanner;updateBanner=function(){lockUpdateBanner();renderLockStatus()};setInterval(()=>{if(workspaceHandle&&!lockOwnedByUs())refreshObservedLock().catch(()=>{})},30000);window.addEventListener('pagehide',()=>{stopLockHeartbeat()});const lockStyles=document.createElement('style');lockStyles.textContent='.lock-status{white-space:nowrap}';document.head.appendChild(lockStyles);
