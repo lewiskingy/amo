@@ -1,63 +1,143 @@
-/* Keep Status Report RAG and Demand health consistent. */
-(function initStatusRagSync(){
-  function demandRag(d){return String(d?.health||'').trim()}
-  function explicitReportEntry(demandId,source){return source?.entries?.find(e=>e.demandId===demandId)||null}
-  function effectiveRag(d,e){return String(e?.rag||'').trim()||demandRag(d)}
-  function ragIsOverride(d,e){const explicit=String(e?.rag||'').trim();return !!explicit&&explicit!==demandRag(d)}
+/* Converge Demand and Status Reporting on one Health model. Legacy RAG values remain readable. */
+(function initStatusHealthSync(){
+  const HEALTH_STATES=['On Track','At Risk','Off Track'];
+  const LEGACY_HEALTH={Green:'On Track',Amber:'At Risk',Red:'Off Track','On Track':'On Track','At Risk':'At Risk','Off Track':'Off Track'};
+  const HEALTH_HELP={
+    'On Track':'Target is expected to be met with the current plan.',
+    'At Risk':'Target is at risk without action; recovery is expected to remain possible.',
+    'Off Track':'Without action the target will not be met and recovery may be difficult or no longer possible.'
+  };
+  const normalizeHealth=v=>LEGACY_HEALTH[String(v||'').trim()]||String(v||'').trim();
+  const demandHealth=d=>normalizeHealth(d?.health);
+  const explicitReportEntry=(demandId,source)=>source?.entries?.find(e=>e.demandId===demandId)||null;
+  const explicitEntryHealth=e=>normalizeHealth(e?.health||e?.rag);
+  const effectiveHealth=(d,e)=>explicitEntryHealth(e)||demandHealth(d);
+  const healthIsOverride=(d,e)=>{const explicit=explicitEntryHealth(e);return !!explicit&&explicit!==demandHealth(d)};
 
-  /* Rendering and previewing use Demand health unless the report draft explicitly overrides it. */
-  const baseStatusDraftEntryRag=statusDraftEntry;
+  function normalizeHealthModel(){
+    if(!db?.settings)return;
+    let changed=false;
+    if(JSON.stringify(db.settings.healthStates)!==JSON.stringify(HEALTH_STATES)){
+      db.settings.healthStates=[...HEALTH_STATES];
+      if(db.configFiles)db.configFiles['settings.json']={...(db.configFiles['settings.json']||{}),...clone(db.settings)};
+      configDirty=true;changed=true
+    }
+    for(const d of db.demand||[]){
+      const next=normalizeHealth(d.health);
+      if(next&&next!==d.health){d.health=next;markDirty('demand',d.id,`Migrated ${d.id} Health to ${next}.`);changed=true}
+    }
+    const normalizeEntry=e=>{
+      const next=explicitEntryHealth(e);
+      if(next){e.health=next}
+      if(Object.prototype.hasOwnProperty.call(e,'rag'))delete e.rag
+    };
+    for(const e of statusReportDraft?.entries||[])normalizeEntry(e);
+    for(const r of statusReports||[])for(const e of r.entries||[])normalizeEntry(e);
+    if(changed&&typeof requestAutosave==='function')requestAutosave()
+  }
+
+  /* Existing reports/drafts fall back to Demand Health until explicitly overridden. */
+  const baseStatusDraftEntryHealth=statusDraftEntry;
   statusDraftEntry=function(d,source=statusReportDraft){
-    const e=baseStatusDraftEntryRag(d,source);
-    return {...e,rag:effectiveRag(d,e)}
+    const e=baseStatusDraftEntryHealth(d,source);
+    const health=effectiveHealth(d,e);
+    return {...e,health,rag:health}
   };
 
-  function applyRagIndicators(){
+  function healthOptions(selected,includeAll=false){
+    return `${includeAll?'<option value="">All</option>':'<option value="">Unset</option>'}${HEALTH_STATES.map(v=>`<option value="${escHtml(v)}" ${v===selected?'selected':''}>${escHtml(v)}</option>`).join('')}`
+  }
+
+  function applyHealthUi(){
     const source=statusReportState.editing?statusReportState.draftBuffer:statusReportDraft;
+    const sortHead=document.querySelector('#statusReportTable th[data-sr-sort="rag"]');
+    if(sortHead)sortHead.textContent=`Health${statusReportState.sort==='rag'?(statusReportState.direction==='asc'?' ↑':' ↓'):' ↕'}`;
+    const filter=document.querySelector('#statusReportTable [data-sr-filter="rag"]');
+    if(filter){const selected=normalizeHealth(filter.value);filter.innerHTML=healthOptions(selected,true);filter.value=selected}
     document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{
       const d=db.demand.find(x=>x.id===tr.dataset.statusDemand);if(!d)return;
-      const explicit=explicitReportEntry(d.id,source);
-      const rag=effectiveRag(d,explicit);
-      const cell=tr.children?.[4];if(!cell)return;
+      const explicit=explicitReportEntry(d.id,source),health=effectiveHealth(d,explicit),cell=tr.children?.[4];if(!cell)return;
+      cell.title=health?HEALTH_HELP[health]||'Demand Health':'Health has not been set.';
       if(statusReportState.editing){
         const select=cell.querySelector('[data-status-field="rag"]');
-        if(select&&select.value!==rag)select.value=rag;
-        if(select&&!select.dataset.ragSyncBound){select.dataset.ragSyncBound='true';select.addEventListener('change',()=>setTimeout(applyRagIndicators,0))}
-        cell.querySelector('.rag-sync-note')?.remove();
-        if(ragIsOverride(d,explicit)){
-          const note=document.createElement('span');note.className='rag-sync-note';note.textContent=' *';note.title='Will update Demand status';note.setAttribute('aria-label','Will update Demand status');cell.appendChild(note)
+        if(select){
+          const selected=health;
+          select.innerHTML=healthOptions(selected,false);select.value=selected;
+          if(!select.dataset.healthSyncBound){
+            select.dataset.healthSyncBound='true';
+            select.addEventListener('change',()=>setTimeout(applyHealthUi,0))
+          }
+        }
+        cell.querySelector('.health-sync-note')?.remove();
+        if(healthIsOverride(d,explicit)){
+          const note=document.createElement('span');note.className='health-sync-note';note.textContent=' *';
+          note.title='Will update Demand Health when this Status Report is published.';
+          note.setAttribute('aria-label',note.title);cell.appendChild(note)
         }
       }else{
-        cell.innerHTML=`<span class="rag-dot rag-${escHtml(rag||'Unset')}"></span>${escHtml(rag||'Unset')}`
+        cell.innerHTML=`<span class="rag-dot health-${healthTone(health)}"></span>${escHtml(health||'Unset')}`
       }
     })
   }
+  function healthTone(v){return v==='On Track'?'green':v==='At Risk'?'amber':v==='Off Track'?'red':'unset'}
 
-  const baseRenderStatusReportingRag=renderStatusReporting;
-  renderStatusReporting=function(){const r=baseRenderStatusReportingRag();applyRagIndicators();return r};
+  const baseRenderStatusReportingHealth=renderStatusReporting;
+  renderStatusReporting=function(){const r=baseRenderStatusReportingHealth();applyHealthUi();return r};
 
-  /* Persist any explicit report override back to the Demand record when the draft is saved. */
-  const baseSaveStatusDraftRag=saveStatusDraft;
+  /* Saving Draft stores provisional report Health only. Demand is not changed until Publish. */
+  const baseSaveStatusDraftHealth=saveStatusDraft;
   saveStatusDraft=function(){
-    const source=statusReportState.draftBuffer;
-    if(source?.entries){
-      for(const e of source.entries){
-        const d=db.demand.find(x=>x.id===e.demandId);if(!d)continue;
-        const explicit=String(e.rag||'').trim();
-        if(explicit&&explicit!==demandRag(d)){
-          d.health=explicit;
-          d.version=(Number(d.version)||0)+1;
-          d.modifiedAt=new Date().toISOString();
-          markDirty('demand',d.id,`Updated ${d.id} RAG from Status Report.`)
-        }
+    if(statusReportState.draftBuffer?.entries){
+      for(const e of statusReportState.draftBuffer.entries){
+        const next=explicitEntryHealth(e);if(next)e.health=next;delete e.rag
       }
     }
-    return baseSaveStatusDraftRag()
+    return baseSaveStatusDraftHealth()
   };
 
-  /* Published snapshots always contain the effective RAG. */
-  const baseSnapshotStatusEntryRag=snapshotStatusEntry;
-  snapshotStatusEntry=function(d,e){return{...baseSnapshotStatusEntryRag(d,e),rag:effectiveRag(d,e)}};
+  /* New snapshots persist Health, while old report RAG remains readable. */
+  const baseSnapshotStatusEntryHealth=snapshotStatusEntry;
+  snapshotStatusEntry=function(d,e){
+    const snap=baseSnapshotStatusEntryHealth(d,e);delete snap.rag;snap.health=effectiveHealth(d,e);return snap
+  };
 
-  const style=document.createElement('style');style.id='status-rag-sync-styles';style.textContent=`.rag-sync-note{font-weight:800;color:var(--warn);cursor:help;margin-left:2px}html[data-theme="dark"] .rag-sync-note{color:var(--warn)}`;document.head.appendChild(style);
+  /* Core narrative rendering still expects `rag`; adapt only for presentation. */
+  const baseReportNarrativeHealth=reportNarrativeHtml;
+  reportNarrativeHtml=function(report){
+    const copy=clone(report);copy.entries=(copy.entries||[]).map(e=>({...e,rag:normalizeHealth(e.health||e.rag)}));
+    let html=baseReportNarrativeHealth(copy);
+    html=html.replaceAll('RAG not set','Health not set');
+    html=html.replace(/rag-(On Track|At Risk|Off Track)/g,(_,v)=>`health-${healthTone(v)}`);
+    return html
+  };
+
+  /* Publish is the commit point: confirmed report Health updates Demand, then the immutable report snapshots that same Health. */
+  publishStatusReport=function(){
+    const preview=buildPreviewReport();
+    if(!preview.entries.length){alert('Add at least one Status Update, Achievement or Issue before publishing.');return}
+    if(!confirm(`Publish this status report with ${preview.entries.length} updated demand item${preview.entries.length===1?'':'s'}? Published reports are immutable and any Health overrides will update the corresponding Demand items.`))return;
+    const source=statusReportState.editing?statusReportState.draftBuffer:statusReportDraft;
+    for(const e of source?.entries||[]){
+      const d=db.demand.find(x=>x.id===e.demandId);if(!d)continue;
+      const next=explicitEntryHealth(e);if(!next||next===demandHealth(d))continue;
+      d.health=next;d.version=(Number(d.version)||0)+1;d.modifiedAt=new Date().toISOString();
+      markDirty('demand',d.id,`Updated ${d.id} Health to ${next} from published Status Report.`)
+    }
+    const finalPreview=buildPreviewReport();
+    finalPreview.entries=(finalPreview.entries||[]).map(e=>{const d=db.demand.find(x=>x.id===e.demandId);return{...e,health:d?demandHealth(d):normalizeHealth(e.health||e.rag)}});
+    const report={...finalPreview,id:statusReportId(),status:'Published',publishedAt:new Date().toISOString(),publishedBy:'Workspace User'};
+    statusReports.unshift(report);markPublishedDirty(report.id,`Published status report ${report.id}.`);
+    statusReportDraft={id:'DRAFT',status:'Draft',reportingDate:todayIso(),entries:[]};statusReportState.draftDirty=true;statusReportState.editing=false;statusReportState.draftBuffer=null;
+    requestAutosave();renderStatusReporting();renderStatusHistory();openStatusReportModal(report)
+  };
+
+  /* Normalize once now and after any future workspace open/reconnect. */
+  const baseOpenWorkspaceHealth=openWorkspace;
+  openWorkspace=async function(){const r=await baseOpenWorkspaceHealth();normalizeHealthModel();renderStatusReporting();return r};
+  normalizeHealthModel();
+
+  const style=document.createElement('style');style.id='status-health-sync-styles';style.textContent=`
+    .health-sync-note{font-weight:800;color:var(--warn);cursor:help;margin-left:2px}.health-green{background:#1b7f5a}.health-amber{background:#d88a00}.health-red{background:#b42318}.health-unset{background:#98a2b3}
+    html[data-theme="dark"] .health-sync-note{color:var(--warn)}
+  `;document.head.appendChild(style);
 })();
