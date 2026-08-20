@@ -5,6 +5,8 @@
   "priority": "Low",
   "service": "Consultancy",
   "businessArea": "Sales",
+  "initiative": "",
+  "costCentreOrProjectCode": "CC-SALES-2205",
   "health": "Red",
   "source": {"type": "SharePoint", "id": "FD-4050", "url": "https://sharepoint.example/frontdoor/4050"},
   "triage": {"architectureImpact": "Low", "complexity": "Small", "romDays": 5, "summary": "Short consultancy engagement to rationalise integration options.", "dependencies": []},
