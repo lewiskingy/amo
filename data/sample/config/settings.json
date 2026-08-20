@@ -1,7 +1,13 @@
 {
   "schemaVersion": 1,
   "applicationName": "Architecture Operations Hub",
+  "appearance": "light",
   "planningMonths": ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
+  "teams": [
+    {"id": "TEAM-EA", "name": "Enterprise Architecture"},
+    {"id": "TEAM-BA", "name": "Business Architecture"},
+    {"id": "TEAM-DOM", "name": "Domain Architecture"}
+  ],
   "services": ["Triage", "Consultancy", "Assurance", "Design", "Strategy"],
   "serviceWorkflows": {
     "Triage": ["Triage", "Prioritisation", "Accepted", "Rejected", "Closed"],
