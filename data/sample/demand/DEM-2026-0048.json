@@ -5,6 +5,8 @@
   "priority": "Medium",
   "service": "Design",
   "businessArea": "Data & Analytics",
+  "initiative": "Data Transformation Programme",
+  "costCentreOrProjectCode": "PRJ-DATA-26",
   "health": "Green",
   "source": {"type": "SharePoint", "id": "FD-4072", "url": "https://sharepoint.example/frontdoor/4072"},
   "triage": {"architectureImpact": "High", "complexity": "Medium", "romDays": 22, "summary": "New data-product patterns and platform capabilities required.", "dependencies": ["Data Office", "Analytics Platform"]},
