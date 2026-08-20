@@ -5,7 +5,12 @@
   "statuses": ["Ready / Committed", "Mobilising", "Analysis / Design", "Review & Socialise", "Governance", "Complete", "Cancelled"],
   "services": ["Consultancy", "Design", "Assurance", "Strategy"],
   "businessAreas": ["Customer", "Payments", "Sales", "Digital", "Enterprise", "Technology Platforms", "Data & Analytics", "Operations"],
-  "initiatives": ["Customer Modernisation Programme", "Payments Renewal Programme", "Digital Experience Programme", "Data Transformation Programme"],
+  "initiatives": [
+    {"name": "Customer Modernisation Programme", "businessArea": "Customer"},
+    {"name": "Payments Renewal Programme", "businessArea": "Payments"},
+    {"name": "Digital Experience Programme", "businessArea": "Digital"},
+    {"name": "Data Transformation Programme", "businessArea": "Data & Analytics"}
+  ],
   "priorities": ["Critical", "High", "Medium", "Low"],
   "healthStates": ["Green", "Amber", "Red"],
   "defaultFteWarningThreshold": 0.85,
