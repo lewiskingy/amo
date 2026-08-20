@@ -1,6 +1,6 @@
-# Architecture Operations Hub
+# Architecture Management Office
 
-Architecture Operations Hub is a browser-based workspace for managing Architecture demand, team capacity, allocations, roadmap planning, status reporting and improvement ideas.
+Architecture Management Office is a browser-based workspace for managing Architecture demand, team capacity, allocations, roadmap planning, status reporting and improvement ideas.
 
 ## Workspace
 
@@ -8,7 +8,7 @@ Open the root workspace folder using **Open Workspace Folder**. The application 
 
 The expected workspace structure includes `workspace.json`, `demand/`, `team/`, `allocations/`, `ideas/`, `status-reports/`, `config/`, `backups/` and, while somebody is editing, a temporary `.lock.json` file.
 
-The workspace represents an Architecture Department containing configured Teams. The global Scope selector can show the Whole Department or one Team across Demand, People, Allocations, Resource Plan, Roadmap and reporting.
+The workspace represents an Architecture Department containing configured Teams. The global Team View selector can show the Whole Department or one Team across Demand, People, Allocations, Resource Plan, Roadmap and reporting.
 
 ## Multi-user editing and workspace lock
 
@@ -48,7 +48,7 @@ Roadmap shows the planned Demand window as a thin line with circle/diamond endpo
 
 ## Status Reporting
 
-**Status Report** maintains the current reporting draft for unresolved Demand. Report fields include RAG, Status Update, Achievements and Issues / Escalations. Preview displays a narrative report; Publish creates an immutable snapshot under `status-reports/` and starts a fresh draft.
+**Status Report** maintains the current reporting draft for unresolved Demand. Report fields include Health, Status Update, Achievements and Issues / Escalations. Health uses the controlled values **On Track**, **At Risk** and **Off Track**. Draft Health can propose a change; Demand Health is updated only when the report is published, and the immutable published report snapshots the resulting Demand Health.
 
 The Status Report page also displays the same headline portfolio information as Dashboard above the working draft: Active Demand, Unallocated, In Socialisation, In Governance, Capacity Conflicts, Capacity Outlook and Attention Required. Preview captures that management summary, and Publish stores it inside the historical report so later portfolio changes do not alter the published snapshot. Department reports also retain Team ownership so historical reports can be viewed by Department or Team scope.
 
@@ -60,7 +60,7 @@ Ideas is an improvement backlog stored under `ideas/` using the normal Create, V
 
 ## Configuration
 
-Config maintains controlled reference data including Teams, Business Areas, Initiatives, Services, service-specific Demand workflows, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area.
+Config maintains controlled reference data including Teams, Business Areas, Initiatives, Services, service-specific Demand workflows, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area. The application name **Architecture Management Office** is fixed product identity and is not workspace-configurable.
 
 ## Backups and Autosave
 
