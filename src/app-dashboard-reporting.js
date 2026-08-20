@@ -15,35 +15,11 @@ function capacitySnapshotHtml(snapshot){const rows=snapshot.capacityOutlook||[];
 function attentionSnapshotHtml(snapshot){const rows=snapshot.attentionRequired||[];return `<div class="card report-snapshot-panel"><div class="section-title" style="margin-top:0"><h3>Attention required</h3></div>${rows.length?`<ul>${rows.map(x=>`<li><strong>${escHtml(x.demandId)}</strong> — ${escHtml(x.title)}: ${escHtml(x.reason)}</li>`).join('')}</ul>`:'<span class="muted">No immediate allocation issues.</span>'}</div>`}
 function dashboardSnapshotHtml(snapshot){return `<div class="report-dashboard-snapshot">${dashboardCardsHtml(snapshot)}<div class="split" style="margin-top:16px">${capacitySnapshotHtml(snapshot)}${attentionSnapshotHtml(snapshot)}</div></div>`}
 function ensureDashboardReportingStyles(){if(document.getElementById('dashboard-reporting-styles'))return;const s=document.createElement('style');s.id='dashboard-reporting-styles';s.textContent='.report-headline-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.report-snapshot-panel{box-shadow:none}.report-dashboard-snapshot{margin:14px 0 22px}@media(max-width:1100px){.report-headline-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.report-headline-kpis{grid-template-columns:1fr}}';document.head.appendChild(s)}
-
-/* Dashboard uses the same shared metric definition as Status Reporting. */
-const baseRenderDashboardHeadline=renderDashboard;
-renderDashboard=function(){
-  baseRenderDashboardHeadline();
-  const snapshot=dashboardHeadlineSnapshot(),grid=$('kpiGrid');
-  if(grid)grid.innerHTML=dashboardCardsHtml(snapshot).replace(/^<div class="grid kpis report-headline-kpis">|<\/div>$/g,'');
-};
-
-/* Add a live management snapshot above the working Status Report draft. */
+const baseRenderDashboardHeadline=renderDashboard;renderDashboard=function(){baseRenderDashboardHeadline();const snapshot=dashboardHeadlineSnapshot(),grid=$('kpiGrid');if(grid)grid.innerHTML=dashboardCardsHtml(snapshot).replace(/^<div class="grid kpis report-headline-kpis">|<\/div>$/g,'')};
 function ensureStatusDashboardSnapshot(){ensureDashboardReportingStyles();const section=$('status-report'),table=$('statusReportTable');if(!section||!table)return;let host=$('statusDashboardSnapshot');if(!host){host=document.createElement('div');host.id='statusDashboardSnapshot';const currentHeading=[...section.querySelectorAll('.section-title h2')].find(h=>h.textContent.trim()==='Current Draft')?.closest('.section-title');if(currentHeading)section.insertBefore(host,currentHeading);else table.closest('.table-wrap')?.before(host)}host.innerHTML=`<div class="section-title"><h2>Portfolio Snapshot</h2><span class="muted">Current live position; captured when the report is published.</span></div>${dashboardSnapshotHtml(dashboardHeadlineSnapshot())}`}
-const baseRenderStatusReportingHeadline=renderStatusReporting;
-renderStatusReporting=function(){baseRenderStatusReportingHeadline();ensureStatusDashboardSnapshot()};
-
-/* Preview captures the current headline state. Published reports retain it immutably. */
-const baseBuildPreviewReportHeadline=buildPreviewReport;
-buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();return report};
-
-/* Narrative Preview/View includes the captured headline information above Demand updates. */
-const baseReportNarrativeHtmlHeadline=reportNarrativeHtml;
-reportNarrativeHtml=function(report){
-  ensureDashboardReportingStyles();
-  const base=baseReportNarrativeHtmlHeadline(report),snapshot=report.dashboardSnapshot;
-  if(!snapshot)return base;
-  const opening='<div class="report-card">';
-  return base.startsWith(opening)?opening+dashboardSnapshotHtml(snapshot)+base.slice(opening.length):dashboardSnapshotHtml(snapshot)+base;
-};
-
-/* Backward-compatible historical reports without a snapshot remain viewable. */
+const baseRenderStatusReportingHeadline=renderStatusReporting;renderStatusReporting=function(){baseRenderStatusReportingHeadline();ensureStatusDashboardSnapshot()};
+const baseBuildPreviewReportHeadline=buildPreviewReport;buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();return report};
+const baseReportNarrativeHtmlHeadline=reportNarrativeHtml;reportNarrativeHtml=function(report){ensureDashboardReportingStyles();const base=baseReportNarrativeHtmlHeadline(report),snapshot=report.dashboardSnapshot;if(!snapshot)return base;const opening='<div class="report-card">';return base.startsWith(opening)?opening+dashboardSnapshotHtml(snapshot)+base.slice(opening.length):dashboardSnapshotHtml(snapshot)+base};
 ensureDashboardReportingStyles();
 
 /* Application branding and persisted workspace appearance. */
@@ -51,20 +27,17 @@ ensureDashboardReportingStyles();
   const themeCss=document.createElement('link');themeCss.rel='stylesheet';themeCss.href='app-theme.css';document.head.appendChild(themeCss);
   const favicon=document.createElement('link');favicon.rel='icon';favicon.href='favicon.ico';document.head.appendChild(favicon);
   const touchIcon=document.createElement('link');touchIcon.rel='apple-touch-icon';touchIcon.href='assets/amo-icon.png';document.head.appendChild(touchIcon);
-  let temporaryAppearance='light';
-  const normalizedAppearance=v=>v==='dark'?'dark':'light';
-  function currentAppearance(){return workspaceHandle?normalizedAppearance(db.settings?.appearance):temporaryAppearance}
-  function decoratePageTitle(){const host=$('pageTitle');if(!host)return;const text=host.dataset.titleText||host.textContent.trim()||'Dashboard';host.dataset.titleText=text;if(!host.querySelector('.page-title-icon')){host.textContent='';const img=document.createElement('img');img.src='assets/amo-icon.png';img.alt='';img.className='page-title-icon';const span=document.createElement('span');span.className='page-title-text';span.textContent=text;host.append(img,span)}else{host.querySelector('.page-title-text').textContent=text}}
+  let temporaryAppearance='light';const normalizedAppearance=v=>v==='dark'?'dark':'light';function currentAppearance(){return workspaceHandle?normalizedAppearance(db.settings?.appearance):temporaryAppearance}
+  function decoratePageTitle(){const host=$('pageTitle');if(!host)return;const text=host.dataset.titleText||host.textContent.trim()||'Dashboard';host.dataset.titleText=text;if(!host.querySelector('.page-title-icon')){host.textContent='';const img=document.createElement('img');img.src='assets/amo-icon.png';img.alt='';img.className='page-title-icon';const span=document.createElement('span');span.className='page-title-text';span.textContent=text;host.append(img,span)}else host.querySelector('.page-title-text').textContent=text}
   function updateThemeButton(){const btn=$('themeToggle');if(!btn)return;const dark=currentAppearance()==='dark';btn.textContent=dark?'☀':'☾';btn.title=dark?'Switch to light mode':'Switch to dark mode';btn.setAttribute('aria-label',btn.title)}
   function applyAppearance(value){const appearance=normalizedAppearance(value);document.documentElement.dataset.theme=appearance;if(!workspaceHandle)temporaryAppearance=appearance;updateThemeButton()}
   function ensureThemeButton(){let btn=$('themeToggle');if(btn)return btn;btn=document.createElement('button');btn.id='themeToggle';btn.className='theme-toggle';btn.type='button';document.querySelector('.top-actions')?.appendChild(btn);btn.addEventListener('click',()=>{const next=currentAppearance()==='dark'?'light':'dark';if(workspaceHandle){db.settings.appearance=next;db.configFiles['settings.json']=clone(db.settings);configDirty=true;if(configState.editing&&configState.draft)configState.draft.appearance=next;applyAppearance(next);updateBanner();log(`Appearance changed to ${next} mode. Autosave scheduled.`);requestAutosave()}else applyAppearance(next)});updateThemeButton();return btn}
-  const baseSwitchViewTheme=switchView;
-  switchView=function(id){baseSwitchViewTheme(id);const host=$('pageTitle');if(host){host.dataset.titleText=host.textContent.trim();decoratePageTitle()}updateThemeButton()};
-  const baseUpdateBannerTheme=updateBanner;
-  updateBanner=function(){baseUpdateBannerTheme();applyAppearance(workspaceHandle?db.settings?.appearance:temporaryAppearance);decoratePageTitle()};
-  const baseRenderConfigTheme=renderConfig;
-  renderConfig=function(){baseRenderConfigTheme();if(!workspaceHandle)return;if(configState.editing&&configState.draft&&!configState.draft.appearance)configState.draft.appearance=normalizedAppearance(db.settings?.appearance);const grid=$('configContent')?.querySelector('.config-grid');if(!grid)return;grid.querySelector('.appearance-card')?.remove();const value=configState.editing?normalizedAppearance(configState.draft?.appearance):normalizedAppearance(db.settings?.appearance);const card=document.createElement('div');card.className='card config-card appearance-card';card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Appearance</h2><p class="muted config-description">Workspace display theme. The top-right sun/moon button changes this setting immediately.</p></div></div><div class="appearance-options">${configState.editing?`<select class="cell-input" id="configAppearance"><option value="light" ${value==='light'?'selected':''}>Light</option><option value="dark" ${value==='dark'?'selected':''}>Dark</option></select>`:`<span class="pill blue">${value==='dark'?'Dark':'Light'} mode</span>`}<span class="appearance-preview">${value==='dark'?'☾ Dark workspace':'☀ Light workspace'}</span></div>`;grid.appendChild(card);$('configAppearance')?.addEventListener('change',e=>{configState.draft.appearance=normalizedAppearance(e.target.value);applyAppearance(configState.draft.appearance)})};
-  const baseSaveConfigTheme=saveConfigChanges;
-  saveConfigChanges=function(){const wanted=normalizedAppearance(configState.draft?.appearance||db.settings?.appearance);const wasEditing=configState.editing;const result=baseSaveConfigTheme();if(wasEditing&&!configState.editing){db.settings.appearance=wanted;db.configFiles['settings.json']=clone(db.settings);configDirty=true;applyAppearance(wanted);updateBanner();requestAutosave()}return result};
+  const baseSwitchViewTheme=switchView;switchView=function(id){baseSwitchViewTheme(id);const host=$('pageTitle');if(host){host.dataset.titleText=host.textContent.trim();decoratePageTitle()}updateThemeButton()};
+  const baseUpdateBannerTheme=updateBanner;updateBanner=function(){baseUpdateBannerTheme();applyAppearance(workspaceHandle?db.settings?.appearance:temporaryAppearance);decoratePageTitle()};
+  const baseRenderConfigTheme=renderConfig;renderConfig=function(){baseRenderConfigTheme();if(!workspaceHandle)return;if(configState.editing&&configState.draft&&!configState.draft.appearance)configState.draft.appearance=normalizedAppearance(db.settings?.appearance);const grid=$('configContent')?.querySelector('.config-grid');if(!grid)return;grid.querySelector('.appearance-card')?.remove();const value=configState.editing?normalizedAppearance(configState.draft?.appearance):normalizedAppearance(db.settings?.appearance);const card=document.createElement('div');card.className='card config-card appearance-card';card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Appearance</h2><p class="muted config-description">Workspace display theme. The top-right sun/moon button changes this setting immediately.</p></div></div><div class="appearance-options">${configState.editing?`<select class="cell-input" id="configAppearance"><option value="light" ${value==='light'?'selected':''}>Light</option><option value="dark" ${value==='dark'?'selected':''}>Dark</option></select>`:`<span class="pill blue">${value==='dark'?'Dark':'Light'} mode</span>`}<span class="appearance-preview">${value==='dark'?'☾ Dark workspace':'☀ Light workspace'}</span></div>`;grid.appendChild(card);$('configAppearance')?.addEventListener('change',e=>{configState.draft.appearance=normalizedAppearance(e.target.value);applyAppearance(configState.draft.appearance)})};
+  const baseSaveConfigTheme=saveConfigChanges;saveConfigChanges=function(){const wanted=normalizedAppearance(configState.draft?.appearance||db.settings?.appearance);const wasEditing=configState.editing;const result=baseSaveConfigTheme();if(wasEditing&&!configState.editing){db.settings.appearance=wanted;db.configFiles['settings.json']=clone(db.settings);configDirty=true;applyAppearance(wanted);updateBanner();requestAutosave()}return result};
   ensureThemeButton();decoratePageTitle();applyAppearance(currentAppearance());
 })();
+
+/* Load the Department / multi-team scope extension last so it can compose with all existing UI modules. */
+const departmentScript=document.createElement('script');departmentScript.src='app-department.js';document.body.appendChild(departmentScript);
