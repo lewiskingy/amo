@@ -72,4 +72,4 @@ The quick Light/Dark toggle is browser-local in multi-user mode so a display pre
 
 ## README tab
 
-The in-app README tab loads this file from `src/docs/README.md`. Some browsers block local `fetch()` when the application is opened directly with `file://`; serving `src/` over HTTP avoids that restriction.
+The in-app README is bundled as Markdown in a JavaScript resource so it works when AMO is opened directly with `file://`. The source documentation remains in `src/docs/README.md`; the embedded copy is refreshed with application releases. This avoids browser security restrictions that prevent a `file://` page from using `fetch()` to read a sibling Markdown file.
