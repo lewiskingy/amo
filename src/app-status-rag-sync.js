@@ -22,6 +22,7 @@
       if(statusReportState.editing){
         const select=cell.querySelector('[data-status-field="rag"]');
         if(select&&select.value!==rag)select.value=rag;
+        if(select&&!select.dataset.ragSyncBound){select.dataset.ragSyncBound='true';select.addEventListener('change',()=>setTimeout(applyRagIndicators,0))}
         cell.querySelector('.rag-sync-note')?.remove();
         if(ragIsOverride(d,explicit)){
           const note=document.createElement('span');note.className='rag-sync-note';note.textContent=' *';note.title='Will update Demand status';note.setAttribute('aria-label','Will update Demand status');cell.appendChild(note)
