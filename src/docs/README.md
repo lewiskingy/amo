@@ -26,15 +26,15 @@ Demand can link to two external process records:
 - **Demand Source** — normally the SharePoint Front Door list item that originated the demand.
 - **Work Item** — normally the Azure DevOps Epic or Feature used to manage the delivery work.
 
-In Demand View mode these appear as hyperlinks. In Edit mode, URL and optional display title are edited separately.
+In Demand View mode these appear as hyperlinks. In Edit mode, URL and optional display title are edited separately. The Demand title itself links to its Demand Source when a source URL exists.
 
-The browser attempts to populate a blank Demand Source display title from page metadata when the URL field loses focus. This only succeeds where the target website allows the browser to read the page cross-origin. Authenticated SharePoint commonly blocks this with CORS, so the display title remains manually editable.
+The browser attempts to populate a blank Demand Source display title when the URL field loses focus. It looks for `og:title`, `twitter:title`, a page `h1`, and the HTML title. This only succeeds where the target website allows the browser to read the page cross-origin. Authenticated SharePoint commonly blocks this with CORS, so the display title remains manually editable.
 
 ## Allocations and Resource Plan
 
-Allocations are maintained as Demand + Team Member records with percentage allocations across the configured Planning Months.
+Allocations are maintained as Demand + Team Member records with percentage allocations across the configured Planning Months. The **Work** column links the Demand to its Azure DevOps Work Item.
 
-Resource Plan is a read-only reporting dashboard over those allocations. It shows capacity, allocated demand, unmet demand and individual utilisation.
+Resource Plan is a read-only reporting dashboard over those allocations. It shows capacity, allocated demand, unmet demand and individual utilisation. Allocation detail also links to the associated Work Item.
 
 ## Roadmap
 
@@ -43,7 +43,7 @@ Roadmap shows:
 - the planned Demand window as a thin line with a circular start marker and diamond end marker;
 - the resourced period as a thicker line derived from committed resource allocations.
 
-Roadmap Edit mode changes planned Demand dates only. Resource allocation remains managed through Allocations.
+Roadmap Demand titles link to their Azure DevOps Work Item where one is configured. Roadmap Edit mode changes planned Demand dates only. Resource allocation remains managed through Allocations.
 
 ## Status Reporting
 
@@ -76,3 +76,7 @@ Retention keeps:
 Committed changes autosave shortly after **Save Changes**, with a periodic safety flush while outstanding changes remain. **Save Now** remains available as a manual fallback.
 
 The Workspace tab lists the retained backup folders so they can be located for manual recovery.
+
+## README tab
+
+The in-app README tab loads this file from `src/docs/README.md`. If the application is opened directly with a `file://` URL, some browsers may block JavaScript `fetch()` of adjacent local files. Serving the `src/` directory over HTTP avoids that browser restriction.
