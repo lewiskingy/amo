@@ -5,6 +5,8 @@
   "priority": "Medium",
   "service": "Assurance",
   "businessArea": "Technology Platforms",
+  "initiative": "",
+  "costCentreOrProjectCode": "CC-TP-1400",
   "health": "Green",
   "source": {"type": "SharePoint", "id": "FD-4032", "url": "https://sharepoint.example/frontdoor/4032"},
   "triage": {"architectureImpact": "Medium", "complexity": "Medium", "romDays": 12, "summary": "Assurance required against cloud guardrails.", "dependencies": ["Cloud Platform"]},
