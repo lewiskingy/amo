@@ -1,0 +1,9 @@
+{
+  "id": "IDEA-2026-0002",
+  "raisedBy": "Ben Carter",
+  "raisedDate": "2026-08-20",
+  "title": "Show overdue governance actions",
+  "description": "Add a dashboard signal for demand items that have reached governance but have remained there beyond an agreed review period.",
+  "status": "Under Review",
+  "version": 1
+}
