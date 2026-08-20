@@ -5,7 +5,21 @@ const WORKSPACE_STORE='handles';
 const DEFAULT_WORKSPACE_KEY='defaultWorkspace';
 let rememberedWorkspaceHandle=null;
 let workspaceReconnectRunning=false;
+let workspaceLoading=false;
 
+function setWorkspaceLoading(active,label='Loading workspace…'){
+  workspaceLoading=!!active;
+  const state=document.getElementById('workspaceState'),dot=document.getElementById('stateDot'),btn=document.getElementById('openWorkspaceBtn'),summary=document.getElementById('recordSummary');
+  if(active){
+    if(state)state.innerHTML=`<span class="workspace-spinner" aria-hidden="true"></span><span>${escHtml(label)}</span>`;
+    if(dot)dot.className='state-dot loading';
+    if(btn)btn.disabled=true;
+    if(summary)summary.textContent='Reading workspace data…';
+  }else{
+    if(btn)btn.disabled=false;
+    updateBanner();
+  }
+}
 function openWorkspaceHandleDb(){
   return new Promise((resolve,reject)=>{
     if(!('indexedDB' in window)){reject(new Error('IndexedDB is not available in this browser.'));return}
@@ -64,20 +78,25 @@ async function reconnectRememberedWorkspace({requestPermission=true,quiet=false}
         renderRememberedWorkspace();return false
       }
     }
+    setWorkspaceLoading(true,`Loading ${rememberedWorkspaceHandle.name||'workspace'}…`);
     await invokeOpenWorkspaceWithHandle(rememberedWorkspaceHandle);
     if(workspaceHandle){await workspaceHandlePut(workspaceHandle);log(`Reconnected remembered workspace ${workspaceHandle.name}.`);return true}
     return false
   }catch(e){
     if(!quiet){alert(`Could not reconnect remembered workspace: ${e.message}`);log(`ERROR reconnecting workspace: ${e.message}`)}
     return false
-  }finally{workspaceReconnectRunning=false;renderRememberedWorkspace()}
+  }finally{workspaceReconnectRunning=false;setWorkspaceLoading(false);renderRememberedWorkspace()}
 }
 async function chooseDifferentWorkspace(){
+  const original=window.showDirectoryPicker;
   try{
+    if(original){
+      window.showDirectoryPicker=async options=>{const h=await original.call(window,options);setWorkspaceLoading(true,`Loading ${h.name||'workspace'}…`);return h}
+    }
     await memoryOpenWorkspace();
     if(workspaceHandle){await workspaceHandlePut(workspaceHandle);log(`Remembered workspace ${workspaceHandle.name} in this browser.`)}
   }catch(e){if(e.name!=='AbortError'){alert(e.message);log(`ERROR opening workspace: ${e.message}`)}}
-  renderRememberedWorkspace()
+  finally{try{window.showDirectoryPicker=original}catch(e){}setWorkspaceLoading(false);renderRememberedWorkspace()}
 }
 
 /* Current open action prefers the remembered workspace only when no workspace is already connected. */
@@ -90,7 +109,7 @@ const memoryOpenBtn=document.getElementById('openWorkspaceBtn');if(memoryOpenBtn
 
 function renderRememberedWorkspace(){
   const btn=document.getElementById('openWorkspaceBtn');
-  if(btn){
+  if(btn&&!workspaceLoading){
     if(workspaceHandle)btn.textContent='Change Workspace';
     else if(rememberedWorkspaceHandle)btn.textContent=`Reconnect ${rememberedWorkspaceHandle.name||'Workspace'}`;
     else btn.textContent='Open Workspace Folder';
@@ -107,7 +126,7 @@ function renderRememberedWorkspace(){
 }
 
 const memoryUpdateBanner=updateBanner;
-updateBanner=function(){memoryUpdateBanner();renderRememberedWorkspace()};
+updateBanner=function(){if(workspaceLoading)return;memoryUpdateBanner();renderRememberedWorkspace()};
 
 async function initialiseRememberedWorkspace(){
   try{
@@ -120,4 +139,5 @@ async function initialiseRememberedWorkspace(){
     }
   }catch(e){log(`Workspace memory unavailable: ${e.message}`);renderRememberedWorkspace()}
 }
+const loadingStyles=document.createElement('style');loadingStyles.textContent='.workspace-spinner{display:inline-block;width:14px;height:14px;margin-right:7px;vertical-align:-2px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:amo-spin .8s linear infinite}.state-dot.loading{background:var(--accent);box-shadow:0 0 0 3px var(--soft)}@keyframes amo-spin{to{transform:rotate(360deg)}}';document.head.appendChild(loadingStyles);
 initialiseRememberedWorkspace();
