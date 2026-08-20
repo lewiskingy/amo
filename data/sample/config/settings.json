@@ -2,8 +2,15 @@
   "schemaVersion": 1,
   "applicationName": "Architecture Operations Hub",
   "planningMonths": ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
-  "statuses": ["Ready / Committed", "Mobilising", "Analysis / Design", "Review & Socialise", "Governance", "Complete", "Cancelled"],
-  "services": ["Consultancy", "Design", "Assurance", "Strategy"],
+  "services": ["Triage", "Consultancy", "Assurance", "Design", "Strategy"],
+  "serviceWorkflows": {
+    "Triage": ["Triage", "Prioritisation", "Accepted", "Rejected", "Closed"],
+    "Consultancy": ["Assessment", "Prioritisation", "Mobilisation", "In Progress", "Review", "Complete", "On Hold", "Cancelled"],
+    "Assurance": ["Assessment", "Prioritisation", "Mobilisation", "Assurance Review", "Findings / Remediation", "Governance / Approval", "Complete", "On Hold", "Cancelled"],
+    "Design": ["Assessment", "Prioritisation", "Mobilisation", "Discovery", "Analysis / Design", "Socialisation / Review", "Approval", "Governance", "Complete", "On Hold", "Cancelled"],
+    "Strategy": ["Assessment", "Prioritisation", "Mobilisation", "Discovery", "Analysis", "Strategy Development", "Socialisation / Review", "Approval", "Governance", "Complete", "On Hold", "Cancelled"]
+  },
+  "statuses": ["Triage", "Prioritisation", "Accepted", "Rejected", "Closed", "Assessment", "Mobilisation", "In Progress", "Review", "Complete", "On Hold", "Cancelled", "Assurance Review", "Findings / Remediation", "Governance / Approval", "Discovery", "Analysis / Design", "Socialisation / Review", "Approval", "Governance", "Analysis", "Strategy Development"],
   "businessAreas": ["Customer", "Payments", "Sales", "Digital", "Enterprise", "Technology Platforms", "Data & Analytics", "Operations"],
   "initiatives": [
     {"name": "Customer Modernisation Programme", "businessArea": "Customer"},
@@ -13,6 +20,7 @@
   ],
   "priorities": ["Critical", "High", "Medium", "Low"],
   "healthStates": ["Green", "Amber", "Red"],
+  "ideaStatuses": ["New", "Under Review", "Planned", "Implemented", "Closed"],
   "defaultFteWarningThreshold": 0.85,
   "defaultFteOverallocationThreshold": 1.0
 }

@@ -4,10 +4,12 @@
   "workspaceId": "AOH-TEST-POPULATED-001",
   "schemaVersion": 1,
   "created": "2026-08-19T22:21:00+01:00",
-  "description": "Populated sample database for Architecture Operations Hub MVP v2.",
+  "description": "Populated sample database for Architecture Operations Hub MVP.",
   "entities": {
     "demand": {"path": "demand", "filePattern": "DEM-*.json"},
     "team": {"path": "team", "filePattern": "USR-*.json"},
-    "allocations": {"path": "allocations", "filePattern": "ALLOC-*.json"}
+    "allocations": {"path": "allocations", "filePattern": "ALLOC-*.json"},
+    "ideas": {"path": "ideas", "filePattern": "IDEA-*.json"},
+    "statusReports": {"path": "status-reports", "filePattern": "SR-*.json", "draft": "draft.json"}
   }
 }
