@@ -16,23 +16,17 @@ Demand can link to two external process records: **Demand Source** for the Share
 
 The browser attempts to populate a blank Demand Source display title when the URL loses focus. It checks Open Graph title, Twitter title, the first page heading and the HTML title. This only works when the remote site permits browser cross-origin reads. Authenticated SharePoint commonly blocks this with CORS, so the display title remains manually editable.
 
-### Service workflows
+## Service workflows
 
-Demand Status is constrained by the selected Architecture Service. New Demand starts as **Triage / Triage** and can then be classified into Consultancy, Assurance, Design or Strategy.
-
-The default workflows are:
-
-- **Triage:** Triage, Prioritisation, Accepted, Rejected, Closed.
-- **Consultancy:** Assessment, Prioritisation, Mobilisation, In Progress, Review, Complete, On Hold, Cancelled.
-- **Assurance:** Assessment, Prioritisation, Mobilisation, Assurance Review, Findings / Remediation, Governance / Approval, Complete, On Hold, Cancelled.
-- **Design:** Assessment, Prioritisation, Mobilisation, Discovery, Analysis / Design, Socialisation / Review, Approval, Governance, Complete, On Hold, Cancelled.
-- **Strategy:** Assessment, Prioritisation, Mobilisation, Discovery, Analysis, Strategy Development, Socialisation / Review, Approval, Governance, Complete, On Hold, Cancelled.
-
-These are ordered permitted states, not a rigid transition engine. Users may move between any status configured for the selected Service. Changing Service resets an incompatible Status to the first configured stage for the new Service.
+Demand Status is constrained by the selected Architecture Service. New Demand begins under the holding **Triage** service. Config maintains ordered permitted lifecycle statuses for Triage, Consultancy, Assurance, Design and Strategy. These are guidance lists rather than rigid state-transition rules.
 
 ## Allocations and Resource Plan
 
 Allocations are Demand + Team Member records with percentage allocations across configured Planning Months. The **Work** column links to the Demand's Azure DevOps Work Item. Resource Plan is a read-only dashboard over allocations and its allocation detail also links to Work Items.
+
+## Dashboard
+
+The dashboard headline measures are **Active Demand**, **Unallocated**, **In Socialisation**, **In Governance** and **Capacity Conflicts**. In Governance includes Demand whose lifecycle state contains Approval or Governance. In Socialisation includes Socialisation states. Capacity Outlook and Attention Required complete the management summary.
 
 ## Roadmap
 
@@ -42,6 +36,8 @@ Roadmap shows the planned Demand window as a thin line with circle/diamond endpo
 
 **Status Report** maintains the current reporting draft for unresolved Demand. Report fields include RAG, Status Update, Achievements and Issues / Escalations. Preview displays a narrative report; Publish creates an immutable snapshot under `status-reports/` and starts a fresh draft.
 
+The Status Report page also displays the same headline portfolio information as Dashboard above the working draft: Active Demand, Unallocated, In Socialisation, In Governance, Capacity Conflicts, Capacity Outlook and Attention Required. Preview captures that management summary, and Publish stores it inside the historical report so later portfolio changes do not alter the published snapshot.
+
 **Status Report History** lists retained published snapshots.
 
 ## Ideas
@@ -50,15 +46,13 @@ Ideas is an improvement backlog stored under `ideas/` using the normal Create, V
 
 ## Configuration
 
-Config maintains controlled reference data including Business Areas, Initiatives, Services, Service Workflows, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area.
-
-Service Workflows are maintained alongside Service Offerings. The flat `statuses` value in `settings.json` is derived automatically as the union of configured workflow states for compatibility with existing filters and older workspace data.
+Config maintains controlled reference data including Business Areas, Initiatives, Services, service-specific Demand workflows, Priorities, Health States, Idea Statuses and Planning Months. Initiatives have an owning Business Area.
 
 ## Backups and Autosave
 
 Opening a workspace creates a safety snapshot under `backups/<timestamp>/`. Retention keeps every backup today, the first backup per day within the last seven days, and the first retained backup from each older calendar month. The Workspace tab lists retained backup folders for manual recovery.
 
-Committed changes autosave after **Save Changes**, with a periodic safety flush. **Save Now** remains available as a manual fallback.
+Committed changes autosave after **Save Changes**, with a periodic safety flush. **Save Now** remains available as a manual fallback, and the workspace banner displays the last successful autosave time.
 
 ## README tab
 
