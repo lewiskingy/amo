@@ -3,28 +3,12 @@ function renderResource(){
   const peak=YEAR_MONTHS.map(m=>({m,used:allocatedTotal(m)})).sort((a,b)=>b.used-a.used)[0]||{m:YEAR_MONTHS[0],used:0};
   const overMonths=YEAR_MONTHS.filter(m=>allocatedTotal(m)>capacity).length;
   const currentMonth=`${CURRENT_YEAR}-${String(new Date().getMonth()+1).padStart(2,'0')}`,currentUsed=allocatedTotal(currentMonth);
-  $('resourceKpis').innerHTML=[
-    ['Available capacity',`${capacity.toFixed(1)} FTE`,'Active team baseline'],
-    ['Current allocated',`${currentUsed.toFixed(1)} FTE`,`${monthLabel(currentMonth)} allocation`],
-    ['Unmet demand',unmet.length,'Unresolved items with no resource'],
-    ['Over-capacity months',overMonths,`Peak ${monthLabel(peak.m)}: ${peak.used.toFixed(1)} FTE`]
-  ].map(k=>`<div class="card"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-sub">${k[2]}</div></div>`).join('');
+  $('resourceKpis').innerHTML=[['Available capacity',`${capacity.toFixed(1)} FTE`,'Active team baseline'],['Current allocated',`${currentUsed.toFixed(1)} FTE`,`${monthLabel(currentMonth)} allocation`],['Unmet demand',unmet.length,'Unresolved items with no resource'],['Over-capacity months',overMonths,`Peak ${monthLabel(peak.m)}: ${peak.used.toFixed(1)} FTE`]].map(k=>`<div class="card"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-sub">${k[2]}</div></div>`).join('');
   const metric=(label,cls,fn)=>`<tr class="metric-row ${cls}"><td>${label}</td>${YEAR_MONTHS.map(m=>`<td>${fn(m)}</td>`).join('')}</tr>`;
-  $('resourceSummaryTable').innerHTML=`<thead><tr><th>Metric</th>${YEAR_MONTHS.map(m=>`<th>${monthLabel(m)}</th>`).join('')}</tr></thead><tbody>`+
-    metric('Available capacity','metric-capacity',()=>`${capacity.toFixed(1)} FTE`)+
-    metric('Allocated resource','metric-allocated',m=>`${allocatedTotal(m).toFixed(1)} FTE`)+
-    metric('Remaining / over capacity',YEAR_MONTHS.some(m=>allocatedTotal(m)>capacity)?'metric-gap over':'metric-gap',m=>{const gap=capacity-allocatedTotal(m);return `<span class="${gap<0?'over':''}">${gap>=0?'+':''}${gap.toFixed(1)} FTE</span>`})+
-    metric('Utilisation','',m=>{const pct=capacity?Math.round(allocatedTotal(m)/capacity*100):0;return `<span class="pill ${pct>100?'red':pct>=85?'amber':'green'}">${pct}%</span>`})+
-    `</tbody>`;
-  $('unmetDemandPanel').innerHTML=unmet.length?`<ul class="unmet-list">${unmet.map(d=>`<li><strong>${d.id}</strong> — ${d.title}<br><span class="muted">${d.priority||'—'} · ${d.service||'—'} · ${d.status||'—'}</span></li>`).join('')}</ul>`:'<span class="pill green">No unresolved demand without resource allocation</span>';
-  const overPeople=activeTeam.filter(t=>YEAR_MONTHS.some(m=>allocationFor(t.id,m)>(Number(t.fte)||0)));
-  const underNow=activeTeam.filter(t=>allocationFor(t.id,currentMonth)<(Number(t.fte)||0)*.5);
-  $('resourceSignals').innerHTML=[
-    ['Team members',activeTeam.length],
-    ['People over-allocated',overPeople.length],
-    ['People under 50% this month',underNow.length],
-    ['Allocation records',db.allocations.length]
-  ].map(([l,v])=>`<div class="mini-stat"><span>${l}</span><strong>${v}</strong></div>`).join('');
+  $('resourceSummaryTable').innerHTML=`<thead><tr><th>Metric</th>${YEAR_MONTHS.map(m=>`<th>${monthLabel(m)}</th>`).join('')}</tr></thead><tbody>`+metric('Available capacity','metric-capacity',()=>`${capacity.toFixed(1)} FTE`)+metric('Allocated resource','metric-allocated',m=>`${allocatedTotal(m).toFixed(1)} FTE`)+metric('Remaining / over capacity',YEAR_MONTHS.some(m=>allocatedTotal(m)>capacity)?'metric-gap over':'metric-gap',m=>{const gap=capacity-allocatedTotal(m);return `<span class="${gap<0?'over':''}">${gap>=0?'+':''}${gap.toFixed(1)} FTE</span>`})+metric('Utilisation','',m=>{const pct=capacity?Math.round(allocatedTotal(m)/capacity*100):0;return `<span class="pill ${pct>100?'red':pct>=85?'amber':'green'}">${pct}%</span>`})+`</tbody>`;
+  $('unmetDemandPanel').innerHTML=!workspaceHandle?'<span class="muted">Open a workspace folder to load data.</span>':unmet.length?`<ul class="unmet-list">${unmet.map(d=>`<li><strong>${d.id}</strong> — ${d.title}<br><span class="muted">${d.priority||'—'} · ${d.service||'—'} · ${d.status||'—'}</span></li>`).join('')}</ul>`:'<span class="pill green">No unresolved demand without resource allocation</span>';
+  const overPeople=activeTeam.filter(t=>YEAR_MONTHS.some(m=>allocationFor(t.id,m)>(Number(t.fte)||0))),underNow=activeTeam.filter(t=>allocationFor(t.id,currentMonth)<(Number(t.fte)||0)*.5);
+  $('resourceSignals').innerHTML=[['Team members',activeTeam.length],['People over-allocated',overPeople.length],['People under 50% this month',underNow.length],['Allocation records',db.allocations.length]].map(([l,v])=>`<div class="mini-stat"><span>${l}</span><strong>${v}</strong></div>`).join('');
   $('resourceUtilTable').innerHTML=`<thead><tr><th>Team member</th><th>Available FTE</th>${YEAR_MONTHS.map(m=>`<th>${monthLabel(m)}</th>`).join('')}</tr></thead><tbody>${activeTeam.map(t=>`<tr><td><strong>${t.name}</strong><br><span class="muted">${t.role||''}</span></td><td>${(Number(t.fte)||0).toFixed(1)}</td>${YEAR_MONTHS.map(m=>{const used=allocationFor(t.id,m),cap=Number(t.fte)||0,pct=cap?Math.round(used/cap*100):0;return `<td><span class="pill ${pct>100?'red':pct>=85?'amber':'green'}">${pct}%</span><br><span class="muted">${used.toFixed(1)} FTE</span></td>`}).join('')}</tr>`).join('')}</tbody>`;
   const allocRows=[...db.allocations].sort((a,b)=>`${a.demandId}|${person(a.teamMemberId)?.name||a.teamMemberId}`.localeCompare(`${b.demandId}|${person(b.teamMemberId)?.name||b.teamMemberId}`));
   $('resourceAllocationDetail').innerHTML=`<thead><tr><th>Demand</th><th>Person</th>${YEAR_MONTHS.map(m=>`<th>${monthLabel(m)}</th>`).join('')}</tr></thead><tbody>${allocRows.map(a=>{const d=demandById(a.demandId);return `<tr><td><strong>${a.demandId}</strong><br><span class="muted">${d?.title||'Unknown demand'}</span></td><td>${person(a.teamMemberId)?.name||a.teamMemberId}</td>${YEAR_MONTHS.map(m=>`<td>${Math.round((Number(a.forecast?.[m])||0)*100)}%</td>`).join('')}</tr>`}).join('')}</tbody>`;
