@@ -39,13 +39,8 @@ reportNarrativeHtml=function(report){
   ensureDashboardReportingStyles();
   const base=baseReportNarrativeHtmlHeadline(report),snapshot=report.dashboardSnapshot;
   if(!snapshot)return base;
-  const marker='<div class="section-title" style="margin-top:0">';
-  const idx=base.indexOf(marker);
-  if(idx<0)return dashboardSnapshotHtml(snapshot)+base;
-  const close=base.indexOf('</div>',idx);
-  if(close<0)return dashboardSnapshotHtml(snapshot)+base;
-  const insertAt=close+6;
-  return base.slice(0,insertAt)+dashboardSnapshotHtml(snapshot)+base.slice(insertAt);
+  const opening='<div class="report-card">';
+  return base.startsWith(opening)?opening+dashboardSnapshotHtml(snapshot)+base.slice(opening.length):dashboardSnapshotHtml(snapshot)+base;
 };
 
 /* Backward-compatible historical reports without a snapshot remain viewable. */
