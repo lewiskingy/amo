@@ -1,0 +1,83 @@
+/* Compact Roadmap filtering and visual grouping by owning Team then Initiative. */
+(function initRoadmapGrouping(){
+  const filters={search:'',initiative:'',service:'',health:''};
+  let filterTimer=null;
+
+  const normalizeHealth=v=>({Green:'On Track',Amber:'At Risk',Red:'Off Track'}[String(v||'').trim()]||String(v||'').trim());
+  const teamName=d=>typeof teamById==='function'?(teamById(d.teamId)?.name||'Unassigned Team'):(d.teamId||'Unassigned Team');
+  const initiativeName=d=>String(d.initiative||'').trim()||'No Initiative';
+  const matches=d=>{
+    const q=filters.search.trim().toLowerCase();
+    return (!q||`${d.id||''} ${d.title||''} ${typeof ownerName==='function'?ownerName(d):''}`.toLowerCase().includes(q))
+      &&(!filters.initiative||initiativeName(d)===filters.initiative)
+      &&(!filters.service||String(d.service||'')===filters.service)
+      &&(!filters.health||normalizeHealth(d.health)===filters.health);
+  };
+
+  function sourceRows(){
+    const rows=(roadmapState.editing?roadmapState.draft:db.demand).filter(isOpenDemand);
+    return rows.filter(d=>(typeof demandInScope!=='function'||demandInScope(d))&&matches(d));
+  }
+
+  function options(values,current,label){return `<option value="">${label}</option>${values.map(v=>`<option value="${escHtml(v)}" ${v===current?'selected':''}>${escHtml(v)}</option>`).join('')}`}
+
+  function ensureFilterHost(){
+    const section=$('roadmap');if(!section)return null;
+    let host=$('roadmapFilters');
+    if(!host){host=document.createElement('div');host.id='roadmapFilters';host.className='roadmap-filters';const legend=$('roadmapLegend');legend?.before(host)}
+    return host;
+  }
+
+  function renderFilters(){
+    const host=ensureFilterHost();if(!host)return;
+    const scoped=(roadmapState.editing?roadmapState.draft:db.demand).filter(isOpenDemand).filter(d=>typeof demandInScope!=='function'||demandInScope(d));
+    const initiatives=[...new Set(scoped.map(initiativeName))].sort((a,b)=>a.localeCompare(b));
+    const services=[...new Set(scoped.map(d=>d.service).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const health=['On Track','At Risk','Off Track'].filter(v=>scoped.some(d=>normalizeHealth(d.health)===v));
+    host.innerHTML=`<div class="roadmap-filter-fields"><input id="roadmapSearch" value="${escHtml(filters.search)}" placeholder="Filter demand…"><select id="roadmapInitiativeFilter">${options(initiatives,filters.initiative,'All initiatives')}</select><select id="roadmapServiceFilter">${options(services,filters.service,'All services')}</select><select id="roadmapHealthFilter">${options(health,filters.health,'All health')}</select><button class="btn" id="clearRoadmapFilters" ${Object.values(filters).some(Boolean)?'':'disabled'}>Clear Filters</button></div><span class="muted roadmap-filter-count">${sourceRows().length} demand item${sourceRows().length===1?'':'s'} shown</span>`;
+    const search=$('roadmapSearch');if(search)search.oninput=e=>{filters.search=e.target.value;const pos=e.target.selectionStart;clearTimeout(filterTimer);filterTimer=setTimeout(()=>{renderRoadmap();requestAnimationFrame(()=>{const n=$('roadmapSearch');n?.focus({preventScroll:true});n?.setSelectionRange?.(pos,pos)})},280)};
+    $('roadmapInitiativeFilter')?.addEventListener('change',e=>{filters.initiative=e.target.value;renderRoadmap()});
+    $('roadmapServiceFilter')?.addEventListener('change',e=>{filters.service=e.target.value;renderRoadmap()});
+    $('roadmapHealthFilter')?.addEventListener('change',e=>{filters.health=e.target.value;renderRoadmap()});
+    $('clearRoadmapFilters')?.addEventListener('click',()=>{Object.keys(filters).forEach(k=>filters[k]='');renderRoadmap()});
+  }
+
+  function groupRenderedRows(rows){
+    const host=$('roadmapRows');if(!host)return;
+    const rowMap=new Map([...host.querySelectorAll('[data-roadmap-row]')].map(el=>[el.dataset.roadmapRow,el]));
+    host.innerHTML='';
+    let priorTeam=null,priorInitiative=null;
+    for(const d of rows){
+      const team=teamName(d),initiative=initiativeName(d);
+      if(team!==priorTeam){const h=document.createElement('div');h.className='roadmap-group roadmap-team-group';h.innerHTML=`<strong>${escHtml(team)}</strong>`;host.appendChild(h);priorTeam=team;priorInitiative=null}
+      if(initiative!==priorInitiative){const h=document.createElement('div');h.className='roadmap-group roadmap-initiative-group';h.innerHTML=`<span>${escHtml(initiative)}</span>`;host.appendChild(h);priorInitiative=initiative}
+      const row=rowMap.get(d.id);if(row)host.appendChild(row)
+    }
+    if(!rows.length)host.innerHTML='<div class="notice roadmap-empty">No open Demand matches the current Roadmap filters.</div>';
+  }
+
+  const baseRenderRoadmap=renderRoadmap;
+  renderRoadmap=function(){
+    const allDemand=db.demand,allDraft=roadmapState.draft;
+    const filtered=sourceRows().sort((a,b)=>`${teamName(a)}|${initiativeName(a)}|${a.title||a.id}`.localeCompare(`${teamName(b)}|${initiativeName(b)}|${b.title||b.id}`,undefined,{sensitivity:'base'}));
+    if(roadmapState.editing)roadmapState.draft=filtered;else db.demand=filtered;
+    try{baseRenderRoadmap()}finally{db.demand=allDemand;roadmapState.draft=allDraft}
+    renderFilters();groupRenderedRows(filtered);
+  };
+
+  const style=document.createElement('style');style.id='roadmap-group-filter-styles';style.textContent=`
+    .roadmap-filters{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+    .roadmap-filter-fields{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .roadmap-filter-fields input,.roadmap-filter-fields select{border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);padding:5px 7px;font-size:.76rem;font-weight:600;min-height:29px}
+    .roadmap-filter-fields input{width:180px}.roadmap-filter-fields select{max-width:180px}
+    .roadmap-filter-count{white-space:nowrap}
+    .roadmap-group{min-width:1100px;border-bottom:1px solid var(--line)}
+    .roadmap-team-group{padding:10px 12px 6px;background:var(--soft);color:var(--accent2);font-size:.82rem;text-transform:uppercase;letter-spacing:.035em}
+    .roadmap-initiative-group{padding:5px 12px 5px 22px;background:color-mix(in srgb,var(--panel) 92%,var(--soft));color:var(--muted);font-size:.76rem;font-weight:800}
+    .roadmap-empty{margin:8px 0;min-width:0}
+    html[data-theme="dark"] .roadmap-team-group{background:color-mix(in srgb,var(--accent) 16%,var(--panel));color:var(--ink)}
+    html[data-theme="dark"] .roadmap-initiative-group{background:color-mix(in srgb,var(--panel) 90%,white 3%)}
+    @media(max-width:760px){.roadmap-filters{align-items:flex-start}.roadmap-filter-fields{width:100%}.roadmap-filter-fields input,.roadmap-filter-fields select{flex:1 1 145px;max-width:none}}
+  `;document.head.appendChild(style);
+  renderRoadmap();
+})();
