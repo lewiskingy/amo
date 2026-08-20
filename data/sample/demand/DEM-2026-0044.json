@@ -5,6 +5,8 @@
   "priority": "Medium",
   "service": "Consultancy",
   "businessArea": "Enterprise",
+  "initiative": "",
+  "costCentreOrProjectCode": "CC-ENT-3100",
   "health": "Green",
   "source": {"type": "SharePoint", "id": "FD-3988", "url": "https://sharepoint.example/frontdoor/3988"},
   "triage": {"architectureImpact": "Medium", "complexity": "Small", "romDays": 8, "summary": "Architecture guidance required to interpret policy across platforms.", "dependencies": ["Data Office"]},

@@ -5,6 +5,8 @@
   "priority": "Low",
   "service": "Assurance",
   "businessArea": "Operations",
+  "initiative": "",
+  "costCentreOrProjectCode": "CC-OPS-1180",
   "health": "Green",
   "source": {"type": "SharePoint", "id": "FD-3899", "url": "https://sharepoint.example/frontdoor/3899"},
   "triage": {"architectureImpact": "Low", "complexity": "Small", "romDays": 4, "summary": "Low-impact assurance against approved network pattern.", "dependencies": ["Network Platform"]},

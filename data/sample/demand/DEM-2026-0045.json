@@ -5,6 +5,8 @@
   "priority": "Critical",
   "service": "Design",
   "businessArea": "Digital",
+  "initiative": "Digital Experience Programme",
+  "costCentreOrProjectCode": "PRJ-DXP-26",
   "health": "Amber",
   "source": {"type": "SharePoint", "id": "FD-4011", "url": "https://sharepoint.example/frontdoor/4011"},
   "triage": {"architectureImpact": "High", "complexity": "Large", "romDays": 45, "summary": "Major target-platform and migration architecture engagement.", "dependencies": ["Digital Engagement", "Security", "Data"]},

@@ -5,6 +5,8 @@
   "priority": "High",
   "service": "Design",
   "businessArea": "Payments",
+  "initiative": "Payments Renewal Programme",
+  "costCentreOrProjectCode": "PRJ-PAY-26",
   "health": "Green",
   "source": {"type": "SharePoint", "id": "FD-3940", "url": "https://sharepoint.example/frontdoor/3940"},
   "triage": {"architectureImpact": "Medium", "complexity": "Medium", "romDays": 18, "summary": "Upgrade impacts payment routing and integration interfaces.", "dependencies": ["Payments Engineering"]},
