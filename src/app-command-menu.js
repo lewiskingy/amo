@@ -1,25 +1,14 @@
-/* Compact top command menu. Keeps Team View visible while consolidating workspace and create actions. */
+/* Compact top command menu. Team View stays visible; page create/edit actions stay with page content. */
 (function initCommandMenu(){
   const SOURCE_CLASS='command-source-hidden';
-  const activeView=()=>document.querySelector('.view.active')?.id||'dashboard';
 
   function source(selector){return document.querySelector(selector)}
   function sourceUsable(el){return !!el&&!el.disabled}
   function invoke(selector){const el=source(selector);if(el&&!el.disabled)el.click()}
 
-  function contextCommands(){
-    switch(activeView()){
-      case 'demand': return [{label:'New Demand',selector:'#demandToolbar [data-grid-new]'}];
-      case 'allocations': return [{label:'New Allocation',selector:'#newAllocation'}];
-      case 'team': return [{label:'New Person',selector:'#teamToolbar [data-grid-new]'}];
-      case 'ideas': return [{label:'New Idea',selector:'#newIdeaBtn'}];
-      default:return [];
-    }
-  }
-
   function hideCommandSources(){
-    ['#openWorkspaceBtn','#saveWorkspaceBtn','#exportBtn','#newDemandBtn','#themeToggle',
-     '#demandToolbar [data-grid-new]','#allocationToolbar #newAllocation','#teamToolbar [data-grid-new]','#ideaToolbar #newIdeaBtn']
+    /* Only global commands are represented through the burger menu. Page-level New/Edit controls remain visible. */
+    ['#openWorkspaceBtn','#saveWorkspaceBtn','#exportBtn','#newDemandBtn','#themeToggle']
       .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.classList.add(SOURCE_CLASS)));
   }
 
@@ -49,8 +38,6 @@
     html+=menuItem('Save Workspace','#saveWorkspaceBtn',{icon:'✓'});
     html+=menuItem('Export Snapshot','#exportBtn',{icon:'⇩'});
     html+='<div class="command-menu-separator"></div>';
-    const contextual=contextCommands();
-    if(contextual.length){html+=contextual.map(c=>menuItem(c.label,c.selector,{primary:true,icon:'＋'})).join('');html+='<div class="command-menu-separator"></div>'}
     const theme=document.getElementById('themeToggle');
     if(theme){const dark=document.documentElement.dataset.theme==='dark';html+=`<button class="command-menu-item" type="button" data-command-theme><span class="command-menu-icon">${dark?'☀':'☾'}</span><span>${dark?'Light Mode':'Dark Mode'}</span></button>`}
     menu.innerHTML=html;
@@ -67,6 +54,16 @@
     .btn{font-size:.76rem;font-weight:750;padding:6px 9px;border-radius:8px;line-height:1.2}
     .toolbar{gap:6px}.top-actions{gap:7px}
     .${SOURCE_CLASS}{display:none!important}
+
+    /* New-record actions are deliberately page-level commands beside Edit List / related workflow controls. */
+    #demandToolbar [data-grid-new],#allocationToolbar #newAllocation,#teamToolbar [data-grid-new],#ideaToolbar #newIdeaBtn{
+      background:transparent!important;border-color:transparent!important;color:var(--accent)!important;font-weight:850!important;padding-left:5px!important;padding-right:7px!important;box-shadow:none!important
+    }
+    #demandToolbar [data-grid-new]::before,#allocationToolbar #newAllocation::before,#teamToolbar [data-grid-new]::before,#ideaToolbar #newIdeaBtn::before{
+      content:'＋';display:inline-block;margin-right:5px;font-size:.9rem;font-weight:900;line-height:1
+    }
+    #demandToolbar [data-grid-new]:hover:not(:disabled),#allocationToolbar #newAllocation:hover:not(:disabled),#teamToolbar [data-grid-new]:hover:not(:disabled),#ideaToolbar #newIdeaBtn:hover:not(:disabled){background:var(--soft)!important}
+
     .command-menu-shell{position:relative;margin-left:2px}
     .command-menu-toggle{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:9px;padding:7px 10px;font-size:.76rem;font-weight:800;cursor:pointer;line-height:1}
     .command-menu-toggle:hover{background:var(--soft)}
