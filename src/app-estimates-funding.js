@@ -1,0 +1,103 @@
+/* Demand estimating, funding and forecast controls.
+   Demand remains the portfolio entity; Work Package estimate is the commitment baseline. */
+(function initEstimateFunding(){
+  const FUNDING_STATUSES=['Not Assessed','Estimate Only','Funding Requested','Confirmed','Unfunded','Not Required'];
+  const DEFAULT_DAY_RATE=0;
+  const DEFAULT_WORKING_DAYS=20;
+
+  DEFAULT_SETTINGS.architectureDayRate=DEFAULT_SETTINGS.architectureDayRate??DEFAULT_DAY_RATE;
+  DEFAULT_SETTINGS.workingDaysPerMonth=DEFAULT_SETTINGS.workingDaysPerMonth??DEFAULT_WORKING_DAYS;
+
+  function dayRate(){const n=Number(db.settings?.architectureDayRate);return Number.isFinite(n)&&n>=0?n:DEFAULT_DAY_RATE}
+  function workingDaysPerMonth(){const n=Number(db.settings?.workingDaysPerMonth);return Number.isFinite(n)&&n>0?n:DEFAULT_WORKING_DAYS}
+  function numberOrNull(v){if(v===null||v===undefined||v==='')return null;const n=Number(v);return Number.isFinite(n)?n:null}
+  function money(v){const n=Number(v)||0;return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(n)}
+  function days(v){const n=Number(v);return Number.isFinite(n)?`${Number.isInteger(n)?n:n.toFixed(1)}d`:'—'}
+  function estimateValues(d){
+    const triage=numberOrNull(d?.triage?.romDays),committed=numberOrNull(d?.workPackage?.estimateDays),storedCurrent=numberOrNull(d?.workPackage?.currentEstimateDays),current=storedCurrent??committed??triage;
+    return{triage,committed,current,storedCurrent}
+  }
+  function estimateStatus(d){const e=estimateValues(d);if(e.triage==null&&e.committed==null)return'Not Estimated';if(e.committed==null)return'Triage';if(e.current!=null&&Math.abs(e.current-e.committed)>0.001)return'Refined';return'Committed'}
+  function fundingStatus(d){return FUNDING_STATUSES.includes(d?.funding?.status)?d.funding.status:'Not Assessed'}
+  function demandForecast(d){
+    const wd=workingDaysPerMonth(),rate=dayRate(),allocations=(db.allocations||[]).filter(a=>a.demandId===d.id&&a.teamMemberId);
+    let forecastDays=0;
+    for(const a of allocations){const p=person(a.teamMemberId),fte=Math.max(0,Number(p?.fte)||0);for(const m of planningMonths())forecastDays+=(Math.max(0,Number(a.forecast?.[m])||0))*fte*wd}
+    return{days:forecastDays,value:forecastDays*rate}
+  }
+  function fundingValues(d){const approvedDays=numberOrNull(d?.funding?.approvedDays),approvedBudget=numberOrNull(d?.funding?.approvedBudget);return{approvedDays,approvedBudget}}
+  function planningSignals(d){
+    const out=[],phase=d.phase||(window.amoPhaseForStatus?amoPhaseForStatus(d.service,d.status):''),e=estimateValues(d),f=demandForecast(d),fund=fundingValues(d),fs=fundingStatus(d);
+    if(phase!=='Triage'&&phase!=='Exit'&&e.triage==null)out.push('Triage estimate missing');
+    if((phase==='Engaged'||phase==='Governance')&&e.committed==null)out.push('Committed estimate missing');
+    if(phase!=='Triage'&&phase!=='Exit'&&!['Confirmed','Not Required'].includes(fs))out.push(`Funding ${fs.toLowerCase()}`);
+    if(e.current!=null&&f.days>e.current+0.5)out.push(`Forecast ${days(f.days-e.current)} above current estimate`);
+    if(fund.approvedDays!=null&&f.days>fund.approvedDays+0.5)out.push(`Forecast ${days(f.days-fund.approvedDays)} above funded days`);
+    if(fund.approvedBudget!=null&&f.value>fund.approvedBudget+1)out.push(`Forecast ${money(f.value-fund.approvedBudget)} above approved funding`);
+    return out
+  }
+  function estimateSummary(d){const e=estimateValues(d);return `${estimateStatus(d)}${e.current!=null?` · ${days(e.current)}`:''}`}
+  function fundingSummary(d){const f=fundingValues(d),status=fundingStatus(d);return `${status}${f.approvedBudget!=null?` · ${money(f.approvedBudget)}`:''}`}
+  function auditUser(){try{return typeof localWorkspaceUser==='function'?(localWorkspaceUser()?.displayName||localWorkspaceUser()?.id||'Unknown user'):'Unknown user'}catch(_){return'Unknown user'}}
+  function auditEntry(stage,previousDays,newDays,reason){const rate=dayRate();return{stage,previousDays:previousDays??null,days:newDays??null,dayRate:rate,value:newDays==null?null:newDays*rate,changedAt:new Date().toISOString(),changedBy:auditUser(),reason:String(reason||'').trim()}}
+  function appendEstimateHistory(next,old,reason){
+    next.estimateHistory=Array.isArray(old?.estimateHistory)?clone(old.estimateHistory):Array.isArray(next.estimateHistory)?clone(next.estimateHistory):[];
+    const pairs=[['Triage',numberOrNull(old?.triage?.romDays),numberOrNull(next?.triage?.romDays)],['Committed',numberOrNull(old?.workPackage?.estimateDays),numberOrNull(next?.workPackage?.estimateDays)],['Refined',numberOrNull(old?.workPackage?.currentEstimateDays),numberOrNull(next?.workPackage?.currentEstimateDays)]];
+    for(const [stage,before,after] of pairs)if(before!==after){let why=reason;if(!why){if(before==null&&stage==='Triage')why='Initial Triage estimate';else if(before==null&&stage==='Committed')why='Work Package estimate committed';else if(before==null&&stage==='Refined')why='Current estimate established';else why='Estimate revised'}next.estimateHistory.push(auditEntry(stage,before,after,why))}
+  }
+  function ensureDemandPlanning(d){
+    d.triage=d.triage||{};d.workPackage=d.workPackage||{};d.funding=d.funding||{};d.estimateHistory=Array.isArray(d.estimateHistory)?d.estimateHistory:[];
+    if(!FUNDING_STATUSES.includes(d.funding.status))d.funding.status='Not Assessed';
+    if(d.workPackage.currentEstimateDays==null&&d.workPackage.estimateDays!=null)d.workPackage.currentEstimateDays=d.workPackage.estimateDays;
+    return d
+  }
+  window.amoDemandForecast=demandForecast;window.amoEstimateStatus=estimateStatus;window.amoPlanningSignals=planningSignals;
+
+  /* New Demand records start with explicit planning/funding structures. */
+  const baseDefaultDemand=defaultDemandRecord;
+  defaultDemandRecord=function(){const d=baseDefaultDemand();d.workPackage=d.workPackage||{};d.workPackage.estimateDays=null;d.workPackage.currentEstimateDays=null;d.funding={status:'Not Assessed',approvedDays:null,approvedBudget:null,confirmedAt:null,confirmedBy:null,dayRateAtConfirmation:null};d.estimateHistory=[];return d};
+
+  /* Demand Register: retain the compact Triage ROM column and add read-only estimate/funding state. */
+  const romCol=demandTailColumns.find(c=>c.key==='triage.romDays');if(romCol)romCol.label='Triage Est.';
+  if(!demandTailColumns.some(c=>c.key==='_estimateStatus')){const i=Math.max(0,demandTailColumns.findIndex(c=>c.key==='workPackage.targetStart'));demandTailColumns.splice(i,0,{key:'_estimateStatus',label:'Estimate',type:'text',editable:false},{key:'_fundingStatus',label:'Funding',type:'text',editable:false})}
+  const baseIntegratedValue=integratedDemandValue;integratedDemandValue=function(row,col){if(col.key==='_estimateStatus')return estimateSummary(row);if(col.key==='_fundingStatus')return fundingSummary(row);return baseIntegratedValue(row,col)};
+
+  function planningHistoryHtml(r){const history=[...(r.estimateHistory||[])].slice(-8).reverse();if(!history.length)return'<span class="muted">No estimate changes recorded yet.</span>';return `<div class="table-wrap"><table><thead><tr><th>When</th><th>Stage</th><th>Change</th><th>By</th><th>Reason</th></tr></thead><tbody>${history.map(h=>`<tr><td>${escHtml(h.changedAt?new Date(h.changedAt).toLocaleString():'—')}</td><td>${escHtml(h.stage||'')}</td><td>${escHtml(days(h.previousDays))} → <strong>${escHtml(days(h.days))}</strong>${h.value!=null?`<br><span class="muted">${escHtml(money(h.value))} @ ${escHtml(money(h.dayRate||0))}/day</span>`:''}</td><td>${escHtml(h.changedBy||'')}</td><td>${escHtml(h.reason||'')}</td></tr>`).join('')}</tbody></table></div>`}
+  function planningSummaryHtml(r){const e=estimateValues(r),forecast=demandForecast(r),fund=fundingValues(r),rate=dayRate(),signals=planningSignals(r);return `<div class="field full planning-summary"><label>Estimate &amp; Funding Position</label><div class="planning-summary-grid"><div><span>Triage ROM</span><strong>${escHtml(days(e.triage))}</strong><small>${e.triage!=null?escHtml(money(e.triage*rate)):'—'}</small></div><div><span>Committed</span><strong>${escHtml(days(e.committed))}</strong><small>${e.committed!=null?escHtml(money(e.committed*rate)):'—'}</small></div><div><span>Current estimate</span><strong>${escHtml(days(e.current))}</strong><small>${e.current!=null?escHtml(money(e.current*rate)):'—'}</small></div><div><span>Resource forecast</span><strong>${escHtml(days(forecast.days))}</strong><small>${escHtml(money(forecast.value))}</small></div><div><span>Approved funding</span><strong>${escHtml(fund.approvedDays!=null?days(fund.approvedDays):'—')}</strong><small>${fund.approvedBudget!=null?escHtml(money(fund.approvedBudget)):'—'}</small></div></div><div class="planning-state"><span class="pill blue">${escHtml(estimateStatus(r))}</span><span class="pill blue">${escHtml(fundingStatus(r))}</span>${signals.map(s=>`<span class="pill amber">${escHtml(s)}</span>`).join('')}</div></div>`}
+
+  const baseRenderDemandModal=renderDemandModal;
+  renderDemandModal=function(r){ensureDemandPlanning(r);let html=baseRenderDemandModal(r).replace(/>ROM Days</g,'>Triage Estimate (days)<');const phase=r.phase||(window.amoPhaseForStatus?amoPhaseForStatus(r.service,r.status):''),triageLocked=phase!=='Triage'&&numberOrNull(r.triage?.romDays)!=null,committedLocked=!['Triage','Mobilisation'].includes(phase)&&numberOrNull(r.workPackage?.estimateDays)!=null,currentValue=r.workPackage?.currentEstimateDays??r.workPackage?.estimateDays??'';
+    const extra=`${planningSummaryHtml(r)}${modalField('Work Package Committed Estimate (days)','workPackage.estimateDays',r.workPackage?.estimateDays??'','number',null,false,false,committedLocked)}${modalField('Current Estimate (days)','workPackage.currentEstimateDays',currentValue,'number')}${modalField('Funding Status','funding.status',fundingStatus(r),'select',FUNDING_STATUSES)}${modalField('Approved Funding (days)','funding.approvedDays',r.funding?.approvedDays??'','number')}${modalField('Approved Funding (GBP)','funding.approvedBudget',r.funding?.approvedBudget??'','number')}${recordModalState.mode==='edit'?modalField('Reason for estimate change','_estimateChangeReason','','textarea',null,false,true):''}<div class="field full"><label>Estimate History</label>${planningHistoryHtml(r)}</div>`;
+    html=html.replace('</div>',`${triageLocked?'<div class="field full"><span class="muted">Triage estimate is retained as the original ROM once the Demand leaves Triage.</span></div>':''}${extra}</div>`);return html};
+
+  /* Keep the summary live when planning fields change; confirming funding proposes a budget from the current estimate. */
+  const baseRenderRecordModalFunding=renderRecordModal;
+  renderRecordModal=function(){baseRenderRecordModalFunding();if(recordModalState.type!=='demand'||recordModalState.mode!=='edit')return;const body=$('recordModalBody');if(!body)return;const rerenderFields=['triage.romDays','workPackage.estimateDays','workPackage.currentEstimateDays','funding.approvedDays','funding.approvedBudget'];for(const key of rerenderFields)body.querySelector(`[data-modal-field="${key}"]`)?.addEventListener('change',()=>{recordModalState.draft=readModalDraft();renderRecordModal()});body.querySelector('[data-modal-field="funding.status"]')?.addEventListener('change',e=>{const next=readModalDraft();next.funding=next.funding||{};next.funding.status=e.target.value;if(e.target.value==='Confirmed'){const estimate=numberOrNull(next.workPackage?.currentEstimateDays)??numberOrNull(next.workPackage?.estimateDays)??numberOrNull(next.triage?.romDays);if(next.funding.approvedDays==null&&estimate!=null)next.funding.approvedDays=estimate;if(next.funding.approvedBudget==null&&next.funding.approvedDays!=null)next.funding.approvedBudget=Number(next.funding.approvedDays)*dayRate()}recordModalState.draft=next;renderRecordModal()})};
+
+  const baseReadDraftFunding=readModalDraft;
+  readModalDraft=function(){const d=baseReadDraftFunding();for(const key of ['workPackage.estimateDays','workPackage.currentEstimateDays','funding.approvedDays','funding.approvedBudget']){const v=getPath(d,key);if(v!==undefined)setPath(d,key,v===''?null:numberOrNull(v))}return d};
+
+  /* Stage rules and append-only estimate audit. */
+  const baseSaveDemandFunding=saveDemandModal;
+  saveDemandModal=function(next){ensureDemandPlanning(next);const old=recordModalState.isNew?null:demandById(recordModalState.id),oldPhase=old?.phase||(old&&window.amoPhaseForStatus?amoPhaseForStatus(old.service,old.status):'');const phase=next.phase||(window.amoPhaseForStatus?amoPhaseForStatus(next.service,next.status):'');const triage=numberOrNull(next.triage?.romDays),committed=numberOrNull(next.workPackage?.estimateDays),current=numberOrNull(next.workPackage?.currentEstimateDays),reason=String(next._estimateChangeReason||'').trim();delete next._estimateChangeReason;
+    if(old&&oldPhase==='Triage'&&phase!=='Triage'&&triage==null){alert('A Triage Estimate is required before Demand leaves Triage.');return}
+    if(old&&oldPhase==='Mobilisation'&&(phase==='Engaged'||phase==='Governance')&&committed==null){alert('A Work Package Committed Estimate is required before Demand leaves Mobilisation.');return}
+    if(committed!=null&&current==null)next.workPackage.currentEstimateDays=committed;
+    const changedExisting=old&&[[old.triage?.romDays,next.triage?.romDays],[old.workPackage?.estimateDays,next.workPackage?.estimateDays],[old.workPackage?.currentEstimateDays,next.workPackage?.currentEstimateDays]].some(([a,b])=>numberOrNull(a)!=null&&numberOrNull(a)!==numberOrNull(b));if(changedExisting&&!reason){alert('Please record a Reason for estimate change so the Demand keeps a useful audit trail.');return}
+    appendEstimateHistory(next,old,reason);
+    next.funding=next.funding||{};if(next.funding.status==='Confirmed'){const approvedDays=numberOrNull(next.funding.approvedDays),approvedBudget=numberOrNull(next.funding.approvedBudget);if(approvedDays==null&&approvedBudget==null){alert('Confirmed funding requires Approved Funding days or an Approved Funding amount.');return}if(old?.funding?.status!=='Confirmed'){next.funding.confirmedAt=new Date().toISOString();next.funding.confirmedBy=auditUser();next.funding.dayRateAtConfirmation=dayRate()}}
+    return baseSaveDemandFunding(next)};
+
+  /* Config assumptions are scalar workspace settings, deliberately kept simple. */
+  function ensurePlanningConfigDraft(){if(!configState.editing||!configState.draft)return;configState.draft.architectureDayRate=numberOrNull(configState.draft.architectureDayRate)??numberOrNull(db.settings?.architectureDayRate)??DEFAULT_DAY_RATE;configState.draft.workingDaysPerMonth=numberOrNull(configState.draft.workingDaysPerMonth)??numberOrNull(db.settings?.workingDaysPerMonth)??DEFAULT_WORKING_DAYS}
+  const baseRenderConfigFunding=renderConfig;
+  renderConfig=function(){baseRenderConfigFunding();if(!workspaceHandle)return;ensurePlanningConfigDraft();const grid=$('configContent')?.querySelector('.config-grid');if(!grid)return;grid.querySelector('.funding-assumptions-card')?.remove();const rate=configState.editing?configState.draft.architectureDayRate:(numberOrNull(db.settings?.architectureDayRate)??DEFAULT_DAY_RATE),wd=configState.editing?configState.draft.workingDaysPerMonth:(numberOrNull(db.settings?.workingDaysPerMonth)??DEFAULT_WORKING_DAYS);const card=document.createElement('div');card.className='card config-card funding-assumptions-card';card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Planning &amp; Funding Assumptions</h2><p class="muted config-description">Simple planning assumptions used to convert Architecture estimates and allocations into forecast days and indicative value. These are management forecasts, not financial actuals.</p></div></div>${configState.editing?`<div class="record-form"><div class="field"><label>Architecture Day Rate (GBP)</label><input id="configDayRate" type="number" min="0" step="1" value="${escHtml(rate)}"></div><div class="field"><label>Working Days per FTE Month</label><input id="configWorkingDays" type="number" min="1" step="0.5" value="${escHtml(wd)}"></div></div>`:`<div class="mini-stat"><span>Architecture Day Rate</span><strong>${escHtml(money(rate))}</strong></div><div class="mini-stat"><span>Working Days / FTE Month</span><strong>${escHtml(String(wd))}</strong></div>`}`;grid.appendChild(card);$('configDayRate')?.addEventListener('input',e=>configState.draft.architectureDayRate=Number(e.target.value));$('configWorkingDays')?.addEventListener('input',e=>configState.draft.workingDaysPerMonth=Number(e.target.value))};
+  const baseSaveConfigFunding=saveConfigChanges;
+  saveConfigChanges=function(){ensurePlanningConfigDraft();const rate=numberOrNull(configState.draft?.architectureDayRate),wd=numberOrNull(configState.draft?.workingDaysPerMonth);if(rate==null||rate<0){alert('Architecture Day Rate must be zero or greater.');return}if(wd==null||wd<=0){alert('Working Days per FTE Month must be greater than zero.');return}const wasEditing=configState.editing,result=baseSaveConfigFunding();if(wasEditing&&!configState.editing){db.settings.architectureDayRate=rate;db.settings.workingDaysPerMonth=wd;db.configFiles['settings.json']=clone(db.settings);configDirty=true;requestAutosave();refreshAll()}return result};
+
+  /* Include estimate/funding exceptions in Dashboard and published Status Report snapshots. */
+  const baseHeadlineFunding=dashboardHeadlineSnapshot;
+  dashboardHeadlineSnapshot=function(){const snap=baseHeadlineFunding(),active=(typeof scopedDemand==='function'?scopedDemand():db.demand).filter(d=>(d.phase||(window.amoPhaseForStatus?amoPhaseForStatus(d.service,d.status):''))!=='Exit'),existing=new Set((snap.attentionRequired||[]).map(x=>`${x.demandId}|${x.reason}`));snap.attentionRequired=snap.attentionRequired||[];for(const d of active)for(const reason of planningSignals(d)){const key=`${d.id}|${reason}`;if(existing.has(key))continue;existing.add(key);snap.attentionRequired.push({demandId:d.id,title:d.title,reason})}return snap};
+
+  const styles=document.createElement('style');styles.id='estimate-funding-styles';styles.textContent=`.planning-summary{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)}.planning-summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.planning-summary-grid>div{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel)}.planning-summary-grid span,.planning-summary-grid small{display:block;color:var(--muted)}.planning-summary-grid strong{display:block;font-size:1.05rem;margin:3px 0}.planning-state{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.pill.amber{background:var(--warnbg,#fff7df);color:var(--warn,#9a6700)}@media(max-width:950px){.planning-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:620px){.planning-summary-grid{grid-template-columns:1fr}}`;if(!document.getElementById(styles.id))document.head.appendChild(styles);
+})();
