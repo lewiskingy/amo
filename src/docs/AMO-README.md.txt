@@ -4,6 +4,10 @@ Architecture Management Office is a browser-based workspace for managing Archite
 
 This document is both the user guide and the technical overview for the current tactical implementation. Start with **Getting started** if you are using AMO for the first time. The later **Data model and storage** sections explain how the workspace works on disk.
 
+## Architecture operating model
+
+The end-to-end Architecture operating model, including Triage, Prioritisation, Mobilisation, Engaged delivery, Governance and Exit, is documented in the [Process Overview](ArchitectureProcess.html). The same page is available from the top-level **Process Overview** link in AMO navigation.
+
 ## What AMO manages
 
 AMO brings together the operational information needed to manage Architecture work without making every source system duplicate every field.
@@ -37,6 +41,7 @@ The left navigation provides the main working views:
 - **Config** — controlled reference data and planning configuration.
 - **Workspace** — workspace, backup, autosave and edit-lock information.
 - **README** — this guide rendered inside AMO.
+- **Process Overview** — the Architecture operating-model process page, linked at top level below the collapsible navigation groups.
 
 A **Team View** selector at the top of the application changes the organisational scope. **Department View** shows the complete Architecture portfolio. Selecting a Team changes relevant operational views to that Team's portfolio.
 
