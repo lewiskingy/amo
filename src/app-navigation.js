@@ -27,16 +27,18 @@
   function ensureProcessOverviewNav(){
     const nav=document.querySelector('.sidebar nav');
     if(!nav)return null;
-    let link=nav.querySelector('[data-process-overview]');
-    if(!link){
-      link=document.createElement('a');
-      link.className='nav-btn';
-      link.dataset.processOverview='true';
-      link.href='docs/ArchitectureProcess.html';
-      link.innerHTML='<span class="nav-dot"></span>Process Overview';
+    let btn=nav.querySelector('[data-view="process-overview"]');
+    const old=nav.querySelector('[data-process-overview]');
+    if(old&&!btn){old.remove()}
+    if(!btn){
+      btn=document.createElement('button');
+      btn.className='nav-btn';
+      btn.dataset.view='process-overview';
+      btn.innerHTML='<span class="nav-dot"></span>Process Overview';
+      btn.addEventListener('click',()=>switchView('process-overview'));
     }
-    nav.appendChild(link);
-    return link
+    nav.appendChild(btn);
+    return btn
   }
 
   /* Replace the older insertion routine, which assumed Workspace was a direct nav child. */
@@ -69,7 +71,7 @@
       if(firstGroup!==reference)nav.insertBefore(firstGroup,reference)
     }
 
-    /* Process Overview is deliberately a top-level link after all collapsible navigation groups. */
+    /* Process Overview is a normal in-app view after all collapsible navigation groups. */
     ensureProcessOverviewNav();
   }
 
