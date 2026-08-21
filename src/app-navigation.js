@@ -83,5 +83,5 @@
   setTimeout(arrangeNavigation,50);
 })();
 
-/* Load the planning/funding extension after all core AMO modules have initialised. */
-(function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src='app-estimates-funding.js';s.dataset.amoEstimatesFunding='true';document.head.appendChild(s)})();
+/* Load planning/funding controls after all core AMO modules, then apply bulk-edit guards. */
+(function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src='app-estimates-funding.js';s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src='app-estimates-funding-guard.js';g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
