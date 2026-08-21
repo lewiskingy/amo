@@ -24,6 +24,21 @@
     return btn
   }
 
+  function ensureProcessOverviewNav(){
+    const nav=document.querySelector('.sidebar nav');
+    if(!nav)return null;
+    let link=nav.querySelector('[data-process-overview]');
+    if(!link){
+      link=document.createElement('a');
+      link.className='nav-btn';
+      link.dataset.processOverview='true';
+      link.href='docs/ArchitectureProcess.html';
+      link.innerHTML='<span class="nav-dot"></span>Process Overview';
+    }
+    nav.appendChild(link);
+    return link
+  }
+
   /* Replace the older insertion routine, which assumed Workspace was a direct nav child. */
   ensureReadmeTab=function(){return ensureReadmeNav()};
 
@@ -53,6 +68,9 @@
       const reference=(assistant||readmeBtn)?.nextSibling||anchor.nextSibling;
       if(firstGroup!==reference)nav.insertBefore(firstGroup,reference)
     }
+
+    /* Process Overview is deliberately a top-level link after all collapsible navigation groups. */
+    ensureProcessOverviewNav();
   }
 
   setDefaultGroupState();
