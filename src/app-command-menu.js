@@ -1,4 +1,4 @@
-/* Compact top command menu. Team View stays visible; page create/edit actions stay with page content. */
+/* Compact top command menu. Team View and the canonical Open Workspace button stay visible; page actions stay with page content. */
 (function initCommandMenu(){
   const SOURCE_CLASS='command-source-hidden';
 
@@ -7,9 +7,10 @@
   function invoke(selector){const el=source(selector);if(el&&!el.disabled)el.click()}
 
   function hideCommandSources(){
-    /* Only global commands are represented through the burger menu. Page-level New/Edit controls remain visible. */
-    ['#openWorkspaceBtn','#saveWorkspaceBtn','#exportBtn','#newDemandBtn','#themeToggle']
+    /* Open Workspace is deliberately NOT hidden/proxied: it remains the canonical workspace action and user gesture. */
+    ['#saveWorkspaceBtn','#exportBtn','#newDemandBtn','#themeToggle']
       .forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.classList.add(SOURCE_CLASS)));
+    document.getElementById('openWorkspaceBtn')?.classList.remove(SOURCE_CLASS)
   }
 
   function ensureShell(){
@@ -33,9 +34,7 @@
   function renderCommandMenu(){
     hideCommandSources();const shell=ensureShell();if(!shell)return;
     const menu=shell.querySelector('#commandMenu');
-    const workspaceLabel=workspaceHandle?'Change Workspace':'Open Workspace';
-    let html=menuItem(workspaceLabel,'#openWorkspaceBtn',{icon:'▣'});
-    html+=menuItem('Save Workspace','#saveWorkspaceBtn',{icon:'✓'});
+    let html=menuItem('Save Workspace','#saveWorkspaceBtn',{icon:'✓'});
     html+=menuItem('Export Snapshot','#exportBtn',{icon:'⇩'});
     html+='<div class="command-menu-separator"></div>';
     const theme=document.getElementById('themeToggle');
@@ -54,6 +53,7 @@
     .btn{font-size:.76rem;font-weight:750;padding:6px 9px;border-radius:8px;line-height:1.2}
     .toolbar{gap:6px}.top-actions{gap:7px}
     .${SOURCE_CLASS}{display:none!important}
+    #openWorkspaceBtn{display:inline-flex!important;align-items:center;white-space:nowrap}
 
     /* New-record actions are deliberately page-level commands beside Edit List / related workflow controls. */
     #demandToolbar [data-grid-new],#allocationToolbar #newAllocation,#teamToolbar [data-grid-new],#ideaToolbar #newIdeaBtn{
