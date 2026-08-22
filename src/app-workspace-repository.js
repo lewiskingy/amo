@@ -117,7 +117,7 @@
     async listBackups(){
       const out=[];for(const e of await this.listEntries('backups',{optional:true}))if(e.kind==='directory')out.push(e.name);return out
     }
-    async pruneBackups({keep}){for(const name of await this.listBackups())if(!keep.has(name))await this.deletePath(`backups/${name}`,{recursive:true})}
+    async pruneBackups({keep,candidates=null}){const allowed=candidates instanceof Set?candidates:null;for(const name of await this.listBackups())if((!allowed||allowed.has(name))&&!keep.has(name))await this.deletePath(`backups/${name}`,{recursive:true})}
   }
 
   window.WorkspaceRepository=WorkspaceRepository;
