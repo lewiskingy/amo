@@ -1,0 +1,96 @@
+# AMO Workspace Repository
+
+## Purpose
+
+AMO application and domain logic should not depend directly on the browser File System Access API or on a future REST transport. Persistence is accessed through a WorkspaceRepository contract.
+
+The current implementation is LocalWorkspaceRepository. It preserves the existing folder-backed JSON workspace. A future RemoteWorkspaceRepository can implement the same application-facing capabilities over HTTP without changing the portfolio UI or domain logic.
+
+## Layers
+
+```text
+AMO UI / domain logic
+        |
+        v
+amoWorkspace / WorkspaceRepository contract
+        |
+        +-- LocalWorkspaceRepository
+        |       -> Browser File System Access API
+        |       -> JSON workspace
+        |
+        +-- RemoteWorkspaceRepository (future)
+                -> REST API
+                -> server-side workspace service
+                -> filesystem or MongoDB repository
+```
+
+`workspaceHandle` remains as a compatibility value for the current local-only UI and remembered-folder feature. New persistence code should use `amoWorkspace` or the active `workspaceRepository`, not navigate the handle directly.
+
+## Common record capabilities
+
+The repository exposes common operations for normal entities:
+
+- `listRecords(type)`
+- `getRecord(type, id)`
+- `saveRecord(type, record)`
+- `deleteRecord(type, id)`
+- `getSettings()`
+- `saveSettings(settings)`
+
+The current entity types are `demand`, `team`, `allocations` and `ideas`.
+
+Workspace load/save also has a batch-oriented `loadWorkspace()` / `saveChanges()` path. This preserves AMO's dirty-record autosave behaviour and avoids unnecessary writes. A remote implementation may translate this into individual REST calls or a bulk endpoint without exposing that decision to the UI.
+
+## Named business/storage capabilities
+
+Operations that are not ordinary CRUD have explicit repository methods:
+
+- status report catalogue, read and write
+- cooperative lock read/write/delete
+- archive movement
+- safety backup creation, listing and retention pruning
+
+These methods are intentionally capability-based. A remote backend does not need to reproduce local filesystem mechanics; it only needs to provide the same outcome.
+
+For example, `listStatusReports()` is implemented locally by listing JSON filenames. A remote implementation could call `GET /api/status-reports`, and a MongoDB implementation could query an indexed collection.
+
+## Compatibility bridge
+
+`app-workspace-repository-bridge.js` currently redirects older modules such as Status Reporting, locking and backup inventory through the repository contract without changing their public/domain functions. It also exposes the small `amoWorkspace` facade for new application code.
+
+This bridge is transitional. As modules are subsequently refactored, direct compatibility hooks can be removed rather than expanded.
+
+## Local repository
+
+`LocalWorkspaceRepository` owns the File System Access API mechanics for:
+
+- loading `workspace.json`, configuration and active entity records;
+- dirty-record saves and deletes;
+- status-report lazy loading and persistence;
+- `.lock.json` persistence;
+- archive writes/removal of active records;
+- safety backup creation and retention.
+
+The existing JSON layout and backup/archive semantics are intentionally unchanged by this refactor.
+
+## Remote implementation direction
+
+A future `RemoteWorkspaceRepository` should implement the WorkspaceRepository contract and hide REST details from the application. Expected server capabilities can map broadly to:
+
+```text
+workspace metadata / settings
+entity CRUD
+status report catalogue / draft / publish
+locking or concurrency control
+maintenance / archive
+```
+
+The remote API should expose domain capabilities rather than filesystem concepts. The server can initially use the same JSON folder layout and later replace its storage implementation with MongoDB while retaining the HTTP and client repository contracts.
+
+## Refactor rule
+
+When adding new AMO features:
+
+> UI and domain code may ask the repository to perform a persistence capability, but should not know how or where that capability is stored.
+
+Simple data uses CRUD-style methods. Multi-record or business transactions should gain explicit named operations rather than being orchestrated as a sequence of low-level storage calls in the UI.
