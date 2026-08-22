@@ -20,16 +20,18 @@
     retainedBackupInventory=[];const repo=value?.listBackups?value:currentRepo();if(repo){try{for(const name of await repo.listBackups()){const date=parseBackupTimestamp(name);if(date)retainedBackupInventory.push({name,date})}}catch(e){log(`Could not list backups: ${e.message}`)}}retainedBackupInventory.sort((a,b)=>b.date-a.date);renderBackupInventory()
   };
 
-  /* Expose one small application-facing adapter. New code should use this object rather than
-     choosing local/remote implementations itself. A remote connector only needs to set a
-     repository implementing the same contract. */
+  /* Application-facing adapter. New code should use this object rather than choosing a
+     local/remote repository implementation itself. */
   window.amoWorkspace={
     get mode(){return currentRepo()?.mode||null},
     get connected(){return !!currentRepo()},
     get repository(){return currentRepo()},
-    async listRecords(type){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.listJsonRecords(type)},
-    async getSettings(){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.readJson('config/settings.json',{required:true})},
-    async saveSettings(settings){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.writeJson('config/settings.json',settings)},
+    async listRecords(type){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.listRecords(type)},
+    async getRecord(type,id){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.getRecord(type,id)},
+    async saveRecord(type,record){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.saveRecord(type,record)},
+    async deleteRecord(type,id){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.deleteRecord(type,id)},
+    async getSettings(){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.getSettings()},
+    async saveSettings(settings){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.saveSettings(settings)},
     async getStatusReport(id){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.getStatusReport(id)},
     async saveStatusReport(id,report){const repo=currentRepo();if(!repo)throw new Error('No workspace is connected.');return repo.saveStatusReport(id,report)},
     async acquireWriteAccess(){const repo=currentRepo();return !!repo&&repo.ensureWritePermission()},
