@@ -83,6 +83,21 @@
   setTimeout(arrangeNavigation,50);
 })();
 
+/* Hosted AMO can run in browsers or managed environments where a showDirectoryPicker
+   property exists but is not callable. Older core code tests for property presence, so
+   normalise that case to a callable compatibility function which produces a useful error
+   instead of "showDirectoryPicker is not a function". Native support is left untouched. */
+(function normaliseDirectoryPicker(){
+  if(typeof window.showDirectoryPicker==='function')return;
+  const message=()=>window.isSecureContext!==false
+    ?'Local Workspace folder access is not available in this browser or has been disabled by browser policy. Use a current desktop Chromium browser such as Edge or Chrome, or use Remote Workspace when available.'
+    :'Local Workspace folder access requires a secure HTTPS context and a supported desktop Chromium browser.';
+  const unavailable=async()=>{throw new Error(message())};
+  try{window.showDirectoryPicker=unavailable}catch(e){
+    try{Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:unavailable})}catch(_e){}
+  }
+})();
+
 /* Route the remaining legacy persistence hooks through WorkspaceRepository after all core modules are loaded. */
 (function loadWorkspaceRepositoryBridge(){if(document.querySelector('script[data-amo-repository-bridge]'))return;const s=document.createElement('script');s.src='app-workspace-repository-bridge.js';s.dataset.amoRepositoryBridge='true';document.head.appendChild(s)})();
 
