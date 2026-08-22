@@ -41,7 +41,6 @@
     return btn
   }
 
-  /* Replace the older insertion routine, which assumed Workspace was a direct nav child. */
   ensureReadmeTab=function(){return ensureReadmeNav()};
 
   function setDefaultGroupState(){
@@ -60,7 +59,6 @@
     const assistant=nav.querySelector('[data-amo-assistant]');
     const firstGroup=nav.querySelector('details.nav-group');
 
-    /* Primary ordering is README, optional AMO Assistant, then collapsible sections. */
     if(readmeBtn)nav.insertBefore(readmeBtn,anchor.nextSibling);
     if(assistant){
       const afterReadme=readmeBtn?.nextSibling||anchor.nextSibling;
@@ -70,15 +68,12 @@
       const reference=(assistant||readmeBtn)?.nextSibling||anchor.nextSibling;
       if(firstGroup!==reference)nav.insertBefore(firstGroup,reference)
     }
-
-    /* Process Overview is a normal in-app view after all collapsible navigation groups. */
     ensureProcessOverviewNav();
   }
 
   setDefaultGroupState();
   arrangeNavigation();
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setDefaultGroupState();arrangeNavigation()},{once:true});
-  /* Optional links and README presentation are added by later compatibility layers. */
   setTimeout(arrangeNavigation,0);
   setTimeout(arrangeNavigation,50);
 })();
@@ -98,8 +93,16 @@
   }
 })();
 
-/* Route the remaining legacy persistence hooks through WorkspaceRepository after all core modules are loaded. */
 (function loadWorkspaceRepositoryBridge(){if(document.querySelector('script[data-amo-repository-bridge]'))return;const s=document.createElement('script');s.src='app-workspace-repository-bridge.js';s.dataset.amoRepositoryBridge='true';document.head.appendChild(s)})();
 
-/* Load planning/funding controls after all core AMO modules, then apply bulk-edit guards. */
 (function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src='app-estimates-funding.js';s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src='app-estimates-funding-guard.js';g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
+
+/* Remote mode is layered on after the local implementation. The HTTP repository implements
+   the same WorkspaceRepository contract and the UX then exposes Local/Remote connection choices. */
+(function loadRemoteWorkspace(){
+  if(document.querySelector('script[data-amo-remote-repository]'))return;
+  const repo=document.createElement('script');repo.src='app-workspace-remote-repository.js';repo.dataset.amoRemoteRepository='true';repo.onload=()=>{
+    if(document.querySelector('script[data-amo-remote-workspace]'))return;
+    const ux=document.createElement('script');ux.src='app-remote-workspace.js';ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
+  };document.head.appendChild(repo)
+})();
