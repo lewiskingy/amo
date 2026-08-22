@@ -39,7 +39,7 @@ async function openWorkspace(){
     if(!window.LocalWorkspaceRepository)throw new Error('Workspace repository layer has not loaded.');
     const repo=new LocalWorkspaceRepository(h),bundle=await repo.loadWorkspace(),{workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles['settings.json'];
     validateWorkspaceSettings(settings);
-    await backupWorkspaceOnOpen(repo);
+    await backupWorkspaceOnOpen(h);
     workspaceHandle=h;setWorkspaceRepository(repo);
     const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);
     demand.forEach(d=>{d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.costCentreOrProjectCode=d.costCentreOrProjectCode||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||'';d.azureDevOps=d.azureDevOps||{id:null,type:null,url:'',title:''};d.azureDevOps.url=d.azureDevOps.url||'';d.azureDevOps.title=d.azureDevOps.title||''});
