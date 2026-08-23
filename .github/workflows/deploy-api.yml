@@ -1,0 +1,119 @@
+name: Build and deploy AMO API
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-api.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+      - 'infra/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE_NAME: amo-api
+
+jobs:
+  build:
+    name: Build container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f server/Dockerfile -t amo-api:${{ github.sha }} .
+
+  deploy:
+    name: Deploy to Azure Container Apps
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: azure-personal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Container Apps CLI extension
+        run: az extension add --name containerapp --upgrade --yes
+
+      - name: Deploy/update Azure infrastructure
+        id: infra
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT=$(az deployment group create \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --template-file infra/main.bicep \
+            --parameters \
+              namePrefix="${{ vars.AMO_AZURE_NAME_PREFIX }}" \
+              allowedOrigin="${{ vars.AMO_ALLOWED_ORIGIN }}" \
+            --query properties.outputs \
+            -o json)
+
+          echo "acr_name=$(echo "$OUTPUT" | jq -r '.acrName.value')" >> "$GITHUB_OUTPUT"
+          echo "acr_server=$(echo "$OUTPUT" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
+          echo "container_app=$(echo "$OUTPUT" | jq -r '.containerAppName.value')" >> "$GITHUB_OUTPUT"
+          echo "container_app_fqdn=$(echo "$OUTPUT" | jq -r '.containerAppFqdn.value')" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name "${{ steps.infra.outputs.acr_name }}"
+
+      - name: Build and push versioned API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.infra.outputs.acr_server }}/${IMAGE_NAME}:${{ github.sha }}"
+          docker build -f server/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Configure Container App registry identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          az containerapp registry set \
+            --name "${{ steps.infra.outputs.container_app }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --server "${{ steps.infra.outputs.acr_server }}" \
+            --identity system
+
+      - name: Deploy AMO API image
+        run: |
+          az containerapp update \
+            --name "${{ steps.infra.outputs.container_app }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "$IMAGE"
+
+      - name: Smoke test API
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://${{ steps.infra.outputs.container_app_fqdn }}/api/info"
+          echo "Waiting for $URL"
+          for attempt in {1..18}; do
+            if curl --fail --silent --show-error "$URL"; then
+              echo
+              echo "AMO API is responding."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "API did not become healthy in time." >&2
+          exit 1
