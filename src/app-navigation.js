@@ -108,3 +108,5 @@
 })();
 
 (function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src='app-ux-fixes.js';s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
+
+(function loadAllocationInteractions(){if(document.querySelector('script[data-amo-allocation-interactions]'))return;const s=document.createElement('script');s.src='app-allocation-interactions.js';s.dataset.amoAllocationInteractions='true';document.head.appendChild(s)})();
