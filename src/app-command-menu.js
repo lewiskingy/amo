@@ -13,8 +13,19 @@
     document.getElementById('openWorkspaceBtn')?.classList.remove(SOURCE_CLASS)
   }
 
+  function ensureConnectionBadge(){
+    const top=document.querySelector('.top-actions');if(!top)return null;
+    let stack=top.parentElement?.classList.contains('top-actions-stack')?top.parentElement:null;
+    if(!stack){stack=document.createElement('div');stack.className='top-actions-stack';top.parentNode?.insertBefore(stack,top);stack.appendChild(top)}
+    let badge=document.getElementById('workspaceConnectionBadge');
+    if(!badge){badge=document.createElement('div');badge.id='workspaceConnectionBadge';badge.className='workspace-connection-badge';badge.textContent='No workspace open';badge.dataset.mode='none';stack.insertBefore(badge,top)}
+    if(typeof renderWorkspaceConnectionBadge==='function')renderWorkspaceConnectionBadge();
+    return badge
+  }
+
   function ensureShell(){
     const top=document.querySelector('.top-actions');if(!top)return null;
+    ensureConnectionBadge();
     let shell=document.getElementById('commandMenuShell');
     if(!shell){
       shell=document.createElement('div');shell.id='commandMenuShell';shell.className='command-menu-shell';
@@ -32,7 +43,7 @@
   }
 
   function renderCommandMenu(){
-    hideCommandSources();const shell=ensureShell();if(!shell)return;
+    hideCommandSources();ensureConnectionBadge();const shell=ensureShell();if(!shell)return;
     const menu=shell.querySelector('#commandMenu');
     let html=menuItem('Save Workspace','#saveWorkspaceBtn',{icon:'✓'});
     html+=menuItem('Export Snapshot','#exportBtn',{icon:'⇩'});
@@ -52,6 +63,10 @@
   const style=document.createElement('style');style.id='command-menu-styles';style.textContent=`
     .btn{font-size:.76rem;font-weight:750;padding:6px 9px;border-radius:8px;line-height:1.2}
     .toolbar{gap:6px}.top-actions{gap:7px}
+    .top-actions-stack{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0}
+    .workspace-connection-badge{max-width:min(560px,48vw);padding:4px 9px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--muted);font-size:.7rem;font-weight:750;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;box-shadow:0 1px 3px rgba(28,40,73,.04)}
+    .workspace-connection-badge[data-mode="remote"]{color:var(--accent2);border-color:color-mix(in srgb,var(--accent) 28%,var(--line))}
+    .workspace-connection-badge[data-mode="local"]{color:var(--good);border-color:color-mix(in srgb,var(--good) 28%,var(--line))}
     .${SOURCE_CLASS}{display:none!important}
     #openWorkspaceBtn{display:inline-flex!important;align-items:center;white-space:nowrap}
 
@@ -74,8 +89,8 @@
     .command-menu-item:hover:not(:disabled){background:var(--soft)}.command-menu-item:disabled{opacity:.4;cursor:not-allowed}
     .command-menu-item.primary{color:var(--accent);font-weight:850}.command-menu-icon{width:18px;text-align:center;font-size:.9rem}
     .command-menu-separator{height:1px;background:var(--line);margin:5px 4px}
-    html[data-theme="dark"] .command-menu-toggle,html[data-theme="dark"] .command-menu{background:var(--panel);color:var(--ink);border-color:var(--line)}
-    @media(max-width:760px){.command-menu-label{display:none}.command-menu{right:0;min-width:190px}}
+    html[data-theme="dark"] .command-menu-toggle,html[data-theme="dark"] .command-menu,html[data-theme="dark"] .workspace-connection-badge{background:var(--panel);color:var(--ink);border-color:var(--line)}
+    @media(max-width:760px){.topbar{align-items:flex-start}.top-actions-stack{align-items:stretch;width:100%}.top-actions{justify-content:flex-end}.workspace-connection-badge{max-width:100%;width:100%}.command-menu-label{display:none}.command-menu{right:0;min-width:190px}}
   `;document.head.appendChild(style);
   renderCommandMenu();
 })();
