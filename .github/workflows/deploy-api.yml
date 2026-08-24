@@ -53,6 +53,33 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Ensure required Azure resource providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          providers=(Microsoft.App Microsoft.ContainerRegistry Microsoft.Storage)
+
+          for provider in "${providers[@]}"; do
+            state=$(az provider show --namespace "$provider" --query registrationState -o tsv 2>/dev/null || true)
+            echo "$provider initial state: ${state:-unknown}"
+
+            if [ "$state" != "Registered" ]; then
+              echo "Registering $provider..."
+              if ! az provider register --namespace "$provider" --wait; then
+                echo "::error::Unable to register $provider. The GitHub deployment identity may need subscription-level permission for Microsoft.Resources/subscriptions/providers/register/action, or the provider can be registered once by a subscription administrator."
+                exit 1
+              fi
+            fi
+
+            state=$(az provider show --namespace "$provider" --query registrationState -o tsv)
+            if [ "$state" != "Registered" ]; then
+              echo "::error::$provider is not Registered (state: $state)."
+              exit 1
+            fi
+
+            echo "$provider: Registered"
+          done
+
       - name: Ensure Container Apps CLI extension
         run: az extension add --name containerapp --upgrade --yes
 
