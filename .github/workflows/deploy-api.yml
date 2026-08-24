@@ -21,6 +21,8 @@ permissions:
 
 env:
   IMAGE_NAME: amo-api
+  API_HOSTNAME: api.amo.theflat.me.uk
+  CONTAINER_APP_ENVIRONMENT: amo-env
 
 jobs:
   build:
@@ -134,7 +136,28 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "$IMAGE"
 
-      - name: Smoke test API
+      - name: Ensure custom API hostname and managed certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.container_app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+
+          echo "Ensuring custom hostname $API_HOSTNAME on $APP"
+          az containerapp hostname add \
+            --hostname "$API_HOSTNAME" \
+            --resource-group "$RG" \
+            --name "$APP" || true
+
+          echo "Ensuring managed certificate and TLS binding for $API_HOSTNAME"
+          az containerapp hostname bind \
+            --hostname "$API_HOSTNAME" \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --environment "$CONTAINER_APP_ENVIRONMENT" \
+            --validation-method CNAME
+
+      - name: Smoke test generated API hostname
         shell: bash
         run: |
           set -euo pipefail
@@ -143,10 +166,27 @@ jobs:
           for attempt in {1..18}; do
             if curl --fail --silent --show-error "$URL"; then
               echo
-              echo "AMO API is responding."
+              echo "AMO API is responding on generated hostname."
               exit 0
             fi
             sleep 10
           done
           echo "API did not become healthy in time." >&2
+          exit 1
+
+      - name: Smoke test custom API hostname
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="https://${API_HOSTNAME}/api/info"
+          echo "Waiting for $URL"
+          for attempt in {1..24}; do
+            if curl --fail --silent --show-error "$URL"; then
+              echo
+              echo "AMO API custom hostname is responding."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Custom API hostname did not become healthy in time." >&2
           exit 1
