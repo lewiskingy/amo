@@ -118,3 +118,5 @@
   };
   document.head.appendChild(s)
 })();
+
+(function loadLockAllocationGuards(){if(document.querySelector('script[data-amo-lock-allocation-guards]'))return;const s=document.createElement('script');s.src='app-lock-allocation-guards.js';s.dataset.amoLockAllocationGuards='true';document.head.appendChild(s)})();
