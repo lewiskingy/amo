@@ -27,10 +27,18 @@ const defaultWorkspace=()=>{
   };
 };
 
+const defaultPlanningMonths=(count=6)=>{
+  const now=new Date();
+  return Array.from({length:count},(_,offset)=>{
+    const month=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+offset,1));
+    return `${month.getUTCFullYear()}-${String(month.getUTCMonth()+1).padStart(2,'0')}`;
+  });
+};
+
 const defaultSettings=()=>({
   schemaVersion:1,
   appearance:'light',
-  planningMonths:[],
+  planningMonths:defaultPlanningMonths(),
   teams:[],
   services:['Triage','Consultancy','Assurance','Design','Strategy'],
   serviceWorkflows:{
@@ -64,7 +72,13 @@ export class ServerJsonWorkspaceRepository{
     await this.ensureDir(this.root);
     for(const folder of REQUIRED_FOLDERS)await this.ensureDir(this.resolve(folder));
     const created=await this.writeJsonIfAbsent('workspace.json',defaultWorkspace());
-    await this.writeJsonIfAbsent('config/settings.json',defaultSettings());
+    const settingsCreated=await this.writeJsonIfAbsent('config/settings.json',defaultSettings());
+    if(!settingsCreated){
+      const settings=await this.readJson('config/settings.json',{required:true});
+      if(!Array.isArray(settings.planningMonths)||settings.planningMonths.length===0){
+        await this.writeJson('config/settings.json',{...settings,planningMonths:defaultPlanningMonths()});
+      }
+    }
     this.bootstrapped=created;
     return {created};
   }
