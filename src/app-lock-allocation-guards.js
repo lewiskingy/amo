@@ -34,3 +34,5 @@
   document.addEventListener('keydown',e=>{const input=e.target.matches?.('#allocationTable .alloc-resource-input')?e.target:null;if(input&&e.key==='Enter')setTimeout(()=>closeSelectedCombo(input.dataset.aid),0)},true);
   document.addEventListener('click',e=>{const save=e.target.closest?.('#saveAllocations');if(!save||!allocationState?.editing)return;const seen=new Set(),duplicate=(allocationState.draft||[]).filter(a=>!allocationState.deleted.has(a.id)&&a.teamMemberId).find(a=>{const key=`${a.demandId}|${a.teamMemberId}`;if(seen.has(key))return true;seen.add(key);return false});if(!duplicate)return;e.preventDefault();e.stopImmediatePropagation();const resource=person(duplicate.teamMemberId)?.name||duplicate.teamMemberId;alert(`${resource} is already allocated to ${duplicate.demandId}. A Resource can appear only once under each Demand item.`)},true);
 })();
+
+(function loadAllocationFilterToolbar(){if(document.querySelector('script[data-amo-allocation-filter-toolbar]'))return;const s=document.createElement('script');s.src='app-allocation-filter-toolbar.js';s.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(s)})();
