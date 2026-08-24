@@ -106,3 +106,5 @@
     const ux=document.createElement('script');ux.src='app-remote-workspace.js';ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
   };document.head.appendChild(repo)
 })();
+
+(function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src='app-ux-fixes.js';s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
