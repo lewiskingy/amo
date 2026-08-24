@@ -3,7 +3,7 @@ targetScope = 'resourceGroup'
 @description('Azure region for all AMO resources.')
 param location string = resourceGroup().location
 
-@description('Short globally unique suffix, for example lewiskingamo01. Use only lowercase letters and numbers.')
+@description('Short application prefix, for example amo. Lowercase letters/numbers/hyphens are recommended.')
 param namePrefix string
 
 @description('Allowed browser origin for the AMO API CORS policy.')
@@ -12,8 +12,10 @@ param allowedOrigin string = 'https://amo.theflat.me.uk'
 @description('Initial image used only while bootstrapping the Container App. GitHub Actions replaces it with the AMO API image.')
 param bootstrapImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
-var acrName = take(replace('${namePrefix}acr', '-', ''), 50)
-var storageAccountName = take(replace('${namePrefix}data', '-', ''), 24)
+var compactPrefix = toLower(replace(namePrefix, '-', ''))
+var globalSuffix = uniqueString(subscription().subscriptionId, resourceGroup().id)
+var acrName = take('${compactPrefix}acr${globalSuffix}', 50)
+var storageAccountName = take('${compactPrefix}data${globalSuffix}', 24)
 var fileShareName = 'amo-workspace'
 var environmentName = '${namePrefix}-env'
 var containerAppName = '${namePrefix}-api'
@@ -140,9 +142,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       ]
     }
   }
-  dependsOn: [
-    environmentStorage
-  ]
 }
 
 resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
