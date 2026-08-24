@@ -115,6 +115,7 @@
   s.onload=()=>{
     if(!document.querySelector('script[data-amo-allocation-fill-polish]')){const p=document.createElement('script');p.src='app-allocation-fill-polish.js';p.dataset.amoAllocationFillPolish='true';document.head.appendChild(p)}
     if(!document.querySelector('script[data-amo-allocation-drag-wins]')){const d=document.createElement('script');d.src='app-allocation-drag-wins.js';d.dataset.amoAllocationDragWins='true';document.head.appendChild(d)}
+    if(!document.querySelector('script[data-amo-allocation-filter-toolbar]')){const f=document.createElement('script');f.src='app-allocation-filter-toolbar.js';f.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(f)}
   };
   document.head.appendChild(s)
 })();
