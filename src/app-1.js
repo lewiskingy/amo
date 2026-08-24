@@ -10,9 +10,21 @@ const $=id=>document.getElementById(id),clone=x=>structuredClone(x),person=id=>d
 const planningMonths=()=>Array.isArray(db.settings?.planningMonths)?db.settings.planningMonths:[];
 const monthLabel=m=>/^\d{4}-\d{2}$/.test(m||'')?new Date(`${m}-01T00:00:00`).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}):(m||'—');
 const isOpenDemand=d=>!/^(complete|completed|closed|cancelled)$/i.test((d.status||'').trim());
+
+/* Browser/device preference for the last workspace connection. The local File System Access
+   handle itself remains in IndexedDB; localStorage only records which mode should win at startup. */
+const AMO_CONNECTION_PREF_KEY='amo.lastWorkspaceConnection';
+let workspaceConnectionGeneration=0;
+let workspaceConnectionIntent={token:0,mode:null,detail:''};
+function getLastConnectionPreference(){try{const value=JSON.parse(localStorage.getItem(AMO_CONNECTION_PREF_KEY)||'null');return value&&['local','remote'].includes(value.mode)?value:null}catch(_){return null}}
+function setLastConnectionPreference(value){try{if(value?.mode)localStorage.setItem(AMO_CONNECTION_PREF_KEY,JSON.stringify({...value,updatedAt:new Date().toISOString()}))}catch(_){}return value}
+function beginWorkspaceConnection(mode,detail=''){workspaceConnectionGeneration+=1;workspaceConnectionIntent={token:workspaceConnectionGeneration,mode,detail};return workspaceConnectionGeneration}
+function workspaceConnectionIsCurrent(token,mode=null){return token===workspaceConnectionIntent.token&&(!mode||workspaceConnectionIntent.mode===mode)}
+function renderWorkspaceConnectionBadge(){const el=$('workspaceConnectionBadge');if(!el)return;const repo=window.workspaceRepository;if(repo?.mode==='remote'){el.textContent=`Remote: ${repo.baseUrl||repo.name||'API workspace'}`;el.title=repo.baseUrl||'Remote API workspace';el.dataset.mode='remote';return}if(repo?.mode==='local'&&workspaceHandle){el.textContent=`Local: ${workspaceHandle.name||'Workspace'}`;el.title='Local browser folder. Browsers do not expose the full filesystem path to web applications.';el.dataset.mode='local';return}el.textContent='No workspace open';el.title='No workspace is currently connected.';el.dataset.mode='none'}
+
 function log(m){activity.unshift(`${new Date().toLocaleTimeString()}  ${m}`);activity=activity.slice(0,100);$('activityLog').textContent=activity.join('\n')}
 function dirtyCount(){return Object.values(dirtyRecords).reduce((n,s)=>n+s.size,0)+deletedDemand.size+deletedTeam.size+deletedAllocations.size+deletedIdeas.size+(configDirty?1:0)}
-function updateBanner(){const dirty=dirtyCount()>0,loaded=!!workspaceHandle;$('stateDot').className='state-dot'+(loaded?' connected':'')+(dirty?' dirty':'');$('workspaceState').textContent=loaded?`${db.workspace?.name||workspaceHandle.name}${dirty?' — saving changes…':''}`:'No workspace loaded — open a data source folder to begin';$('recordSummary').textContent=loaded?`${db.demand.length} demand · ${db.team.length} team · ${db.allocations.length} allocations · ${db.ideas.length} ideas`:'No data loaded';$('saveWorkspaceBtn').disabled=!loaded;$('exportBtn').disabled=!loaded;$('newDemandBtn').disabled=!loaded;$('datasetPill').textContent=loaded?(window.workspaceRepository?.mode==='remote'?'Remote workspace':'Folder workspace'):'No workspace loaded';$('dirtySummary').textContent=dirty?`${dirtyRecords.demand.size} demand changes, ${dirtyRecords.team.size} team changes, ${dirtyRecords.allocations.size} allocation changes, ${dirtyRecords.ideas.size} idea changes${configDirty?', configuration changed':''}; deletions: ${deletedDemand.size} demand, ${deletedTeam.size} team, ${deletedAllocations.size} allocations, ${deletedIdeas.size} ideas. Autosave pending.`:'No unsaved changes.'}
+function updateBanner(){const dirty=dirtyCount()>0,loaded=!!workspaceHandle;$('stateDot').className='state-dot'+(loaded?' connected':'')+(dirty?' dirty':'');$('workspaceState').textContent=loaded?`${db.workspace?.name||workspaceHandle.name}${dirty?' — saving changes…':''}`:'No workspace loaded — open a data source folder to begin';$('recordSummary').textContent=loaded?`${db.demand.length} demand · ${db.team.length} team · ${db.allocations.length} allocations · ${db.ideas.length} ideas`:'No data loaded';$('saveWorkspaceBtn').disabled=!loaded;$('exportBtn').disabled=!loaded;$('newDemandBtn').disabled=!loaded;$('datasetPill').textContent=loaded?(window.workspaceRepository?.mode==='remote'?'Remote workspace':'Folder workspace'):'No workspace loaded';$('dirtySummary').textContent=dirty?`${dirtyRecords.demand.size} demand changes, ${dirtyRecords.team.size} team changes, ${dirtyRecords.allocations.size} allocation changes, ${dirtyRecords.ideas.size} idea changes${configDirty?', configuration changed':''}; deletions: ${deletedDemand.size} demand, ${deletedTeam.size} team, ${deletedAllocations.size} allocations, ${deletedIdeas.size} ideas. Autosave pending.`:'No unsaved changes.';renderWorkspaceConnectionBadge()}
 function markDirty(type,id,msg){dirtyRecords[type].add(id);updateBanner();if(msg)log(msg);if(typeof requestAutosave==='function')requestAutosave()}
 function clearDirty(){Object.values(dirtyRecords).forEach(s=>s.clear());deletedDemand.clear();deletedTeam.clear();deletedAllocations.clear();deletedIdeas.clear();configDirty=false;updateBanner()}
 
@@ -34,13 +46,17 @@ function validateWorkspaceSettings(settings){
 }
 async function openWorkspace(){
   if(!('showDirectoryPicker'in window)){alert('Folder access is not supported in this browser.');return}
+  const connectionToken=workspaceConnectionIntent.mode==='local'?workspaceConnectionIntent.token:beginWorkspaceConnection('local');
   try{
     const h=await showDirectoryPicker({mode:'readwrite'});
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
     if(!window.LocalWorkspaceRepository)throw new Error('Workspace repository layer has not loaded.');
     const repo=new LocalWorkspaceRepository(h),bundle=await repo.loadWorkspace(),{workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles['settings.json'];
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
     validateWorkspaceSettings(settings);
     await backupWorkspaceOnOpen(h);
-    workspaceHandle=h;setWorkspaceRepository(repo);
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
+    workspaceHandle=h;setWorkspaceRepository(repo);setLastConnectionPreference({mode:'local',name:h.name||'Workspace'});
     const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);
     demand.forEach(d=>{d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.costCentreOrProjectCode=d.costCentreOrProjectCode||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||'';d.azureDevOps=d.azureDevOps||{id:null,type:null,url:'',title:''};d.azureDevOps.url=d.azureDevOps.url||'';d.azureDevOps.title=d.azureDevOps.title||''});
     db={schemaVersion:workspace.schemaVersion||1,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();selectedDemandId=null;resetEdits();refreshAll();log(`Loaded ${demand.length} demand, ${team.length} team, ${allocations.length} allocations and ${ideas.length} ideas through LocalWorkspaceRepository. Safety backup created.`)
