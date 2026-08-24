@@ -14,7 +14,7 @@ function renderAllocations(){
   const months=planningMonths(),groups=allocationGroups(),editing=allocationState.editing,allocationCount=groups.reduce((n,g)=>n+g.allocations.length,0);
   $('allocationToolbar').innerHTML=editing?'<button class="btn success" id="saveAllocations">Save Changes</button><button class="btn" id="cancelAllocations">Cancel</button><button class="btn" id="clearAllocationFilters">Clear Filters</button>':`<button class="btn" id="editAllocations" ${workspaceHandle?'':'disabled'}>Edit List</button><button class="btn" id="clearAllocationFilters">Clear Filters</button>`;
   $('allocationCount').textContent=workspaceHandle?`Showing ${allocationCount} allocation${allocationCount===1?'':'s'} across ${groups.length} demand item${groups.length===1?'':'s'}`:'No workspace loaded';
-  const personOpts='<option value="">Select resource…</option>'+db.team.filter(t=>t.active!==false).map(t=>`<option value="${t.id}">${t.name}</option>`).join(''),colspan=2+months.length+(editing?1:0);
+  const personOpts='<option value="">Select resource…</option>'+db.team.filter(t=>t.active!==false).map(t=>`<option value="${t.id}">${t.name}</option>`).join(''),colspan=1+months.length+(editing?1:0);
   const body=groups.map(({demand:d,allocations})=>{
     const header=`<tr class="allocation-demand-header" data-demand-header="${d.id}"><td colspan="${colspan}"><div class="allocation-demand-heading"><div><span class="allocation-demand-id">${escHtml(d.id)}</span><strong class="allocation-demand-title">${escHtml(d.title)}</strong></div>${editing?`<button class="btn allocation-add" type="button" data-add-allocation="${d.id}">＋ New Allocation</button>`:''}</div></td></tr>`;
     const rows=allocations.map(a=>`<tr class="allocation-row${!a.teamMemberId?' allocation-inactive':''}" data-aid="${a.id}" data-demand="${d.id}">${editing?`<td class="allocation-remove-cell"><button class="allocation-remove" type="button" data-remove-allocation="${a.id}" title="Remove allocation" aria-label="Remove allocation">−</button></td>`:''}<td class="allocation-resource">${editing?`<select class="cell-input alloc-person" data-aid="${a.id}" data-demand="${d.id}">${personOpts.replace(`value="${a.teamMemberId}"`,`value="${a.teamMemberId}" selected`)}</select>`:(a.teamMemberId?(person(a.teamMemberId)?.name||a.teamMemberId):'<span class="muted">Unallocated</span>')}</td>${months.map(m=>`<td>${editing?(a.teamMemberId?`<input class="cell-input compact alloc-pct" type="number" min="0" max="100" step="5" data-aid="${a.id}" data-demand="${d.id}" data-month="${m}" value="${Math.round((Number(a.forecast?.[m])||0)*100)}">`:'<span class="muted allocation-empty">—</span>'):(a.teamMemberId?Math.round((Number(a.forecast?.[m])||0)*100)+'%':'—')}</td>`).join('')}</tr>`).join('');
@@ -40,3 +40,21 @@ function saveAllocations(){const final=allocationState.draft.filter(a=>!allocati
 function teamCapacity(){return db.team.filter(t=>t.active!==false).reduce((n,t)=>n+(Number(t.fte)||0),0)}
 function allocatedTotal(month){return db.allocations.reduce((n,a)=>n+(Number(a.forecast?.[month])||0),0)}
 function unresolvedWithoutAllocation(){return db.demand.filter(isOpenDemand).filter(d=>!db.allocations.some(a=>a.demandId===d.id&&a.teamMemberId))}
+
+(function addNestedAllocationStyles(){if(document.getElementById('nested-allocation-styles'))return;const s=document.createElement('style');s.id='nested-allocation-styles';s.textContent=`
+#allocationTable .allocation-demand-header td{padding:7px 10px;background:var(--soft);border-top:2px solid var(--line);border-bottom:1px solid var(--line)}
+#allocationTable .allocation-demand-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:28px}
+#allocationTable .allocation-demand-heading>div{display:flex;align-items:baseline;gap:9px;min-width:0}
+#allocationTable .allocation-demand-id{font-size:.68rem;font-weight:750;color:var(--muted);letter-spacing:.02em;white-space:nowrap}
+#allocationTable .allocation-demand-title{font-size:.82rem;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#allocationTable .allocation-add{margin-left:auto;background:transparent;border-color:transparent;color:var(--accent);font-weight:850;white-space:nowrap}
+#allocationTable .allocation-add:hover{background:var(--panel)}
+#allocationTable .allocation-remove-head,#allocationTable .allocation-remove-cell{width:38px;min-width:38px;max-width:38px;text-align:center;padding-left:5px;padding-right:5px}
+#allocationTable .allocation-remove{width:23px;height:23px;border-radius:50%;border:1px solid var(--bad);background:transparent;color:var(--bad);font-size:1rem;font-weight:900;line-height:18px;cursor:pointer;padding:0}
+#allocationTable .allocation-remove:hover{background:var(--bad);color:white}
+#allocationTable .allocation-row td{border-bottom-color:color-mix(in srgb,var(--line) 65%,transparent)}
+#allocationTable .allocation-demand-filter-row th{padding-top:5px;padding-bottom:7px;background:var(--panel)}
+#allocationTable .allocation-demand-filter-row input{width:100%;max-width:520px}
+html[data-theme="dark"] #allocationTable .allocation-demand-header td{background:#22304a;color:var(--ink)}
+@media(max-width:760px){#allocationTable .allocation-demand-heading{align-items:flex-start}.allocation-demand-heading>div{flex-direction:column;gap:2px}}
+`;document.head.appendChild(s)})();
