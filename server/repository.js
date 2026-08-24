@@ -49,7 +49,7 @@ const defaultSettings=()=>({
     Strategy:['Assessment','Prioritisation','Mobilisation','Discovery','Analysis','Strategy Development','Socialisation / Review','Approval','Governance','Complete','On Hold','Cancelled']
   },
   statuses:['Triage','Prioritisation','Accepted','Rejected','Closed','Assessment','Mobilisation','In Progress','Review','Complete','On Hold','Cancelled','Assurance Review','Findings / Remediation','Governance / Approval','Discovery','Analysis / Design','Socialisation / Review','Approval','Governance','Analysis','Strategy Development'],
-  businessAreas:[],
+  businessAreas:['Group'],
   initiatives:[],
   priorities:['Critical','High','Medium','Low'],
   healthStates:['On Track','At Risk','Off Track'],
@@ -57,6 +57,23 @@ const defaultSettings=()=>({
   defaultFteWarningThreshold:0.85,
   defaultFteOverallocationThreshold:1.0
 });
+
+const repairRequiredSettings=settings=>{
+  const defaults=defaultSettings();
+  const repaired={...settings};
+  let changed=false;
+  for(const key of ['planningMonths','statuses','services','businessAreas','priorities','healthStates']){
+    if(!Array.isArray(repaired[key])||repaired[key].length===0){
+      repaired[key]=defaults[key];
+      changed=true;
+    }
+  }
+  if(!repaired.services.includes('Strategy')){
+    repaired.services=[...repaired.services,'Strategy'];
+    changed=true;
+  }
+  return {settings:repaired,changed};
+};
 
 export class ServerJsonWorkspaceRepository{
   constructor(root){this.root=path.resolve(root);this.bootstrapped=false}
@@ -74,10 +91,9 @@ export class ServerJsonWorkspaceRepository{
     const created=await this.writeJsonIfAbsent('workspace.json',defaultWorkspace());
     const settingsCreated=await this.writeJsonIfAbsent('config/settings.json',defaultSettings());
     if(!settingsCreated){
-      const settings=await this.readJson('config/settings.json',{required:true});
-      if(!Array.isArray(settings.planningMonths)||settings.planningMonths.length===0){
-        await this.writeJson('config/settings.json',{...settings,planningMonths:defaultPlanningMonths()});
-      }
+      const current=await this.readJson('config/settings.json',{required:true});
+      const {settings,changed}=repairRequiredSettings(current);
+      if(changed)await this.writeJson('config/settings.json',settings);
     }
     this.bootstrapped=created;
     return {created};
