@@ -88,7 +88,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          DEPLOYMENT_NAME="amo-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "Azure deployment: $DEPLOYMENT_NAME"
           OUTPUT=$(az deployment group create \
+            --name "$DEPLOYMENT_NAME" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --template-file infra/main.bicep \
             --parameters \
