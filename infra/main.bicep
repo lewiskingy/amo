@@ -19,7 +19,7 @@ var storageAccountName = take('${compactPrefix}data${globalSuffix}', 24)
 var fileShareName = 'amo-workspace'
 var environmentName = '${namePrefix}-env'
 var containerAppName = '${namePrefix}-api'
-var environmentStorageName = 'amoworkspace'
+var environmentStorageName = take('amoworkspace${globalSuffix}', 32)
 var workspaceMountPath = '/data/workspace'
 var acrPullRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 
