@@ -107,6 +107,22 @@ jobs:
           echo "container_app=$(echo "$OUTPUT" | jq -r '.containerAppName.value')" >> "$GITHUB_OUTPUT"
           echo "container_app_fqdn=$(echo "$OUTPUT" | jq -r '.containerAppFqdn.value')" >> "$GITHUB_OUTPUT"
 
+      - name: Wait for Container App after infrastructure deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.container_app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          for attempt in {1..60}; do
+            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
+            echo "Container App provisioning state: ${state:-unknown}"
+            if [ "$state" = "Succeeded" ]; then exit 0; fi
+            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed."; exit 1; fi
+            sleep 10
+          done
+          echo "::error::Timed out waiting for Container App provisioning to settle after infrastructure deployment."
+          exit 1
+
       - name: Login to Azure Container Registry
         run: az acr login --name "${{ steps.infra.outputs.acr_name }}"
 
@@ -123,11 +139,41 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          az containerapp registry set \
-            --name "${{ steps.infra.outputs.container_app }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --server "${{ steps.infra.outputs.acr_server }}" \
-            --identity system
+          APP="${{ steps.infra.outputs.container_app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          SERVER="${{ steps.infra.outputs.acr_server }}"
+
+          configured=$(az containerapp registry list \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --query "[?server=='$SERVER'] | length(@)" \
+            -o tsv 2>/dev/null || echo 0)
+
+          if [ "$configured" = "0" ]; then
+            az containerapp registry set \
+              --name "$APP" \
+              --resource-group "$RG" \
+              --server "$SERVER" \
+              --identity system
+          else
+            echo "Registry $SERVER is already configured; skipping registry mutation."
+          fi
+
+      - name: Wait for Container App after registry configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.container_app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          for attempt in {1..60}; do
+            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
+            echo "Container App provisioning state: ${state:-unknown}"
+            if [ "$state" = "Succeeded" ]; then exit 0; fi
+            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed after registry configuration."; exit 1; fi
+            sleep 10
+          done
+          echo "::error::Timed out waiting for Container App provisioning after registry configuration."
+          exit 1
 
       - name: Deploy AMO API image
         run: |
@@ -135,6 +181,22 @@ jobs:
             --name "${{ steps.infra.outputs.container_app }}" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --image "$IMAGE"
+
+      - name: Wait for Container App after image deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="${{ steps.infra.outputs.container_app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          for attempt in {1..60}; do
+            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
+            echo "Container App provisioning state: ${state:-unknown}"
+            if [ "$state" = "Succeeded" ]; then exit 0; fi
+            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed after image deployment."; exit 1; fi
+            sleep 10
+          done
+          echo "::error::Timed out waiting for Container App provisioning after image deployment."
+          exit 1
 
       - name: Ensure custom API hostname and managed certificate
         shell: bash
