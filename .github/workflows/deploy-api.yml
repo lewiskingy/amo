@@ -41,7 +41,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
-    environment: azure-personal
+    environment: prod-amo
     steps:
       - name: Checkout
         uses: actions/checkout@v4
