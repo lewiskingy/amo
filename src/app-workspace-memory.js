@@ -66,11 +66,14 @@ async function invokeOpenWorkspaceWithHandle(handle){
     try{window.showDirectoryPicker=original}catch(e){}
   }
 }
-async function reconnectRememberedWorkspace({requestPermission=true,quiet=false}={}){
+async function reconnectRememberedWorkspace({requestPermission=true,quiet=false,automatic=false}={}){
   if(workspaceReconnectRunning||!rememberedWorkspaceHandle)return false;
+  if(automatic&&getLastConnectionPreference()?.mode==='remote')return false;
+  const connectionToken=beginWorkspaceConnection('local',rememberedWorkspaceHandle.name||'Workspace');
   workspaceReconnectRunning=true;
   try{
     const permission=await handlePermission(rememberedWorkspaceHandle);
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return false;
     if(permission!=='granted'){
       if(!requestPermission)return false;
       if(!await requestHandlePermission(rememberedWorkspaceHandle)){
@@ -78,9 +81,11 @@ async function reconnectRememberedWorkspace({requestPermission=true,quiet=false}
         renderRememberedWorkspace();return false
       }
     }
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return false;
     setWorkspaceLoading(true,`Loading ${rememberedWorkspaceHandle.name||'workspace'}…`);
     await invokeOpenWorkspaceWithHandle(rememberedWorkspaceHandle);
-    if(workspaceHandle){await workspaceHandlePut(workspaceHandle);log(`Opened remembered workspace ${workspaceHandle.name}.`);return true}
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return false;
+    if(workspaceHandle&&window.workspaceRepository?.mode==='local'){await workspaceHandlePut(workspaceHandle);setLastConnectionPreference({mode:'local',name:workspaceHandle.name||'Workspace'});log(`Opened remembered workspace ${workspaceHandle.name}.`);return true}
     return false
   }catch(e){
     if(!quiet){alert(`Could not open remembered workspace: ${e.message}`);log(`ERROR opening remembered workspace: ${e.message}`)}
@@ -88,34 +93,37 @@ async function reconnectRememberedWorkspace({requestPermission=true,quiet=false}
   }finally{workspaceReconnectRunning=false;setWorkspaceLoading(false);renderRememberedWorkspace()}
 }
 async function chooseDifferentWorkspace(){
+  const connectionToken=beginWorkspaceConnection('local');
   const original=window.showDirectoryPicker;
   try{
-    if(original){window.showDirectoryPicker=async options=>{const h=await original.call(window,options);setWorkspaceLoading(true,`Loading ${h.name||'workspace'}…`);return h}}
+    if(original){window.showDirectoryPicker=async options=>{const h=await original.call(window,options);if(workspaceConnectionIsCurrent(connectionToken,'local'))setWorkspaceLoading(true,`Loading ${h.name||'workspace'}…`);return h}}
     await memoryOpenWorkspace();
-    if(workspaceHandle){await workspaceHandlePut(workspaceHandle);log(`Remembered workspace ${workspaceHandle.name} in this browser.`)}
+    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
+    if(workspaceHandle&&window.workspaceRepository?.mode==='local'){await workspaceHandlePut(workspaceHandle);setLastConnectionPreference({mode:'local',name:workspaceHandle.name||'Workspace'});log(`Remembered workspace ${workspaceHandle.name} in this browser.`)}
   }catch(e){if(e.name!=='AbortError'){alert(e.message);log(`ERROR opening workspace: ${e.message}`)}}
   finally{try{window.showDirectoryPicker=original}catch(e){}setWorkspaceLoading(false);renderRememberedWorkspace()}
 }
 
-/* One canonical visible Open Workspace action. If a remembered folder exists it is tried first. */
+/* One canonical visible Local Workspace action. A remembered local folder is tried only when
+   local is the last-used connection mode or the user explicitly chooses Local Workspace. */
 openWorkspace=async function(){
-  if(workspaceHandle){await chooseDifferentWorkspace();return}
-  if(rememberedWorkspaceHandle){const ok=await reconnectRememberedWorkspace({requestPermission:true});if(ok)return}
+  if(window.workspaceRepository?.mode==='local'&&workspaceHandle){await chooseDifferentWorkspace();return}
+  if(rememberedWorkspaceHandle){const ok=await reconnectRememberedWorkspace({requestPermission:true,automatic:false});if(ok)return}
   await chooseDifferentWorkspace()
 };
 const memoryOpenBtn=document.getElementById('openWorkspaceBtn');if(memoryOpenBtn)memoryOpenBtn.onclick=()=>openWorkspace();
 
 function renderRememberedWorkspace(){
   const btn=document.getElementById('openWorkspaceBtn');
-  if(btn&&!workspaceLoading)btn.textContent=workspaceHandle?'Change Workspace':'Open Workspace';
+  if(btn&&!workspaceLoading)btn.textContent=window.workspaceRepository?.mode==='local'?'Change Local Workspace':'Local Workspace';
   const section=document.getElementById('data');if(!section)return;
   let card=document.getElementById('rememberedWorkspaceCard');
   if(!card){card=document.createElement('div');card.id='rememberedWorkspaceCard';card.className='card';card.style.marginTop='16px';const first=section.querySelector('.card');first?.before(card)}
-  if(!rememberedWorkspaceHandle){card.innerHTML='<div class="section-title" style="margin-top:0"><div><h2>Default Workspace</h2><p class="muted">No folder is remembered in this browser yet. Use Open Workspace above to select one.</p></div></div>';return}
-  card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Default Workspace</h2><p class="muted">The folder handle is stored locally in this browser's IndexedDB. AMO will reconnect automatically when browser permission remains granted; otherwise use the visible Open Workspace button once to re-authorise it.</p></div><div class="toolbar"><button class="btn" id="chooseWorkspaceMemory">Choose Different</button><button class="btn danger" id="forgetWorkspaceMemory">Forget</button></div></div><div class="mini-stat"><span>Remembered folder</span><strong>${escHtml(rememberedWorkspaceHandle.name||'Workspace')}</strong></div><div class="mini-stat"><span>Current connection</span><strong>${workspaceHandle?escHtml(workspaceHandle.name):'Not connected'}</strong></div><div class="muted" id="rememberedWorkspacePermission" style="margin-top:10px">Checking browser permission…</div>`;
+  if(!rememberedWorkspaceHandle){card.innerHTML='<div class="section-title" style="margin-top:0"><div><h2>Default Local Workspace</h2><p class="muted">No local folder is remembered in this browser yet. Use Local Workspace above to select one.</p></div></div>';return}
+  card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Default Local Workspace</h2><p class="muted">The folder handle is stored locally in this browser's IndexedDB. It is only auto-opened when Local was the last-used connection mode.</p></div><div class="toolbar"><button class="btn" id="chooseWorkspaceMemory">Choose Different</button><button class="btn danger" id="forgetWorkspaceMemory">Forget</button></div></div><div class="mini-stat"><span>Remembered folder</span><strong>${escHtml(rememberedWorkspaceHandle.name||'Workspace')}</strong></div><div class="mini-stat"><span>Current connection</span><strong>${window.workspaceRepository?.mode==='local'&&workspaceHandle?escHtml(workspaceHandle.name):'Not using local workspace'}</strong></div><div class="muted" id="rememberedWorkspacePermission" style="margin-top:10px">Checking browser permission…</div>`;
   document.getElementById('chooseWorkspaceMemory')?.addEventListener('click',chooseDifferentWorkspace);
   document.getElementById('forgetWorkspaceMemory')?.addEventListener('click',async()=>{if(confirm('Forget the remembered workspace on this browser? This does not delete any workspace files.'))await workspaceHandleForget()});
-  handlePermission(rememberedWorkspaceHandle).then(p=>{const el=document.getElementById('rememberedWorkspacePermission');if(el)el.textContent=p==='granted'?'Browser permission is currently granted; AMO can reconnect automatically.':p==='prompt'?'The folder is remembered, but this browser requires one Open Workspace click to restore access.':'Browser access is currently denied; use Open Workspace to choose or re-authorise the folder.'}).catch(()=>{})
+  handlePermission(rememberedWorkspaceHandle).then(p=>{const el=document.getElementById('rememberedWorkspacePermission');if(el)el.textContent=p==='granted'?'Browser permission is currently granted.':p==='prompt'?'The folder is remembered, but this browser requires a Local Workspace click to restore access.':'Browser access is currently denied; use Local Workspace to choose or re-authorise the folder.'}).catch(()=>{})
 }
 
 const memoryUpdateBanner=updateBanner;
@@ -125,12 +133,17 @@ async function initialiseRememberedWorkspace(){
   try{
     rememberedWorkspaceHandle=await workspaceHandleGet();renderRememberedWorkspace();
     if(!rememberedWorkspaceHandle)return;
+    const preference=getLastConnectionPreference();
+    if(preference?.mode==='remote'){
+      log(`Remembered local workspace ${rememberedWorkspaceHandle.name||'Workspace'} retained, but Remote was used last; local auto-load suppressed.`);
+      return
+    }
     const permission=await handlePermission(rememberedWorkspaceHandle);
     if(permission==='granted'&&!workspaceHandle){
-      log(`Remembered workspace ${rememberedWorkspaceHandle.name||'Workspace'} found with permission granted; opening automatically.`);
-      await reconnectRememberedWorkspace({requestPermission:false,quiet:true})
+      log(`Remembered local workspace ${rememberedWorkspaceHandle.name||'Workspace'} found with permission granted; opening automatically.`);
+      await reconnectRememberedWorkspace({requestPermission:false,quiet:true,automatic:true})
     }else if(permission==='prompt'){
-      log(`Remembered workspace ${rememberedWorkspaceHandle.name||'Workspace'} found; browser permission requires the Open Workspace user gesture.`)
+      log(`Remembered local workspace ${rememberedWorkspaceHandle.name||'Workspace'} found; browser permission requires the Local Workspace user gesture.`)
     }
   }catch(e){log(`Workspace memory unavailable: ${e.message}`);renderRememberedWorkspace()}
 }
