@@ -78,6 +78,13 @@
   setTimeout(arrangeNavigation,50);
 })();
 
+/* Every dynamically loaded module must use the same deployment version as index.html.
+   Otherwise an updated HTML shell can still execute an older cached dynamic module. */
+function amoAsset(path){
+  const v=window.AMO_ASSET_VERSION;
+  return v?`${path}${path.includes('?')?'&':'?'}v=${encodeURIComponent(v)}`:path
+}
+
 /* Hosted AMO can run in browsers or managed environments where a showDirectoryPicker
    property exists but is not callable. Older core code tests for property presence, so
    normalise that case to a callable compatibility function which produces a useful error
@@ -93,35 +100,37 @@
   }
 })();
 
-(function loadWorkspaceRepositoryBridge(){if(document.querySelector('script[data-amo-repository-bridge]'))return;const s=document.createElement('script');s.src='app-workspace-repository-bridge.js';s.dataset.amoRepositoryBridge='true';document.head.appendChild(s)})();
+(function loadWorkspaceRepositoryBridge(){if(document.querySelector('script[data-amo-repository-bridge]'))return;const s=document.createElement('script');s.src=amoAsset('app-workspace-repository-bridge.js');s.dataset.amoRepositoryBridge='true';document.head.appendChild(s)})();
 
-(function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src='app-estimates-funding.js';s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src='app-estimates-funding-guard.js';g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
+(function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src=amoAsset('app-estimates-funding.js');s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src=amoAsset('app-estimates-funding-guard.js');g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
 
 /* Remote mode is layered on after the local implementation. The HTTP repository implements
    the same WorkspaceRepository contract and the UX then exposes Local/Remote connection choices. */
 (function loadRemoteWorkspace(){
   if(document.querySelector('script[data-amo-remote-repository]'))return;
-  const repo=document.createElement('script');repo.src='app-workspace-remote-repository.js';repo.dataset.amoRemoteRepository='true';repo.onload=()=>{
+  const repo=document.createElement('script');repo.src=amoAsset('app-workspace-remote-repository.js');repo.dataset.amoRemoteRepository='true';repo.onload=()=>{
     if(document.querySelector('script[data-amo-remote-workspace]'))return;
-    const ux=document.createElement('script');ux.src='app-remote-workspace.js';ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
+    const ux=document.createElement('script');ux.src=amoAsset('app-remote-workspace.js');ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
   };document.head.appendChild(repo)
 })();
 
-(function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src='app-ux-fixes.js';s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
+(function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src=amoAsset('app-ux-fixes.js');s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
 
+/* Allocation modules are deliberately ordered. The filter toolbar wraps the rich
+   renderAllocations installed by app-allocation-interactions, so it MUST load afterwards. */
 (function loadAllocationInteractions(){
   if(document.querySelector('script[data-amo-allocation-interactions]'))return;
-  const s=document.createElement('script');s.src='app-allocation-interactions.js';s.dataset.amoAllocationInteractions='true';
+  const s=document.createElement('script');s.src=amoAsset('app-allocation-interactions.js');s.dataset.amoAllocationInteractions='true';
   s.onload=()=>{
-    if(!document.querySelector('script[data-amo-allocation-fill-polish]')){const p=document.createElement('script');p.src='app-allocation-fill-polish.js';p.dataset.amoAllocationFillPolish='true';document.head.appendChild(p)}
-    if(!document.querySelector('script[data-amo-allocation-drag-wins]')){const d=document.createElement('script');d.src='app-allocation-drag-wins.js';d.dataset.amoAllocationDragWins='true';document.head.appendChild(d)}
-    if(!document.querySelector('script[data-amo-allocation-filter-toolbar]')){const f=document.createElement('script');f.src='app-allocation-filter-toolbar.js';f.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(f)}
+    if(!document.querySelector('script[data-amo-allocation-fill-polish]')){const p=document.createElement('script');p.src=amoAsset('app-allocation-fill-polish.js');p.dataset.amoAllocationFillPolish='true';document.head.appendChild(p)}
+    if(!document.querySelector('script[data-amo-allocation-drag-wins]')){const d=document.createElement('script');d.src=amoAsset('app-allocation-drag-wins.js');d.dataset.amoAllocationDragWins='true';document.head.appendChild(d)}
+    if(!document.querySelector('script[data-amo-allocation-filter-toolbar]')){const f=document.createElement('script');f.src=amoAsset('app-allocation-filter-toolbar.js');f.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(f)}
   };
   document.head.appendChild(s)
 })();
 
-(function loadLockAllocationGuards(){if(document.querySelector('script[data-amo-lock-allocation-guards]'))return;const s=document.createElement('script');s.src='app-lock-allocation-guards.js';s.dataset.amoLockAllocationGuards='true';document.head.appendChild(s)})();
+(function loadLockAllocationGuards(){if(document.querySelector('script[data-amo-lock-allocation-guards]'))return;const s=document.createElement('script');s.src=amoAsset('app-lock-allocation-guards.js');s.dataset.amoLockAllocationGuards='true';document.head.appendChild(s)})();
 
-(function loadPageScrollListHeaders(){if(document.querySelector('script[data-amo-page-scroll-list]'))return;const s=document.createElement('script');s.src='app-list-page-sticky.js';s.dataset.amoPageScrollList='true';document.head.appendChild(s)})();
+(function loadPageScrollListHeaders(){if(document.querySelector('script[data-amo-page-scroll-list]'))return;const s=document.createElement('script');s.src=amoAsset('app-list-page-sticky.js');s.dataset.amoPageScrollList='true';document.head.appendChild(s)})();
 
-(function loadModalUx(){if(document.querySelector('script[data-amo-modal-ux]'))return;const s=document.createElement('script');s.src='app-modal-ux.js';s.dataset.amoModalUx='true';document.head.appendChild(s)})();
+(function loadModalUx(){if(document.querySelector('script[data-amo-modal-ux]'))return;const s=document.createElement('script');s.src=amoAsset('app-modal-ux.js');s.dataset.amoModalUx='true';document.head.appendChild(s)})();
