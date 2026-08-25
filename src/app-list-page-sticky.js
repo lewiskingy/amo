@@ -1,20 +1,56 @@
-/* Page-scroll list tables with a floating header once the table reaches the app banner. */
+/* Page-scroll list tables with a floating header once the table reaches the app header. */
 (function initPageScrollListHeaders(){
   const LIST_TABLES=['demandTable','allocationTable','teamTable','ideaTable'];
   let floating=null,currentTable=null,raf=0;
 
   function topOffset(){
+    /* The topbar itself is sticky. The workspace banner scrolls away with the page, so reserving
+       its height left an artificial gap below the app heading. Dock directly to the topbar. */
     const topbar=document.querySelector('.topbar');
-    const banner=document.querySelector('.workspace-banner');
-    return Math.round((topbar?.getBoundingClientRect().height||0)+(banner?.getBoundingClientRect().height||0));
+    return Math.max(0,Math.round(topbar?.getBoundingClientRect().bottom||topbar?.getBoundingClientRect().height||0));
   }
 
   function prepareWrap(table){
     const wrap=table?.closest('.table-wrap');if(!wrap)return null;
     wrap.classList.add('page-scroll-list-wrap');
-    /* Explicitly defeat the old viewport-height list treatment. Keep horizontal scrolling only. */
+    /* The document owns vertical scrolling. The wrapper retains horizontal scrolling only. */
     wrap.style.maxHeight='none';wrap.style.height='auto';wrap.style.overflowX='auto';wrap.style.overflowY='hidden';
     return wrap
+  }
+
+  function installScrollForwarding(wrap){
+    if(!wrap||wrap.dataset.pageScrollForwarding==='true')return;
+    wrap.dataset.pageScrollForwarding='true';
+
+    /* An overflow-x element can consume trackpad/wheel gestures even though it cannot scroll
+       vertically. Forward vertical gestures to the document while leaving horizontal gestures
+       available for wide-table navigation. */
+    wrap.addEventListener('wheel',event=>{
+      if(event.ctrlKey||event.metaKey)return;
+      const vertical=Math.abs(event.deltaY)>Math.abs(event.deltaX);
+      if(!vertical)return;
+      event.preventDefault();
+      window.scrollBy({top:event.deltaY,left:0,behavior:'auto'});
+    },{passive:false});
+
+    /* Do the same for touch. Decide the gesture axis once movement is clear; vertical drags move
+       the page, horizontal drags remain native so the wide table can still be panned sideways. */
+    let touch=null;
+    wrap.addEventListener('touchstart',event=>{
+      if(event.touches.length!==1){touch=null;return}
+      const t=event.touches[0];touch={x:t.clientX,y:t.clientY,lastY:t.clientY,axis:null};
+    },{passive:true});
+    wrap.addEventListener('touchmove',event=>{
+      if(!touch||event.touches.length!==1)return;
+      const t=event.touches[0],dx=t.clientX-touch.x,dy=t.clientY-touch.y;
+      if(!touch.axis&&Math.max(Math.abs(dx),Math.abs(dy))>6)touch.axis=Math.abs(dy)>=Math.abs(dx)?'y':'x';
+      if(touch.axis!=='y')return;
+      const delta=touch.lastY-t.clientY;touch.lastY=t.clientY;
+      event.preventDefault();
+      window.scrollBy({top:delta,left:0,behavior:'auto'});
+    },{passive:false});
+    const clearTouch=()=>{touch=null};
+    wrap.addEventListener('touchend',clearTouch,{passive:true});wrap.addEventListener('touchcancel',clearTouch,{passive:true});
   }
 
   function destroyFloating(){floating?.remove();floating=null;currentTable=null}
@@ -49,20 +85,20 @@
 
   function activeListTable(){return LIST_TABLES.map(id=>document.getElementById(id)).find(t=>t?.closest('.view')?.classList.contains('active'))||null}
   function refresh(){
-    raf=0;const table=activeListTable();if(!table){destroyFloating();return}const wrap=prepareWrap(table);if(!wrap)return;
+    raf=0;const table=activeListTable();if(!table){destroyFloating();return}const wrap=prepareWrap(table);if(!wrap)return;installScrollForwarding(wrap);
     if(currentTable!==table||!floating||floating.dataset.headRows!==String(table.tHead?.rows?.length||0)){cloneHeader(table,wrap);if(floating)floating.dataset.headRows=String(table.tHead?.rows?.length||0)}
     syncFloating(table,wrap)
   }
   function schedule(){if(!raf)raf=requestAnimationFrame(refresh)}
 
-  LIST_TABLES.forEach(id=>{const table=document.getElementById(id),wrap=prepareWrap(table);wrap?.addEventListener('scroll',schedule,{passive:true})});
+  LIST_TABLES.forEach(id=>{const table=document.getElementById(id),wrap=prepareWrap(table);installScrollForwarding(wrap);wrap?.addEventListener('scroll',schedule,{passive:true})});
   window.addEventListener('scroll',schedule,{passive:true});window.addEventListener('resize',()=>{destroyFloating();schedule()});
   new MutationObserver(()=>{destroyFloating();schedule()}).observe(document.querySelector('.content')||document.body,{subtree:true,childList:true});
   document.addEventListener('click',()=>setTimeout(schedule,0));
   schedule();
 
   const style=document.createElement('style');style.id='amo-page-scroll-list-styles';style.textContent=`
-    .page-scroll-list-wrap{max-height:none!important;height:auto!important;overflow-x:auto!important;overflow-y:hidden!important}
+    .page-scroll-list-wrap{max-height:none!important;height:auto!important;overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-y:auto!important;touch-action:pan-x pan-y}
     .amo-floating-list-header{display:none;position:fixed;z-index:19;overflow:hidden;background:var(--panel);border-left:1px solid var(--line);border-right:1px solid var(--line);box-shadow:0 5px 12px rgba(28,40,73,.10)}
     .amo-floating-list-header.visible{display:block}
     .amo-floating-list-header-inner{overflow:hidden;width:100%}
