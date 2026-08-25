@@ -3,204 +3,66 @@
   const SNAP_VALUES=[0,10,20,40,60,80,100];
   let activeAllocationRowId=null;
 
-  /* app-integrations previously injected a Work column into each allocation row. Work now lives on the Demand header. */
   if(typeof window.enhanceAllocationWorkColumn==='function')window.enhanceAllocationWorkColumn=function(){};
 
   function allocationSource(){return allocationState.editing?(allocationState.draft||[]):(db.allocations||[])}
-  function scopedDemandForAllocations(){
-    const base=typeof scopedDemand==='function'?scopedDemand():db.demand;
-    return (base||[]).filter(isOpenDemand)
-  }
+  function scopedDemandForAllocations(){const base=typeof scopedDemand==='function'?scopedDemand():db.demand;return(base||[]).filter(isOpenDemand)}
   function visibleAllocationGroups(){
     const source=allocationSource(),demandFilter=String(allocationState.filters?.demand||'').trim().toLowerCase(),personFilter=String(allocationState.filters?.person||'').trim().toLowerCase();
     let demands=scopedDemandForAllocations().filter(d=>!demandFilter||`${d.id} ${d.title}`.toLowerCase().includes(demandFilter));
-    demands=[...demands].sort((a,b)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true,sensitivity:'base'}));
-    if(allocationState.direction==='desc')demands.reverse();
-    return demands.map(d=>{
-      let allocations=source.filter(a=>a.demandId===d.id&&!allocationState.deleted.has(a.id));
-      if(personFilter)allocations=allocations.filter(a=>(person(a.teamMemberId)?.name||'').toLowerCase().includes(personFilter));
-      return{demand:d,allocations}
-    }).filter(g=>!personFilter||g.allocations.length)
+    demands=[...demands].sort((a,b)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true,sensitivity:'base'}));if(allocationState.direction==='desc')demands.reverse();
+    return demands.map(d=>{let allocations=source.filter(a=>a.demandId===d.id&&!allocationState.deleted.has(a.id));if(personFilter)allocations=allocations.filter(a=>(person(a.teamMemberId)?.name||'').toLowerCase().includes(personFilter));return{demand:d,allocations}}).filter(g=>!personFilter||g.allocations.length)
   }
   function activeResources(){return(db.team||[]).filter(t=>t.active!==false)}
-  function resourceMatches(query){const q=String(query||'').trim().toLowerCase();return activeResources().filter(r=>!q||String(r.name||'').toLowerCase().includes(q))}
+  function resourcesUsedByDemand(demandId,exceptAllocationId){return new Set((allocationState.draft||[]).filter(a=>a.demandId===demandId&&a.id!==exceptAllocationId&&!allocationState.deleted.has(a.id)&&a.teamMemberId).map(a=>a.teamMemberId))}
+  function resourceMatches(query,aid){const q=String(query||'').trim().toLowerCase(),a=currentAllocation(aid),used=a?resourcesUsedByDemand(a.demandId,a.id):new Set();return activeResources().filter(r=>!used.has(r.id)&&(!q||String(r.name||'').toLowerCase().includes(q)))}
   function currentAllocation(aid){return allocationState.draft?.find(a=>a.id===aid)}
-  function monthPct(a,m){return Math.max(0,Math.min(100,Math.round((Number(a.forecast?.[m])||0)*100)))}
-  function totalResourceFraction(resourceId,month){
-    if(!resourceId)return 0;
-    return allocationSource().filter(a=>a.teamMemberId===resourceId&&!allocationState.deleted.has(a.id)).reduce((n,a)=>n+(Number(a.forecast?.[month])||0),0)
-  }
-  function capacityState(resourceId,month){
-    const p=person(resourceId),cap=Math.max(0,Number(p?.fte)||0),used=totalResourceFraction(resourceId,month);
-    if(cap>0&&used>cap+.0001)return'over';
-    if(cap>0&&used>=cap*.9)return'near';
-    return'ok'
-  }
-  function workItemLink(d){
-    const url=d?.azureDevOps?.url;if(!url)return'';
-    const title=d.azureDevOps?.title||'Work Item';
-    return` <a class="allocation-work-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">[Work Item]</a>`
-  }
-  function allocationResourceCombo(a){
-    const current=person(a.teamMemberId),name=current?.name||'';
-    return`<div class="alloc-combobox"><input class="alloc-resource-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="Find resource…" data-aid="${escHtml(a.id)}" data-selected-id="${escHtml(a.teamMemberId||'')}" value="${escHtml(name)}"><div class="alloc-combo-list" role="listbox"></div></div>`
-  }
-  function renderResourceList(input){
-    const list=input.parentElement?.querySelector('.alloc-combo-list');if(!list)return;
-    const matches=resourceMatches(input.value);
-    list.innerHTML=matches.length?matches.map(r=>`<button type="button" role="option" class="alloc-combo-option" data-resource-id="${escHtml(r.id)}"><strong>${escHtml(r.name)}</strong>${r.role?`<span>${escHtml(r.role)}</span>`:''}</button>`).join(''):'<div class="alloc-combo-empty">No matching resources</div>';
-    list.classList.add('open');input.setAttribute('aria-expanded','true');
-    list.querySelectorAll('[data-resource-id]').forEach(btn=>btn.addEventListener('mousedown',e=>{e.preventDefault();selectResource(input,btn.dataset.resourceId)}))
-  }
-  function closeResourceList(input,restore=false){
-    input.parentElement?.querySelector('.alloc-combo-list')?.classList.remove('open');input.setAttribute('aria-expanded','false');
-    if(restore){const a=currentAllocation(input.dataset.aid);input.value=person(a?.teamMemberId)?.name||'';input.dataset.selectedId=a?.teamMemberId||''}
-  }
-  function selectResource(input,resourceId){
-    const a=currentAllocation(input.dataset.aid),r=activeResources().find(x=>x.id===resourceId);if(!a||!r)return;
-    a.teamMemberId=r.id;a.forecast=a.forecast||Object.fromEntries(planningMonths().map(m=>[m,0]));
-    input.dataset.selectedId=r.id;input.value=r.name;closeResourceList(input,false);activeAllocationRowId=a.id;renderAllocations();
-    requestAnimationFrame(()=>document.querySelector(`#allocationTable tr[data-aid="${CSS.escape(a.id)}"] .alloc-resource-input`)?.focus())
-  }
-  function bindResourceCombos(){
-    document.querySelectorAll('#allocationTable .alloc-resource-input').forEach(input=>{
-      input.addEventListener('focus',()=>renderResourceList(input));
-      input.addEventListener('input',()=>{input.dataset.selectedId='';renderResourceList(input)});
-      input.addEventListener('keydown',e=>{
-        if(e.key==='Escape'){e.preventDefault();closeResourceList(input,true);return}
-        if(e.key==='Enter'){
-          const matches=resourceMatches(input.value),exact=matches.filter(r=>String(r.name).toLowerCase()===String(input.value).trim().toLowerCase()),choice=exact.length===1?exact[0]:(matches.length===1?matches[0]:null);
-          if(choice){e.preventDefault();selectResource(input,choice.id)}
-          return
-        }
-        if(e.key==='ArrowDown'){const first=input.parentElement?.querySelector('[data-resource-id]');if(first){e.preventDefault();first.focus()}}
-      });
-      input.addEventListener('blur',()=>setTimeout(()=>{if(!input.dataset.selectedId)closeResourceList(input,true);else closeResourceList(input,false)},120))
-    })
-  }
+  function monthPct(a,m){return Math.max(0,Math.min(100,Math.round((Number(a?.forecast?.[m])||0)*100)))}
+  function totalResourceFraction(resourceId,month){if(!resourceId)return 0;return allocationSource().filter(a=>a.teamMemberId===resourceId&&!allocationState.deleted.has(a.id)).reduce((n,a)=>n+(Number(a.forecast?.[month])||0),0)}
+  function capacityState(resourceId,month){const p=person(resourceId),cap=Math.max(0,Number(p?.fte)||0),used=totalResourceFraction(resourceId,month);if(cap>0&&used>cap+.0001)return'over';if(cap>0&&used>=cap*.9)return'near';return'ok'}
+  function workItemLink(d){const url=d?.azureDevOps?.url;if(!url)return'';const title=d.azureDevOps?.title||'Work Item';return` <a class="allocation-work-link" href="${escHtml(url)}" target="_blank" rel="noopener noreferrer" title="${escHtml(title)}">[Work Item]</a>`}
+  function allocationResourceCombo(a){const current=person(a.teamMemberId),name=current?.name||'';return`<div class="alloc-combobox"><input class="alloc-resource-input" type="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" placeholder="Find resource…" data-aid="${escHtml(a.id)}" data-selected-id="${escHtml(a.teamMemberId||'')}" value="${escHtml(name)}"><div class="alloc-combo-list" role="listbox"></div></div>`}
+  function renderResourceList(input){const list=input.parentElement?.querySelector('.alloc-combo-list');if(!list)return;const matches=resourceMatches(input.value,input.dataset.aid);list.innerHTML=matches.length?matches.map(r=>`<button type="button" role="option" class="alloc-combo-option" data-resource-id="${escHtml(r.id)}"><strong>${escHtml(r.name)}</strong>${r.role?`<span>${escHtml(r.role)}</span>`:''}</button>`).join(''):'<div class="alloc-combo-empty">No matching resources</div>';list.classList.add('open');input.setAttribute('aria-expanded','true');list.querySelectorAll('[data-resource-id]').forEach(btn=>btn.addEventListener('mousedown',e=>{e.preventDefault();selectResource(input,btn.dataset.resourceId)}))}
+  function closeResourceList(input,restore=false){input.parentElement?.querySelector('.alloc-combo-list')?.classList.remove('open');input.setAttribute('aria-expanded','false');if(restore){const a=currentAllocation(input.dataset.aid);input.value=person(a?.teamMemberId)?.name||'';input.dataset.selectedId=a?.teamMemberId||''}}
+  function selectResource(input,resourceId){const a=currentAllocation(input.dataset.aid),r=activeResources().find(x=>x.id===resourceId);if(!a||!r||resourcesUsedByDemand(a.demandId,a.id).has(r.id))return;a.teamMemberId=r.id;a.forecast=a.forecast||Object.fromEntries(planningMonths().map(m=>[m,0]));input.dataset.selectedId=r.id;input.value=r.name;closeResourceList(input,false);activeAllocationRowId=a.id;renderAllocations()}
+  function bindResourceCombos(){document.querySelectorAll('#allocationTable .alloc-resource-input').forEach(input=>{input.addEventListener('focus',()=>renderResourceList(input));input.addEventListener('input',()=>{input.dataset.selectedId='';renderResourceList(input)});input.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeResourceList(input,true);return}if(e.key==='Enter'){const matches=resourceMatches(input.value,input.dataset.aid),exact=matches.filter(r=>String(r.name).toLowerCase()===String(input.value).trim().toLowerCase()),choice=exact.length===1?exact[0]:(matches.length===1?matches[0]:null);if(choice){e.preventDefault();selectResource(input,choice.id)}return}if(e.key==='ArrowDown'){const first=input.parentElement?.querySelector('[data-resource-id]');if(first){e.preventDefault();first.focus()}}});input.addEventListener('blur',()=>setTimeout(()=>{if(!input.dataset.selectedId)closeResourceList(input,true);else closeResourceList(input,false)},120))})}
 
-  function monthCell(a,month,index,months,editing){
-    const pct=monthPct(a,month),state=capacityState(a.teamMemberId,month),style=`--alloc-pct:${pct}%;`;
-    if(!editing)return`<td class="alloc-month-cell state-${state}" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}" style="${style}"><div class="alloc-bar"></div><span class="alloc-pct-label">${pct}%</span></td>`;
-    if(!a.teamMemberId)return`<td class="alloc-month-cell inactive" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}"><span class="muted">—</span></td>`;
-    return`<td class="alloc-month-cell editable state-${state}" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}" style="${style}"><div class="alloc-bar"></div><button type="button" class="alloc-fill-handle left" data-fill="left" title="Drag left to fill earlier months" aria-label="Fill earlier months"></button><button type="button" class="alloc-level-handle" title="Drag vertically: 10, 20, 40, 60, 80 or 100 percent" aria-label="Adjust allocation"></button><input class="alloc-pct-text" inputmode="numeric" pattern="[0-9]*" data-aid="${escHtml(a.id)}" data-month="${month}" value="${pct}%" aria-label="${monthLabel(month)} allocation percentage"><button type="button" class="alloc-fill-handle right" data-fill="right" title="Drag right to fill later months" aria-label="Fill later months"></button></td>`
-  }
+  function monthCell(a,month,index,editing){const pct=monthPct(a,month),state=capacityState(a.teamMemberId,month),style=`--alloc-pct:${pct}%;`;if(!editing)return`<td class="alloc-month-cell state-${state}" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}" style="${style}"><div class="alloc-bar"></div><span class="alloc-pct-label">${pct}%</span></td>`;if(!a.teamMemberId)return`<td class="alloc-month-cell inactive" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}"><span class="muted">—</span></td>`;return`<td class="alloc-month-cell editable state-${state}" data-aid="${escHtml(a.id)}" data-month="${month}" data-month-index="${index}" style="${style}"><div class="alloc-bar"></div><button type="button" class="alloc-fill-handle left" data-fill="left" title="Drag left to fill earlier months"></button><button type="button" class="alloc-level-handle" title="Drag vertically to adjust allocation"></button><input class="alloc-pct-text" inputmode="numeric" data-aid="${escHtml(a.id)}" data-month="${month}" value="${pct}%"><button type="button" class="alloc-fill-handle right" data-fill="right" title="Drag right to fill later months"></button></td>`}
   function snapPercent(raw){return SNAP_VALUES.reduce((best,v)=>Math.abs(v-raw)<Math.abs(best-raw)?v:best,SNAP_VALUES[0])}
-  function setPct(aid,month,pct){
-    const a=currentAllocation(aid);if(!a)return;a.forecast=a.forecast||{};a.forecast[month]=Math.max(0,Math.min(100,Number(pct)||0))/100
-  }
-  function refreshResourceVisuals(resourceId){
-    document.querySelectorAll('#allocationTable .alloc-month-cell[data-aid]').forEach(cell=>{
-      const a=currentAllocation(cell.dataset.aid)||allocationSource().find(x=>x.id===cell.dataset.aid);if(!a||a.teamMemberId!==resourceId)return;
-      const pct=monthPct(a,cell.dataset.month),state=capacityState(resourceId,cell.dataset.month);cell.style.setProperty('--alloc-pct',`${pct}%`);cell.classList.remove('state-ok','state-near','state-over');cell.classList.add(`state-${state}`);const input=cell.querySelector('.alloc-pct-text');if(input&&document.activeElement!==input)input.value=`${pct}%`;const label=cell.querySelector('.alloc-pct-label');if(label)label.textContent=`${pct}%`
-    })
-  }
+  function setPct(aid,month,pct){const a=currentAllocation(aid);if(!a)return;a.forecast=a.forecast||{};a.forecast[month]=Math.max(0,Math.min(100,Number(pct)||0))/100}
+  function refreshResourceVisuals(resourceId){document.querySelectorAll('#allocationTable .alloc-month-cell[data-aid]').forEach(cell=>{const a=currentAllocation(cell.dataset.aid)||allocationSource().find(x=>x.id===cell.dataset.aid);if(!a||a.teamMemberId!==resourceId)return;const pct=monthPct(a,cell.dataset.month),state=capacityState(resourceId,cell.dataset.month);cell.style.setProperty('--alloc-pct',`${pct}%`);cell.classList.remove('state-ok','state-near','state-over');cell.classList.add(`state-${state}`);const input=cell.querySelector('.alloc-pct-text');if(input&&document.activeElement!==input)input.value=`${pct}%`;const label=cell.querySelector('.alloc-pct-label');if(label)label.textContent=`${pct}%`})}
   function activateRow(row){activeAllocationRowId=row?.dataset.aid||null;document.querySelectorAll('#allocationTable .allocation-row').forEach(r=>r.classList.toggle('active',r.dataset.aid===activeAllocationRowId))}
-  function bindPctInputs(){
-    document.querySelectorAll('#allocationTable .alloc-pct-text').forEach(input=>{
-      input.addEventListener('focus',()=>{activateRow(input.closest('.allocation-row'));input.value=input.value.replace('%','');input.select()});
-      const commit=()=>{const value=Math.max(0,Math.min(100,Number(String(input.value).replace('%','').trim())||0)),a=currentAllocation(input.dataset.aid);setPct(input.dataset.aid,input.dataset.month,value);input.value=`${Math.round(value)}%`;refreshResourceVisuals(a?.teamMemberId)};
-      input.addEventListener('change',commit);input.addEventListener('blur',commit);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur()}})
-    })
-  }
-  function bindVerticalHandles(){
-    document.querySelectorAll('#allocationTable .alloc-level-handle').forEach(handle=>handle.addEventListener('pointerdown',e=>{
-      e.preventDefault();e.stopPropagation();const cell=handle.closest('.alloc-month-cell'),row=handle.closest('.allocation-row'),a=currentAllocation(cell.dataset.aid);if(!a)return;activateRow(row);handle.setPointerCapture?.(e.pointerId);
-      const update=clientY=>{const rect=cell.getBoundingClientRect(),raw=(rect.bottom-clientY)/Math.max(1,rect.height)*100,pct=snapPercent(raw);setPct(a.id,cell.dataset.month,pct);refreshResourceVisuals(a.teamMemberId)};
-      update(e.clientY);
-      const move=ev=>update(ev.clientY),up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up)};
-      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up)
-    }))
-  }
-  function bindFillHandles(){
-    document.querySelectorAll('#allocationTable .alloc-fill-handle').forEach(handle=>handle.addEventListener('pointerdown',e=>{
-      e.preventDefault();e.stopPropagation();const sourceCell=handle.closest('.alloc-month-cell'),row=handle.closest('.allocation-row'),aid=sourceCell.dataset.aid,a=currentAllocation(aid);if(!a)return;activateRow(row);
-      const months=planningMonths(),sourceIndex=Number(sourceCell.dataset.monthIndex),direction=handle.dataset.fill,pct=monthPct(a,sourceCell.dataset.month);handle.setPointerCapture?.(e.pointerId);
-      const fillTo=(index)=>{if(direction==='right'&&index<sourceIndex)return;if(direction==='left'&&index>sourceIndex)return;const lo=Math.min(sourceIndex,index),hi=Math.max(sourceIndex,index);for(let i=lo;i<=hi;i++)setPct(aid,months[i],pct);refreshResourceVisuals(a.teamMemberId)};
-      const move=ev=>{const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest?.(`.alloc-month-cell[data-aid="${CSS.escape(aid)}"]`);if(target)fillTo(Number(target.dataset.monthIndex))};
-      const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up)};
-      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up)
-    }))
-  }
-  function addAllocationForDemand(demandId){
-    if(!allocationState.editing)return;const a=makeBlankAllocation(demandId,nextAllocationId([...db.allocations,...allocationState.draft]));allocationState.draft.push(a);activeAllocationRowId=a.id;renderAllocations();requestAnimationFrame(()=>document.querySelector(`#allocationTable tr[data-aid="${CSS.escape(a.id)}"] .alloc-resource-input`)?.focus())
-  }
-  function installStickyToolbarMirror(){
-    const table=document.getElementById('allocationTable'),toolbar=document.getElementById('allocationToolbar'),thead=table?.tHead;if(!table||!toolbar||!thead)return;
-    table.closest('.table-wrap')?.classList.add('list-table-wrap');thead.querySelector('.list-action-row')?.remove();const columns=Math.max(1,thead.rows[0]?.cells?.length||1),row=thead.insertRow(0);row.className='list-action-row';const cell=row.insertCell();cell.colSpan=columns;cell.className='list-action-cell';const actions=document.createElement('div');actions.className='list-sticky-actions';[...toolbar.querySelectorAll('button')].forEach(original=>{const clone=document.createElement('button');clone.type='button';clone.className=original.className;clone.disabled=original.disabled;clone.textContent=original.textContent;clone.onclick=()=>{if(!original.disabled)original.click()};actions.appendChild(clone)});cell.appendChild(actions)
-  }
+  function enterAllocationEdit(aid){if(!workspaceHandle||allocationState.editing)return;allocationState.editing=true;allocationState.draft=clone(db.allocations);allocationState.deleted=new Set();activeAllocationRowId=aid||null;renderAllocations();requestAnimationFrame(()=>document.querySelector(`#allocationTable tr[data-aid="${CSS.escape(aid||'')}"]`)?.scrollIntoView({block:'nearest'}))}
+  function bindPctInputs(){document.querySelectorAll('#allocationTable .alloc-pct-text').forEach(input=>{input.addEventListener('focus',()=>{activateRow(input.closest('.allocation-row'));input.value=input.value.replace('%','');input.select()});const commit=()=>{const value=Math.max(0,Math.min(100,Number(String(input.value).replace('%','').trim())||0)),a=currentAllocation(input.dataset.aid);setPct(input.dataset.aid,input.dataset.month,value);input.value=`${Math.round(value)}%`;refreshResourceVisuals(a?.teamMemberId)};input.addEventListener('change',commit);input.addEventListener('blur',commit);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur()}})})}
+  function bindVerticalHandles(){document.querySelectorAll('#allocationTable .alloc-level-handle').forEach(handle=>handle.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();const cell=handle.closest('.alloc-month-cell'),row=handle.closest('.allocation-row'),a=currentAllocation(cell.dataset.aid);if(!a)return;document.activeElement?.blur?.();activateRow(row);handle.setPointerCapture?.(e.pointerId);const update=clientY=>{const rect=cell.getBoundingClientRect(),raw=(rect.bottom-clientY)/Math.max(1,rect.height)*100,pct=snapPercent(raw);setPct(a.id,cell.dataset.month,pct);refreshResourceVisuals(a.teamMemberId)};update(e.clientY);const move=ev=>update(ev.clientY),up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up)};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up)}))}
+  function bindFillHandles(){document.querySelectorAll('#allocationTable .alloc-fill-handle').forEach(handle=>handle.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();const sourceCell=handle.closest('.alloc-month-cell'),row=handle.closest('.allocation-row'),aid=sourceCell.dataset.aid,a=currentAllocation(aid);if(!a)return;document.activeElement?.blur?.();activateRow(row);const months=planningMonths(),sourceIndex=Number(sourceCell.dataset.monthIndex),direction=handle.dataset.fill,pct=monthPct(a,sourceCell.dataset.month);handle.setPointerCapture?.(e.pointerId);const fillTo=index=>{if(direction==='right'&&index<sourceIndex)return;if(direction==='left'&&index>sourceIndex)return;const lo=Math.min(sourceIndex,index),hi=Math.max(sourceIndex,index);for(let i=lo;i<=hi;i++)setPct(aid,months[i],pct);refreshResourceVisuals(a.teamMemberId)};const move=ev=>{const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest?.(`.alloc-month-cell[data-aid="${CSS.escape(aid)}"]`);if(target)fillTo(Number(target.dataset.monthIndex))};const up=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up)};handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up)}))}
+  function addAllocationForDemand(demandId){if(!allocationState.editing)return;const a=makeBlankAllocation(demandId,nextAllocationId([...db.allocations,...allocationState.draft]));allocationState.draft.push(a);activeAllocationRowId=a.id;renderAllocations()}
+  function installStickyToolbarMirror(){const table=document.getElementById('allocationTable'),toolbar=document.getElementById('allocationToolbar'),thead=table?.tHead;if(!table||!toolbar||!thead)return;table.closest('.table-wrap')?.classList.add('list-table-wrap');thead.querySelector('.list-action-row')?.remove();const columns=Math.max(1,thead.rows[0]?.cells?.length||1),row=thead.insertRow(0);row.className='list-action-row';const cell=row.insertCell();cell.colSpan=columns;cell.className='list-action-cell';const actions=document.createElement('div');actions.className='list-sticky-actions';[...toolbar.querySelectorAll('button')].forEach(original=>{const clone=document.createElement('button');clone.type='button';clone.className=original.className;clone.disabled=original.disabled;clone.textContent=original.textContent;clone.onclick=()=>{if(!original.disabled)original.click()};actions.appendChild(clone)});cell.appendChild(actions)}
 
   renderAllocations=function(){
     const months=planningMonths(),groups=visibleAllocationGroups(),editing=allocationState.editing,count=groups.reduce((n,g)=>n+g.allocations.length,0),table=$('allocationTable'),toolbar=$('allocationToolbar');if(!table||!toolbar)return;
     toolbar.innerHTML=editing?'<button class="btn success" id="saveAllocations">Save Changes</button><button class="btn" id="cancelAllocations">Cancel</button><button class="btn" id="clearAllocationFilters">Clear Filters</button>':`<button class="btn" id="editAllocations" ${workspaceHandle?'':'disabled'}>Edit List</button><button class="btn" id="clearAllocationFilters">Clear Filters</button>`;
     $('allocationCount').textContent=workspaceHandle?`Showing ${count} allocation${count===1?'':'s'} across ${groups.length} demand item${groups.length===1?'':'s'}`:'No workspace loaded';
-    const colCount=(editing?1:0)+1+months.length,body=groups.map(({demand:d,allocations})=>{
-      const header=`<tr class="allocation-demand-header" data-demand-header="${escHtml(d.id)}"><td colspan="${colCount}"><div class="allocation-demand-heading" style="--month-count:${months.length}"><div class="allocation-demand-copy"><span class="allocation-demand-id">${escHtml(d.id)}</span><strong class="allocation-demand-title">${escHtml(d.title)}</strong>${workItemLink(d)}</div>${editing?`<button class="btn allocation-add" type="button" data-add-allocation="${escHtml(d.id)}">＋ New Allocation</button>`:''}</div></td></tr>`;
-      const rows=allocations.map(a=>`<tr class="allocation-row${a.id===activeAllocationRowId?' active':''}${!a.teamMemberId?' allocation-inactive':''}" data-aid="${escHtml(a.id)}" data-demand="${escHtml(d.id)}">${editing?`<td class="allocation-remove-cell"><button class="allocation-remove" type="button" data-remove-allocation="${escHtml(a.id)}" title="Remove allocation" aria-label="Remove allocation">−</button></td>`:''}<td class="allocation-resource">${editing?allocationResourceCombo(a):(a.teamMemberId?escHtml(person(a.teamMemberId)?.name||a.teamMemberId):'<span class="muted">Unallocated</span>')}</td>${months.map((m,i)=>monthCell(a,m,i,months,editing)).join('')}</tr>`).join('');return header+rows
-    }).join('');
-    table.innerHTML=`<colgroup>${editing?'<col class="allocation-remove-col">':''}<col class="allocation-resource-col">${months.map(()=>'<col class="allocation-month-col">').join('')}</colgroup><thead><tr>${editing?'<th class="allocation-remove-head"></th>':''}<th>Resource</th>${months.map(m=>`<th class="month">${monthLabel(m)}</th>`).join('')}</tr><tr class="filter-row">${editing?'<th></th>':''}<th><input id="allocationPersonFilter" value="${escHtml(allocationState.filters.person||'')}" placeholder="filter resource…"></th>${months.map(()=>'<th></th>').join('')}</tr><tr class="allocation-demand-filter-row"><th colspan="${colCount}"><input id="allocationDemandFilter" value="${escHtml(allocationState.filters.demand||'')}" placeholder="filter demand ID or title…"></th></tr></thead><tbody>${body}</tbody>`;
-    $('editAllocations')?.addEventListener('click',()=>{if(!workspaceHandle)return;allocationState.editing=true;allocationState.draft=clone(db.allocations);allocationState.deleted=new Set();activeAllocationRowId=null;renderAllocations()});
+    const colCount=(editing?1:0)+1+months.length,body=groups.map(({demand:d,allocations})=>{const header=`<tr class="allocation-demand-header" data-demand-header="${escHtml(d.id)}"><td colspan="${colCount}"><div class="allocation-demand-heading" style="--month-count:${months.length}"><div class="allocation-demand-copy"><span class="allocation-demand-id">${escHtml(d.id)}</span><strong class="allocation-demand-title">${escHtml(d.title)}</strong>${workItemLink(d)}</div>${editing?`<button class="btn allocation-add" type="button" data-add-allocation="${escHtml(d.id)}">＋ New Allocation</button>`:''}</div></td></tr>`;const rows=allocations.map(a=>`<tr class="allocation-row${a.id===activeAllocationRowId?' active':''}${!a.teamMemberId?' allocation-inactive':''}" data-aid="${escHtml(a.id)}" data-demand="${escHtml(d.id)}">${editing?`<td class="allocation-remove-cell"><button class="allocation-remove" type="button" data-remove-allocation="${escHtml(a.id)}">−</button></td>`:''}<td class="allocation-resource">${editing?allocationResourceCombo(a):(a.teamMemberId?escHtml(person(a.teamMemberId)?.name||a.teamMemberId):'<span class="muted">Unallocated</span>')}</td>${months.map((m,i)=>monthCell(a,m,i,editing)).join('')}</tr>`).join('');return header+rows}).join('');
+    table.innerHTML=`<colgroup>${editing?'<col class="allocation-remove-col">':''}<col class="allocation-resource-col">${months.map(()=>'<col class="allocation-month-col">').join('')}</colgroup><thead><tr>${editing?'<th></th>':''}<th>Resource</th>${months.map(m=>`<th class="month">${monthLabel(m)}</th>`).join('')}</tr><tr class="filter-row">${editing?'<th></th>':''}<th><input id="allocationPersonFilter" value="${escHtml(allocationState.filters.person||'')}" placeholder="filter resource…"></th>${months.map(()=>'<th></th>').join('')}</tr><tr class="allocation-demand-filter-row"><th colspan="${colCount}"><input id="allocationDemandFilter" value="${escHtml(allocationState.filters.demand||'')}" placeholder="filter demand ID or title…"></th></tr></thead><tbody>${body}</tbody>`;
+    $('editAllocations')?.addEventListener('click',()=>enterAllocationEdit(null));
     $('cancelAllocations')?.addEventListener('click',()=>{allocationState.editing=false;allocationState.draft=null;allocationState.deleted=new Set();activeAllocationRowId=null;renderAllocations()});
     $('clearAllocationFilters').onclick=()=>{allocationState.filters={demand:'',person:''};renderAllocations()};
     table.querySelectorAll('[data-add-allocation]').forEach(b=>b.onclick=()=>addAllocationForDemand(b.dataset.addAllocation));
     table.querySelectorAll('.allocation-row').forEach(row=>row.addEventListener('click',e=>{if(!e.target.closest('a'))activateRow(row)}));
-    table.querySelectorAll('tbody tr[data-aid]').forEach(tr=>tr.addEventListener('dblclick',e=>{if(e.target.closest('button,input,select,textarea,a'))return;openRecordModal('allocation',tr.dataset.aid,'view')}));
-    if(editing){
-      $('saveAllocations').onclick=saveAllocations;bindResourceCombos();bindPctInputs();bindVerticalHandles();bindFillHandles();
-      table.querySelectorAll('[data-remove-allocation]').forEach(el=>el.onclick=e=>{allocationState.deleted.add(e.currentTarget.dataset.removeAllocation);if(activeAllocationRowId===e.currentTarget.dataset.removeAllocation)activeAllocationRowId=null;renderAllocations()})
-    }
-    const bindFilter=(id,key)=>{$(id)?.addEventListener('input',e=>{clearTimeout(debounceTimers[`alloc-${key}`]);allocationState.filters[key]=e.target.value;const pos=e.target.selectionStart;debounceTimers[`alloc-${key}`]=setTimeout(()=>{renderAllocations();requestAnimationFrame(()=>{const n=$(id);n?.focus();n?.setSelectionRange?.(pos,pos)})},350)})};bindFilter('allocationDemandFilter','demand');bindFilter('allocationPersonFilter','person');
-    installStickyToolbarMirror()
+    /* Allocations are edited exclusively in the inline planning grid. Double-clicking a read-only allocation enters list edit mode and activates that row; there is deliberately no allocation modal. */
+    table.querySelectorAll('tbody tr[data-aid]').forEach(tr=>tr.addEventListener('dblclick',e=>{if(e.target.closest('button,input,select,textarea,a'))return;if(!allocationState.editing)enterAllocationEdit(tr.dataset.aid);else activateRow(tr)}));
+    if(editing){$('saveAllocations').onclick=saveAllocations;bindResourceCombos();bindPctInputs();bindVerticalHandles();bindFillHandles();table.querySelectorAll('[data-remove-allocation]').forEach(el=>el.onclick=e=>{allocationState.deleted.add(e.currentTarget.dataset.removeAllocation);if(activeAllocationRowId===e.currentTarget.dataset.removeAllocation)activeAllocationRowId=null;renderAllocations()})}
+    const bindFilter=(id,key)=>{$(id)?.addEventListener('input',e=>{clearTimeout(debounceTimers[`alloc-${key}`]);allocationState.filters[key]=e.target.value;const pos=e.target.selectionStart;debounceTimers[`alloc-${key}`]=setTimeout(()=>{renderAllocations();requestAnimationFrame(()=>{const n=$(id);n?.focus();n?.setSelectionRange?.(pos,pos)})},350)})};bindFilter('allocationDemandFilter','demand');bindFilter('allocationPersonFilter','person');installStickyToolbarMirror()
   };
 
   const style=document.createElement('style');style.id='allocation-interaction-styles';style.textContent=`
-    #allocationTable{width:max-content;min-width:100%;table-layout:fixed}
-    #allocationTable .allocation-remove-col{width:34px}
-    #allocationTable .allocation-resource-col{width:172px}
-    #allocationTable .allocation-month-col{width:68px}
-    #allocationTable th.month{min-width:68px;width:68px;text-align:center;padding-left:4px;padding-right:4px}
-    #allocationTable .allocation-resource{width:172px;max-width:172px;padding-left:7px;padding-right:7px}
-    #allocationTable .allocation-demand-header td{padding:6px 0;background:var(--soft);border-top:2px solid var(--line);border-bottom:1px solid var(--line)}
-    #allocationTable .allocation-demand-heading{display:grid;grid-template-columns:34px 172px repeat(var(--month-count),68px);align-items:center;min-height:30px;width:max-content;min-width:100%}
-    #allocationTable .allocation-demand-copy{grid-column:1 / 3;display:flex;align-items:baseline;gap:8px;min-width:0;padding-left:9px;white-space:nowrap;overflow:hidden}
-    #allocationTable .allocation-demand-id{font-size:.66rem;font-weight:750;color:var(--muted)}
-    #allocationTable .allocation-demand-title{font-size:.81rem;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
-    #allocationTable .allocation-work-link{font-size:.68rem;font-weight:700;color:var(--accent);text-decoration:none;flex:0 0 auto}
-    #allocationTable .allocation-work-link:hover{text-decoration:underline}
-    #allocationTable .allocation-add{grid-column:3;justify-self:start;margin-left:3px;padding:4px 5px;background:transparent;border-color:transparent;color:var(--accent);font-weight:850;white-space:nowrap;font-size:.68rem;z-index:1}
-    #allocationTable .allocation-remove-head,#allocationTable .allocation-remove-cell{width:34px;min-width:34px;max-width:34px;text-align:center;padding:3px}
-    #allocationTable .allocation-remove{width:21px;height:21px;border-radius:50%;border:1px solid var(--bad);background:transparent;color:var(--bad);font-size:.95rem;font-weight:900;line-height:17px;cursor:pointer;padding:0}
-    #allocationTable .allocation-remove:hover{background:var(--bad);color:#fff}
-    #allocationTable .alloc-combobox{position:relative;width:158px;max-width:158px}
-    #allocationTable .alloc-resource-input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:5px 7px;font-size:.73rem}
-    #allocationTable .alloc-combo-list{display:none;position:absolute;left:0;width:230px;top:calc(100% + 3px);max-height:220px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);z-index:60}
-    #allocationTable .alloc-combo-list.open{display:block}
-    #allocationTable .alloc-combo-option{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
-    #allocationTable .alloc-combo-option:hover,#allocationTable .alloc-combo-option:focus{background:var(--soft);outline:none}
-    #allocationTable .alloc-combo-option span{font-size:.66rem;color:var(--muted)}
-    #allocationTable .alloc-combo-empty{padding:8px;color:var(--muted);font-size:.72rem}
-    #allocationTable .alloc-month-cell{position:relative;width:68px;min-width:68px;max-width:68px;height:44px;padding:0!important;text-align:center;overflow:visible;background:var(--panel)}
-    #allocationTable .alloc-month-cell .alloc-bar{position:absolute;left:3px;right:3px;bottom:3px;height:var(--alloc-pct,0%);max-height:calc(100% - 6px);border-radius:4px 4px 2px 2px;background:color-mix(in srgb,var(--accent) 22%,transparent);transition:height .08s linear,background .12s}
-    #allocationTable .alloc-month-cell.state-near .alloc-bar{background:color-mix(in srgb,#d99922 36%,transparent)}
-    #allocationTable .alloc-month-cell.state-over .alloc-bar{background:color-mix(in srgb,var(--bad) 38%,transparent)}
-    #allocationTable .alloc-pct-label,#allocationTable .alloc-pct-text{position:relative;z-index:3;font-size:.72rem;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
-    #allocationTable .alloc-pct-text{width:54px;height:25px;border:0;outline:0;background:transparent;text-align:center;padding:0;margin:9px auto 0;display:block;border-radius:4px}
-    #allocationTable .alloc-pct-text:focus{background:color-mix(in srgb,var(--panel) 88%,transparent);box-shadow:0 0 0 1px var(--accent)}
-    #allocationTable .alloc-level-handle{display:none;position:absolute;z-index:5;left:50%;transform:translate(-50%,50%);bottom:clamp(5px,var(--alloc-pct,0%),calc(100% - 5px));width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);background:var(--panel);padding:0;cursor:ns-resize}
-    #allocationTable .alloc-fill-handle{display:none;position:absolute;z-index:5;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;border:2px solid var(--accent);background:var(--panel);padding:0;cursor:ew-resize}
-    #allocationTable .alloc-fill-handle.left{left:-5px}#allocationTable .alloc-fill-handle.right{right:-5px}
-    #allocationTable .allocation-row.active .alloc-level-handle,#allocationTable .allocation-row.active .alloc-fill-handle{display:block}
-    #allocationTable .allocation-row.active .alloc-month-cell.editable{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent)}
-    #allocationTable .allocation-row td{border-bottom-color:color-mix(in srgb,var(--line) 65%,transparent)}
-    #allocationTable .allocation-demand-filter-row th{padding-top:4px;padding-bottom:6px;background:var(--panel)}
-    #allocationTable .allocation-demand-filter-row input{width:min(420px,100%)}
-    html[data-theme="dark"] #allocationTable .allocation-demand-header td{background:#22304a}
-    html[data-theme="dark"] #allocationTable .alloc-combo-list,html[data-theme="dark"] #allocationTable .alloc-resource-input{background:var(--panel);border-color:var(--line);color:var(--ink)}
-    @media(max-width:760px){#allocationTable .allocation-resource-col{width:150px}#allocationTable .allocation-resource{width:150px;max-width:150px}#allocationTable .alloc-combobox{width:138px;max-width:138px}#allocationTable .allocation-demand-heading{grid-template-columns:34px 150px repeat(var(--month-count),64px)}#allocationTable .allocation-month-col,#allocationTable th.month,#allocationTable .alloc-month-cell{width:64px;min-width:64px;max-width:64px}}
+    #allocationTable{width:max-content;min-width:100%;table-layout:fixed}#allocationTable .allocation-remove-col{width:34px}#allocationTable .allocation-resource-col{width:172px}#allocationTable .allocation-month-col{width:68px}#allocationTable th.month{min-width:68px;width:68px;text-align:center;padding-left:4px;padding-right:4px}#allocationTable .allocation-resource{width:172px;max-width:172px;padding-left:7px;padding-right:7px}
+    #allocationTable .allocation-demand-header td{padding:6px 0;background:var(--soft);border-top:2px solid var(--line);border-bottom:1px solid var(--line)}#allocationTable .allocation-demand-heading{display:grid;grid-template-columns:34px 172px repeat(var(--month-count),68px);align-items:center;min-height:30px;width:max-content;min-width:100%}#allocationTable .allocation-demand-copy{grid-column:1 / 3;display:flex;align-items:baseline;gap:8px;min-width:0;padding-left:9px;white-space:nowrap;overflow:hidden}#allocationTable .allocation-demand-id{font-size:.66rem;font-weight:750;color:var(--muted)}#allocationTable .allocation-demand-title{font-size:.81rem;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}#allocationTable .allocation-work-link{font-size:.68rem;font-weight:700;color:var(--accent);text-decoration:none;flex:0 0 auto}#allocationTable .allocation-add{grid-column:3;justify-self:start;margin-left:3px;padding:4px 5px;background:transparent;border-color:transparent;color:var(--accent);font-weight:850;white-space:nowrap;font-size:.68rem}
+    #allocationTable .allocation-remove-head,#allocationTable .allocation-remove-cell{width:34px;min-width:34px;max-width:34px;text-align:center;padding:3px}#allocationTable .allocation-remove{width:21px;height:21px;border-radius:50%;border:1px solid var(--bad);background:transparent;color:var(--bad);font-size:.95rem;font-weight:900;cursor:pointer;padding:0}#allocationTable .alloc-combobox{position:relative;width:158px;max-width:158px}#allocationTable .alloc-resource-input{width:100%;box-sizing:border-box;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:5px 7px;font-size:.73rem}#allocationTable .alloc-combo-list{display:none;position:absolute;left:0;width:230px;top:calc(100% + 3px);max-height:220px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);z-index:60}#allocationTable .alloc-combo-list.open{display:block}#allocationTable .alloc-combo-option{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 8px;border:0;border-radius:6px;background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+    #allocationTable .alloc-month-cell{position:relative;width:68px;min-width:68px;max-width:68px;height:44px;padding:0!important;text-align:center;overflow:visible;background:var(--panel)}#allocationTable .alloc-month-cell .alloc-bar{position:absolute;left:3px;right:3px;bottom:3px;height:var(--alloc-pct,0%);max-height:calc(100% - 6px);border-radius:4px 4px 2px 2px;background:color-mix(in srgb,var(--accent) 22%,transparent)}#allocationTable .alloc-pct-label,#allocationTable .alloc-pct-text{position:relative;z-index:3;font-size:.72rem;font-weight:800;color:var(--ink)}#allocationTable .alloc-pct-text{width:54px;height:25px;border:0;outline:0;background:transparent;text-align:center;padding:0;margin:9px auto 0;display:block;border-radius:4px}#allocationTable .alloc-level-handle{display:none;position:absolute;z-index:5;left:50%;transform:translate(-50%,50%);bottom:clamp(5px,var(--alloc-pct,0%),calc(100% - 5px));width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);background:var(--panel);padding:0;cursor:ns-resize}#allocationTable .alloc-fill-handle{display:none;position:absolute;z-index:5;top:50%;transform:translateY(-50%);width:9px;height:9px;border-radius:50%;border:2px solid var(--accent);background:var(--panel);padding:0;cursor:ew-resize}#allocationTable .allocation-row.active .alloc-level-handle,#allocationTable .allocation-row.active .alloc-fill-handle{display:block}#allocationTable .allocation-row.active .alloc-month-cell.editable{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 32%,transparent)}
+    html[data-theme="dark"] #allocationTable .allocation-demand-header td{background:#22304a}@media(max-width:760px){#allocationTable .allocation-resource-col,#allocationTable .allocation-resource{width:150px;max-width:150px}#allocationTable .alloc-combobox{width:138px;max-width:138px}#allocationTable .allocation-demand-heading{grid-template-columns:34px 150px repeat(var(--month-count),64px)}#allocationTable .allocation-month-col,#allocationTable th.month,#allocationTable .alloc-month-cell{width:64px;min-width:64px;max-width:64px}}
   `;document.head.appendChild(style);
-
-  /* Update stale explanatory copy from the old placeholder-row model. */
-  const notice=document.querySelector('#allocations .notice');if(notice)notice.innerHTML='Columns follow <strong>Planning Months</strong> from Config. Allocations are grouped beneath each Demand item. In Edit mode add resources from the relevant Demand header, set monthly allocation visually, then Save Changes or Cancel.';
-
+  const notice=document.querySelector('#allocations .notice');if(notice)notice.innerHTML='Columns follow <strong>Planning Months</strong> from Config. Allocations are grouped beneath each Demand item. Double-click an allocation to edit inline, or use Edit List. Add resources from the relevant Demand header, then Save Changes or Cancel.';
   renderAllocations()
 })();
