@@ -35,4 +35,7 @@
   document.addEventListener('click',e=>{const save=e.target.closest?.('#saveAllocations');if(!save||!allocationState?.editing)return;const seen=new Set(),duplicate=(allocationState.draft||[]).filter(a=>!allocationState.deleted.has(a.id)&&a.teamMemberId).find(a=>{const key=`${a.demandId}|${a.teamMemberId}`;if(seen.has(key))return true;seen.add(key);return false});if(!duplicate)return;e.preventDefault();e.stopImmediatePropagation();const resource=person(duplicate.teamMemberId)?.name||duplicate.teamMemberId;alert(`${resource} is already allocated to ${duplicate.demandId}. A Resource can appear only once under each Demand item.`)},true);
 })();
 
-(function loadAllocationFilterToolbar(){if(document.querySelector('script[data-amo-allocation-filter-toolbar]'))return;const s=document.createElement('script');s.src='app-allocation-filter-toolbar.js';s.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(s)})();
+/* Allocation filter toolbar loading deliberately lives in app-navigation.js, in the
+   app-allocation-interactions onload chain. Loading it here raced the interaction layer:
+   the filter module wrapped renderAllocations and was then silently overwritten when the
+   richer allocation renderer loaded, leaving only the legacy inline filter rows visible. */
