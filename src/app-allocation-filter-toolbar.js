@@ -1,9 +1,8 @@
-/* Allocations sticky Demand/Resource filters.
-   Deliberately mirrors the proven allocation-row Resource combobox: typing only narrows
-   the popup; the grid is filtered only after an option is explicitly selected. */
+/* Persistent Allocations Demand/Resource combobox filters.
+   Typing narrows suggestions only; selecting an option (or Enter on one match) applies the filter. */
 (function initAllocationFilterToolbar(){
   function install(){
-    if(typeof renderAllocations!=='function'||!document.getElementById('allocation-interaction-styles')){setTimeout(install,25);return}
+    if(typeof renderAllocations!=='function'){setTimeout(install,25);return}
     if(window.__amoAllocationFilterToolbarInstalled)return;window.__amoAllocationFilterToolbarInstalled=true;
 
     const esc=v=>typeof escHtml==='function'?escHtml(v):String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
@@ -27,23 +26,21 @@
     function makeField(label,key,placeholder){
       const wrap=document.createElement('label');wrap.className='allocation-header-filter';
       const caption=document.createElement('span');caption.textContent=label;
-      const combo=document.createElement('div');combo.className='alloc-combobox allocation-filter-combobox';
-      const input=document.createElement('input');input.className='alloc-resource-input allocation-filter-input';input.type='text';input.autocomplete='off';input.placeholder=placeholder;input.dataset.allocationHeaderFilter=key;input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');
-      const list=document.createElement('div');list.className='alloc-combo-list allocation-filter-list';list.setAttribute('role','listbox');
+      const combo=document.createElement('div');combo.className='allocation-filter-combobox';
+      const input=document.createElement('input');input.className='allocation-filter-input';input.type='text';input.autocomplete='off';input.placeholder=placeholder;input.dataset.allocationHeaderFilter=key;input.setAttribute('role','combobox');input.setAttribute('aria-autocomplete','list');input.setAttribute('aria-expanded','false');
+      const list=document.createElement('div');list.className='allocation-filter-list';list.setAttribute('role','listbox');
       combo.append(input,list);wrap.append(caption,combo);bind(input);sync(input);return wrap
     }
     function sync(input){const key=input.dataset.allocationHeaderFilter,value=allocationState.filters?.[key]||'';input.dataset.selectedValue=value;input.value=displayFor(key,value)}
-    function close(input,restore=false){input.parentElement?.querySelector('.alloc-combo-list')?.classList.remove('open');input.setAttribute('aria-expanded','false');if(restore)sync(input)}
+    function close(input,restore=false){input.parentElement?.querySelector('.allocation-filter-list')?.classList.remove('open');input.setAttribute('aria-expanded','false');if(restore)sync(input)}
     function show(input){
-      const list=input.parentElement?.querySelector('.alloc-combo-list');if(!list)return;const found=matches(input);
-      list.innerHTML=found.length?found.map(o=>`<button type="button" role="option" class="alloc-combo-option" data-filter-value="${esc(o.value)}"><strong>${esc(o.label)}</strong></button>`).join(''):'<div class="alloc-combo-empty">No matching values</div>';
+      const list=input.parentElement?.querySelector('.allocation-filter-list');if(!list)return;const found=matches(input);
+      list.innerHTML=found.length?found.map(o=>`<button type="button" role="option" class="allocation-filter-option" data-filter-value="${esc(o.value)}"><strong>${esc(o.label)}</strong></button>`).join(''):'<div class="allocation-filter-empty">No matching values</div>';
       list.classList.add('open');input.setAttribute('aria-expanded','true');
       list.querySelectorAll('[data-filter-value]').forEach(btn=>btn.addEventListener('mousedown',e=>{e.preventDefault();commit(input,btn.dataset.filterValue)}));
     }
     function commit(input,value){
-      const key=input.dataset.allocationHeaderFilter;allocationState.filters=allocationState.filters||{demand:'',person:''};allocationState.filters[key]=value;input.dataset.selectedValue=value;input.value=displayFor(key,value);close(input,false);
-      /* Selection is the ONLY point at which the grid rerenders/applies a filter. */
-      renderAllocations();
+      const key=input.dataset.allocationHeaderFilter;allocationState.filters=allocationState.filters||{demand:'',person:''};allocationState.filters[key]=value;input.dataset.selectedValue=value;input.value=displayFor(key,value);close(input,false);renderAllocations();
     }
     function bind(input){
       input.addEventListener('focus',()=>show(input));
@@ -56,24 +53,32 @@
       input.addEventListener('blur',()=>setTimeout(()=>{if(!input.dataset.selectedValue)close(input,true);else close(input,false)},120));
     }
 
+    function actionHost(thead){
+      let row=thead.querySelector('.list-action-row'),actions=row?.querySelector('.list-sticky-actions');
+      if(actions)return actions;
+      const columns=Math.max(1,thead.rows[0]?.cells?.length||1);row=thead.insertRow(0);row.className='list-action-row';const cell=row.insertCell();cell.colSpan=columns;cell.className='list-action-cell';actions=document.createElement('div');actions.className='list-sticky-actions';
+      const toolbar=document.getElementById('allocationToolbar');[...toolbar?.querySelectorAll('button')||[]].forEach(original=>{const clone=document.createElement('button');clone.type='button';clone.className=original.className;clone.disabled=original.disabled;clone.textContent=original.textContent;clone.onclick=()=>{if(!original.disabled)original.click()};actions.appendChild(clone)});cell.appendChild(actions);return actions
+    }
     function ensureFilters(){
-      const thead=document.getElementById('allocationTable')?.tHead,actions=thead?.querySelector('.list-action-row .list-sticky-actions');if(!actions)return;
-      let holder=actions.querySelector('.allocation-header-filters');if(!holder){holder=document.createElement('div');holder.className='allocation-header-filters';holder.append(makeField('Demand','demand','find demand…'),makeField('Resource','person','find resource…'));actions.appendChild(holder)}
+      const thead=document.getElementById('allocationTable')?.tHead;if(!thead)return;const actions=actionHost(thead);if(!actions)return;
+      let holder=actions.querySelector('.allocation-header-filters');if(!holder){holder=document.createElement('div');holder.className='allocation-header-filters';holder.append(makeField('Demand','demand','Find demand…'),makeField('Resource','person','Find resource…'));actions.appendChild(holder)}
       holder.querySelectorAll('[data-allocation-header-filter]').forEach(input=>{if(document.activeElement!==input)sync(input)});
-      [...thead.rows].forEach(row=>{if(row.classList.contains('allocation-demand-filter-row')||row.classList.contains('filter-row'))row.remove()});
+      [...thead.rows].forEach(row=>{if(row!==actions.closest('tr')&&(row.classList.contains('allocation-demand-filter-row')||row.classList.contains('filter-row')))row.remove()});
     }
 
     const baseRender=renderAllocations;renderAllocations=function(){const result=baseRender.apply(this,arguments);ensureFilters();return result};
-    /* No MutationObserver here: rebuilding suggestion rows must never disturb input focus. */
     if(!document.getElementById('allocation-header-filter-styles')){const style=document.createElement('style');style.id='allocation-header-filter-styles';style.textContent=`
-      #allocationTable .list-sticky-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-      #allocationTable .allocation-header-filters{display:flex;align-items:center;gap:10px;margin-left:6px;flex-wrap:wrap}
-      #allocationTable .allocation-header-filter{display:flex;align-items:center;gap:5px;font-size:.7rem;font-weight:700;color:var(--muted);white-space:nowrap}
-      #allocationTable .allocation-filter-combobox{position:relative;width:210px}
-      #allocationTable .allocation-filter-input{width:100%;box-sizing:border-box}
-      #allocationTable .allocation-filter-list{z-index:200;min-width:100%;width:max-content;max-width:430px;max-height:280px;overflow:auto}
-      #allocationTable .allocation-filter-list .alloc-combo-option{min-width:100%;white-space:nowrap}
-      @media(max-width:760px){#allocationTable .allocation-header-filter>span{display:none}#allocationTable .allocation-filter-combobox{width:150px}#allocationTable .allocation-filter-list{max-width:78vw}}
+      #allocationTable .list-sticky-actions{display:flex!important;align-items:center!important;gap:8px!important;flex-flow:row nowrap!important;overflow:visible!important}
+      #allocationTable .allocation-header-filters{display:flex!important;align-items:center!important;gap:10px!important;flex-flow:row nowrap!important;margin-left:4px!important;visibility:visible!important;opacity:1!important;min-width:0}
+      #allocationTable .allocation-header-filter{display:flex!important;align-items:center;gap:5px;margin:0;font-size:.72rem;font-weight:700;color:var(--muted);white-space:nowrap;visibility:visible!important;opacity:1!important}
+      #allocationTable .allocation-filter-combobox{position:relative;display:block!important;width:190px;min-width:150px;visibility:visible!important;opacity:1!important}
+      #allocationTable .allocation-filter-input{display:block!important;width:100%;height:30px;box-sizing:border-box;padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--ink);font:inherit;visibility:visible!important;opacity:1!important}
+      #allocationTable .allocation-filter-list{display:none;position:absolute;z-index:500;left:0;top:calc(100% + 3px);min-width:100%;width:max-content;max-width:430px;max-height:280px;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+      #allocationTable .allocation-filter-list.open{display:block}
+      #allocationTable .allocation-filter-option{display:block;width:100%;padding:8px 10px;border:0;border-radius:6px;background:transparent;color:var(--ink);text-align:left;white-space:nowrap;cursor:pointer}
+      #allocationTable .allocation-filter-option:hover,#allocationTable .allocation-filter-option:focus{background:var(--soft)}
+      #allocationTable .allocation-filter-empty{padding:8px 10px;color:var(--muted);font-size:.75rem}
+      @media(max-width:900px){#allocationTable .list-sticky-actions{overflow-x:auto!important}#allocationTable .allocation-header-filter>span{display:none}#allocationTable .allocation-filter-combobox{width:155px;min-width:135px}}
     `;document.head.appendChild(style)}
     renderAllocations();
   }
