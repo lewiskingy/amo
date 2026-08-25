@@ -1,6 +1,7 @@
 import http from 'node:http';
 import { URL } from 'node:url';
 import { ServerJsonWorkspaceRepository } from './repository.js';
+import { openApiDocument, swaggerHtml } from './openapi.js';
 
 const PORT=Number(process.env.PORT||8080);
 const WORKSPACE_ROOT=process.env.AMO_WORKSPACE_ROOT||'/data/workspace';
@@ -9,6 +10,7 @@ const repo=new ServerJsonWorkspaceRepository(WORKSPACE_ROOT);
 
 function cors(req,res){const origin=req.headers.origin;if(origin&&(!allowedOrigins.length||allowedOrigins.includes(origin))){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin')}res.setHeader('Access-Control-Allow-Headers','Content-Type,Authorization,If-Match');res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS')}
 function send(res,status,data){const body=data==null?'':JSON.stringify(data);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(body)}
+function sendHtml(res,status,html){res.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(html)}
 async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>10_000_000)throw new Error('Request body too large.')}return raw?JSON.parse(raw):{}}
 function parts(pathname){return pathname.split('/').filter(Boolean).map(decodeURIComponent)}
 
@@ -19,6 +21,8 @@ const server=http.createServer(async(req,res)=>{
   cors(req,res);if(req.method==='OPTIONS'){res.writeHead(204);res.end();return}
   const url=new URL(req.url,'http://localhost');const p=parts(url.pathname);
   try{
+    if(req.method==='GET'&&url.pathname==='/openapi.json')return send(res,200,openApiDocument(req));
+    if(req.method==='GET'&&(url.pathname==='/swagger'||url.pathname==='/swagger/'))return sendHtml(res,200,swaggerHtml());
     if(req.method==='GET'&&url.pathname==='/api/info'){let workspace=null;try{workspace=await repo.connect()}catch{}return send(res,200,{product:'AMO',apiVersion:'1',storage:'json-filesystem',workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:true,archive:true,bulkSave:true}})}
     if(req.method==='GET'&&url.pathname==='/api/workspace')return send(res,200,await repo.loadWorkspace());
     if(req.method==='POST'&&url.pathname==='/api/workspace/save'){await repo.saveChanges(await body(req));return send(res,200,{ok:true})}
