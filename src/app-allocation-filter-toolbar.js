@@ -2,7 +2,10 @@
    Typing narrows suggestions only; selecting an option (or Enter on one match) applies the filter. */
 (function initAllocationFilterToolbar(){
   function install(){
-    if(typeof renderAllocations!=='function'){setTimeout(install,25);return}
+    /* index.html may load this file before app-navigation loads the rich allocation layer.
+       Wait for the interaction layer's marker style so we wrap the final renderAllocations,
+       not the legacy renderer that is subsequently replaced. */
+    if(typeof renderAllocations!=='function'||!document.getElementById('allocation-interaction-styles')){setTimeout(install,25);return}
     if(window.__amoAllocationFilterToolbarInstalled)return;window.__amoAllocationFilterToolbarInstalled=true;
 
     const esc=v=>typeof escHtml==='function'?escHtml(v):String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
