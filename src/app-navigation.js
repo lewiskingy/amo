@@ -123,3 +123,5 @@
 (function loadLockAllocationGuards(){if(document.querySelector('script[data-amo-lock-allocation-guards]'))return;const s=document.createElement('script');s.src='app-lock-allocation-guards.js';s.dataset.amoLockAllocationGuards='true';document.head.appendChild(s)})();
 
 (function loadPageScrollListHeaders(){if(document.querySelector('script[data-amo-page-scroll-list]'))return;const s=document.createElement('script');s.src='app-list-page-sticky.js';s.dataset.amoPageScrollList='true';document.head.appendChild(s)})();
+
+(function loadModalUx(){if(document.querySelector('script[data-amo-modal-ux]'))return;const s=document.createElement('script');s.src='app-modal-ux.js';s.dataset.amoModalUx='true';document.head.appendChild(s)})();
