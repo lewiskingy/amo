@@ -3,8 +3,9 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas'};
-const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','status-reports','archive'];
+const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','status-reports','archive','.locks'];
 const jsonText=value=>JSON.stringify(value,null,2)+'\n';
+const COMMIT_LOCK_STALE_MS=30_000;
 
 const defaultWorkspace=()=>{
   const now=new Date().toISOString();
@@ -12,7 +13,7 @@ const defaultWorkspace=()=>{
     type:'architecture-operations-hub',
     name:'Architecture Management Office Workspace',
     workspaceId:`AMO-${randomUUID()}`,
-    schemaVersion:1,
+    schemaVersion:2,
     department:{id:'DEPT-ARCH',name:'Architecture'},
     created:now,
     modifiedAt:now,
@@ -27,18 +28,15 @@ const defaultWorkspace=()=>{
   };
 };
 
-const defaultPlanningMonths=(count=6)=>{
-  const now=new Date();
-  return Array.from({length:count},(_,offset)=>{
-    const month=new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth()+offset,1));
-    return `${month.getUTCFullYear()}-${String(month.getUTCMonth()+1).padStart(2,'0')}`;
-  });
-};
+const monthStart=(date=new Date())=>`${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-01`;
+const addUtcMonths=(date,count)=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+count,1));
+const defaultPlanningWindow=(count=6)=>{const now=new Date(Date.UTC(new Date().getUTCFullYear(),new Date().getUTCMonth(),1));return{fromMonth:monthStart(now),toMonth:monthStart(addUtcMonths(now,count-1))}};
+const defaultPlanningMonths=(count=6)=>{const w=defaultPlanningWindow(count),out=[];let d=new Date(`${w.fromMonth}T00:00:00Z`),end=new Date(`${w.toMonth}T00:00:00Z`);while(d<=end){out.push(monthStart(d).slice(0,7));d=addUtcMonths(d,1)}return out};
 
 const defaultSettings=()=>({
-  schemaVersion:1,
+  schemaVersion:2,
   appearance:'light',
-  planningMonths:defaultPlanningMonths(),
+  planningWindow:defaultPlanningWindow(),
   teams:[],
   services:['Triage','Consultancy','Assurance','Design','Strategy'],
   serviceWorkflows:{
@@ -59,21 +57,18 @@ const defaultSettings=()=>({
 });
 
 const repairRequiredSettings=settings=>{
-  const defaults=defaultSettings();
-  const repaired={...settings};
-  let changed=false;
-  for(const key of ['planningMonths','statuses','services','businessAreas','priorities','healthStates']){
-    if(!Array.isArray(repaired[key])||repaired[key].length===0){
-      repaired[key]=defaults[key];
-      changed=true;
-    }
-  }
-  if(!repaired.services.includes('Strategy')){
-    repaired.services=[...repaired.services,'Strategy'];
-    changed=true;
-  }
+  const defaults=defaultSettings(),repaired={...settings};let changed=false;
+  const version=Number(repaired.schemaVersion||1);
+  if(version>=2){
+    const w=repaired.planningWindow;if(!w?.fromMonth||!w?.toMonth){repaired.planningWindow=defaults.planningWindow;changed=true}
+  }else if(!Array.isArray(repaired.planningMonths)||!repaired.planningMonths.length){repaired.planningMonths=defaultPlanningMonths();changed=true}
+  for(const key of ['statuses','services','businessAreas','priorities','healthStates'])if(!Array.isArray(repaired[key])||repaired[key].length===0){repaired[key]=defaults[key];changed=true}
+  if(!repaired.services.includes('Strategy')){repaired.services=[...repaired.services,'Strategy'];changed=true}
   return {settings:repaired,changed};
 };
+
+const safeLockName=resource=>String(resource||'resource').replace(/[^a-zA-Z0-9._-]+/g,'--');
+const lockAge=lock=>{const t=Date.parse(lock?.createdAt||'');return Number.isFinite(t)?Date.now()-t:Number.POSITIVE_INFINITY};
 
 export class ServerJsonWorkspaceRepository{
   constructor(root){this.root=path.resolve(root);this.bootstrapped=false}
@@ -86,17 +81,10 @@ export class ServerJsonWorkspaceRepository{
   async listDir(rel){try{return await fs.readdir(this.resolve(rel),{withFileTypes:true})}catch(e){if(e.code==='ENOENT')return[];throw e}}
   entityFolder(type){const folder=ENTITY_FOLDERS[type];if(!folder)throw new Error(`Unsupported entity type: ${type}`);return folder}
   async ensureWorkspace(){
-    await this.ensureDir(this.root);
-    for(const folder of REQUIRED_FOLDERS)await this.ensureDir(this.resolve(folder));
-    const created=await this.writeJsonIfAbsent('workspace.json',defaultWorkspace());
-    const settingsCreated=await this.writeJsonIfAbsent('config/settings.json',defaultSettings());
-    if(!settingsCreated){
-      const current=await this.readJson('config/settings.json',{required:true});
-      const {settings,changed}=repairRequiredSettings(current);
-      if(changed)await this.writeJson('config/settings.json',settings);
-    }
-    this.bootstrapped=created;
-    return {created};
+    await this.ensureDir(this.root);for(const folder of REQUIRED_FOLDERS)await this.ensureDir(this.resolve(folder));
+    const created=await this.writeJsonIfAbsent('workspace.json',defaultWorkspace());const settingsCreated=await this.writeJsonIfAbsent('config/settings.json',defaultSettings());
+    if(!settingsCreated){const current=await this.readJson('config/settings.json',{required:true}),{settings,changed}=repairRequiredSettings(current);if(changed)await this.writeJson('config/settings.json',settings)}
+    this.bootstrapped=created;return {created};
   }
   async connect(){await this.ensureWorkspace();const workspace=await this.readJson('workspace.json',{required:true});if(workspace?.type!=='architecture-operations-hub')throw new Error('Not an Architecture Operations Hub workspace.');return workspace}
   async listRecords(type){const folder=this.entityFolder(type),out=[];for(const entry of await this.listDir(folder))if(entry.isFile()&&entry.name.endsWith('.json'))out.push(await this.readJson(path.join(folder,entry.name),{required:true}));return out}
@@ -113,5 +101,16 @@ export class ServerJsonWorkspaceRepository{
   async readLock(){return this.readJson('.lock.json')}
   async writeLock(lock){await this.writeJson('.lock.json',lock)}
   async deleteLock(){await this.deletePath('.lock.json')}
+  commitLockPath(resource){return path.join('.locks',`${safeLockName(resource)}.lock.json`)}
+  async acquireCommitLock(resource,owner={}){
+    await this.ensureWorkspace();const rel=this.commitLockPath(resource),token=randomUUID(),record={type:'amo-commit-lock',resource,token,createdAt:new Date().toISOString(),...owner};
+    for(let attempt=0;attempt<2;attempt++){
+      if(await this.writeJsonIfAbsent(rel,record))return record;
+      const existing=await this.readJson(rel);if(existing&&lockAge(existing)>COMMIT_LOCK_STALE_MS){await this.deletePath(rel);continue}
+      return null;
+    }
+    return null;
+  }
+  async releaseCommitLock(resource,token){const rel=this.commitLockPath(resource),current=await this.readJson(rel);if(current?.token===token)await this.deletePath(rel)}
   async archiveRecords(recordsByEntity){await this.ensureWorkspace();for(const [type,records] of Object.entries(recordsByEntity||{}))for(const record of records||[]){await this.writeJson(path.join('archive',type,`${record.id}.json`),record);await this.deleteRecord(type,record.id)}}
 }
