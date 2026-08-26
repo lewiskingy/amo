@@ -1,4 +1,18 @@
 // Modal fixes have been consolidated into app-record-modal.js.
+// Compatibility shell: app-integrations.js predates grouped navigation and expects README to
+// exist or to be insertable directly beside Workspace. Create the modern shell first so its
+// legacy ensureReadmeTab() becomes a harmless no-op; app-navigation.js later owns placement.
+(function ensureReadmeCompatibilityShell(){
+  const nav=document.querySelector('.sidebar nav'),content=document.querySelector('.content');
+  if(nav&&!nav.querySelector('[data-view="readme"]')){
+    const btn=document.createElement('button');btn.className='nav-btn';btn.dataset.view='readme';btn.innerHTML='<span class="nav-dot"></span>README';btn.addEventListener('click',()=>switchView('readme'));
+    const firstGroup=nav.querySelector(':scope > details.nav-group');if(firstGroup)nav.insertBefore(btn,firstGroup);else nav.appendChild(btn)
+  }
+  if(content&&!document.getElementById('readme')){
+    const section=document.createElement('section');section.id='readme';section.className='view';section.innerHTML='<div class="hero"><div><h1>README</h1><p>Application usage and operating notes bundled with AMO.</p></div></div><div class="card"><article id="readmeContent" class="readme-markdown"></article></div>';content.appendChild(section)
+  }
+})();
+
 // Load compatibility UX layers after every core module has initialised.
 // Modules already loaded statically by index.html are intentionally excluded here.
 window.addEventListener('load',()=>{
