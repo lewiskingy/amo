@@ -30,6 +30,13 @@ const server=http.createServer(async(req,res)=>{
       const type=p[2],id=p[3];if(req.method==='GET'&&!id)return send(res,200,await repo.listRecords(type));if(req.method==='GET'&&id)return send(res,200,await repo.getRecord(type,id));if(req.method==='PUT'&&id){const record=await body(req);record.id=record.id||id;await repo.saveRecord(type,record);return send(res,200,{ok:true})}if(req.method==='DELETE'&&id){await repo.deleteRecord(type,id);return send(res,200,{ok:true})}
     }
     if(url.pathname==='/api/settings'){if(req.method==='GET')return send(res,200,await repo.getSettings());if(req.method==='PUT'){await repo.saveSettings(await body(req));return send(res,200,{ok:true})}}
+    if(url.pathname==='/api/commit-locks'){
+      const payload=await body(req),resource=String(payload?.resource||'').trim();if(!resource)return send(res,400,{error:'Commit lock resource is required.'});
+      if(req.method==='POST'){const {resource:_resource,...owner}=payload,lock=await repo.acquireCommitLock(resource,owner);return lock?send(res,201,lock):send(res,423,{error:'Resource is currently being committed by another user. Try again.'})}
+      if(req.method==='DELETE'){await repo.releaseCommitLock(resource,payload?.token);return send(res,200,{ok:true})}
+    }
+    /* Backward-compatible path form. New clients use /api/commit-locks with resource in JSON body
+       so reverse proxies never need to preserve an encoded slash inside a route segment. */
     if(p[0]==='api'&&p[1]==='commit-locks'&&p[2]){
       const resource=p.slice(2).join('/');
       if(req.method==='POST'){const lock=await repo.acquireCommitLock(resource,await body(req));return lock?send(res,201,lock):send(res,423,{error:'Resource is currently being committed by another user. Try again.'})}
