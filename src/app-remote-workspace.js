@@ -4,16 +4,14 @@
   const currentRemoteUrl=()=>{try{return localStorage.getItem(REMOTE_URL_KEY)||getLastConnectionPreference()?.url||window.AMO_CONFIG?.defaultRemoteUrl||''}catch{return window.AMO_CONFIG?.defaultRemoteUrl||''}};
   const connected=()=>!!window.workspaceRepository;
 
-  async function activateRemote(repo,bundle,connectionToken){
+  async function activateRemote(repo,rawBundle,connectionToken){
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
-    const {workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles?.['settings.json'];validateWorkspaceSettings(settings);
+    const prepared=prepareLoadedWorkspace(rawBundle),{workspace,demand,team,allocations,ideas,configFiles,loadedSettings}=prepared;
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
-    const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);
-    demand.forEach(d=>{d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.costCentreOrProjectCode=d.costCentreOrProjectCode||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||'';d.azureDevOps=d.azureDevOps||{id:null,type:null,url:'',title:''};d.azureDevOps.url=d.azureDevOps.url||'';d.azureDevOps.title=d.azureDevOps.title||''});
     setWorkspaceRepository(repo);
     /* Temporary compatibility descriptor while older UI modules still use workspaceHandle as their connected flag. */
     workspaceHandle={name:workspace?.name||repo.name||'Remote Workspace',kind:'remote',remote:true};
-    db={schemaVersion:workspace.schemaVersion||1,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();selectedDemandId=null;resetEdits();
+    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);selectedDemandId=null;resetEdits();
     if(typeof loadStatusReports==='function')await loadStatusReports(repo);
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
     if(typeof archiveStaleTerminalDemand==='function')await archiveStaleTerminalDemand(repo);
@@ -22,7 +20,7 @@
     refreshAll();if(typeof renderStatusReporting==='function')renderStatusReporting();if(typeof renderStatusHistory==='function')renderStatusHistory();if(typeof renderLockStatus==='function')renderLockStatus();updateBanner();
     setLastConnectionPreference({mode:'remote',url:repo.baseUrl});
     try{localStorage.setItem(REMOTE_URL_KEY,repo.baseUrl)}catch{}
-    log(`Connected to remote workspace ${db.workspace?.name||repo.name} at ${repo.baseUrl}.`);
+    log(`Connected to remote workspace ${db.workspace?.name||repo.name} at ${repo.baseUrl}.${prepared.migrated?' Schema v2 migration is staged and will be persisted on the next save.':''}`);
     return true
   }
 
