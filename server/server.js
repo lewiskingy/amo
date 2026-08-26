@@ -23,13 +23,18 @@ const server=http.createServer(async(req,res)=>{
   try{
     if(req.method==='GET'&&url.pathname==='/openapi.json')return send(res,200,openApiDocument(req));
     if(req.method==='GET'&&(url.pathname==='/swagger'||url.pathname==='/swagger/'))return sendHtml(res,200,swaggerHtml());
-    if(req.method==='GET'&&url.pathname==='/api/info'){let workspace=null;try{workspace=await repo.connect()}catch{}return send(res,200,{product:'AMO',apiVersion:'1',storage:'json-filesystem',workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:true,archive:true,bulkSave:true}})}
+    if(req.method==='GET'&&url.pathname==='/api/info'){let workspace=null;try{workspace=await repo.connect()}catch{}return send(res,200,{product:'AMO',apiVersion:'1',storage:'json-filesystem',workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:true,commitLocking:true,archive:true,bulkSave:true}})}
     if(req.method==='GET'&&url.pathname==='/api/workspace')return send(res,200,await repo.loadWorkspace());
     if(req.method==='POST'&&url.pathname==='/api/workspace/save'){await repo.saveChanges(await body(req));return send(res,200,{ok:true})}
     if(p[0]==='api'&&p[1]==='records'&&p[2]){
       const type=p[2],id=p[3];if(req.method==='GET'&&!id)return send(res,200,await repo.listRecords(type));if(req.method==='GET'&&id)return send(res,200,await repo.getRecord(type,id));if(req.method==='PUT'&&id){const record=await body(req);record.id=record.id||id;await repo.saveRecord(type,record);return send(res,200,{ok:true})}if(req.method==='DELETE'&&id){await repo.deleteRecord(type,id);return send(res,200,{ok:true})}
     }
     if(url.pathname==='/api/settings'){if(req.method==='GET')return send(res,200,await repo.getSettings());if(req.method==='PUT'){await repo.saveSettings(await body(req));return send(res,200,{ok:true})}}
+    if(p[0]==='api'&&p[1]==='commit-locks'&&p[2]){
+      const resource=p.slice(2).join('/');
+      if(req.method==='POST'){const lock=await repo.acquireCommitLock(resource,await body(req));return lock?send(res,201,lock):send(res,423,{error:'Resource is currently being committed by another user. Try again.'})}
+      if(req.method==='DELETE'){const payload=await body(req);await repo.releaseCommitLock(resource,payload?.token);return send(res,200,{ok:true})}
+    }
     if(url.pathname==='/api/status-reports'&&req.method==='GET')return send(res,200,await repo.listStatusReports());
     if(p[0]==='api'&&p[1]==='status-reports'&&p[2]){const id=p[2];if(req.method==='GET')return send(res,200,await repo.getStatusReport(id));if(req.method==='PUT'){await repo.saveStatusReport(id,await body(req));return send(res,200,{ok:true})}}
     if(url.pathname==='/api/lock'){if(req.method==='GET')return send(res,200,await repo.readLock());if(req.method==='PUT'){await repo.writeLock(await body(req));return send(res,200,{ok:true})}if(req.method==='DELETE'){await repo.deleteLock();return send(res,200,{ok:true})}}
