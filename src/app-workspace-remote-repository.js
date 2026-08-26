@@ -3,7 +3,14 @@
   class RemoteWorkspaceRepository extends WorkspaceRepository{
     constructor(baseUrl){super('remote');this.baseUrl=String(baseUrl||'').replace(/\/+$/,'');this.name='Remote Workspace';this.info=null}
     async request(path,options={}){
-      const response=await fetch(`${this.baseUrl}${path}`,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+      let requestPath=path,requestOptions={...options};
+      const lockPrefix='/api/commit-locks/';
+      if(String(path||'').startsWith(lockPrefix)){
+        const resource=decodeURIComponent(String(path).slice(lockPrefix.length));
+        let payload={};try{payload=options.body?JSON.parse(options.body):{}}catch{payload={}};
+        requestPath='/api/commit-locks';requestOptions={...options,body:JSON.stringify({...payload,resource})}
+      }
+      const response=await fetch(`${this.baseUrl}${requestPath}`,{...requestOptions,headers:{'Content-Type':'application/json',...(requestOptions.headers||{})}});
       const text=await response.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
       if(!response.ok)throw new Error(data?.error||`Remote workspace request failed (${response.status}).`);return data
     }
