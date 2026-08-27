@@ -16,11 +16,13 @@
   };
 
   function kind(context,col){return col.filter?.type||FILTER_OVERRIDES[context]?.[col.key]||({date:'date',number:'number',select:'enum'}[col.type]||'text')}
-  function stateActive(value,type){if(type==='text'||type==='boolean')return String(value||'').trim()!=='';if(type==='enum'||type==='lookup')return Array.isArray(value)&&value.length>0;if(type==='date')return !!(value?.from||value?.to);if(type==='number')return value?.min!==''&&value?.min!=null||value?.max!==''&&value?.max!=null;return false}
+  function stateActive(value,type){if(type==='text'||type==='boolean')return String(value||'').trim()!=='';if(type==='enum'||type==='lookup')return Array.isArray(value)&&value.length>0;if(type==='date')return !!(value?.from||value?.to);if(type==='number')return !!value&&(value.min!==''&&value.min!=null||value.max!==''&&value.max!=null);return false}
   function optionRows(context,col){
     let rows=[];
     if(context==='demand'&&col.key==='initiative')rows=(typeof normalizeInitiatives==='function'?normalizeInitiatives(db.settings.initiatives||[]):[]).map(x=>({value:x.name,label:x.name}));
     else if(context==='team'&&col.key==='role')rows=[...new Set((db.team||[]).map(x=>String(x.role||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b)).map(v=>({value:v,label:v}));
+    else if(context==='demand'&&col.key==='phase')rows=(window.AMO_DEMAND_PHASES||['Triage','Mobilisation','Engaged','Governance','Exit']).map(v=>({value:v,label:v}));
+    else if(context==='demand'&&col.key==='status')rows=(typeof allWorkflowStatuses==='function'?allWorkflowStatuses():[]).map(v=>({value:v,label:v}));
     else rows=(col.values?.()||[]).map(v=>typeof v==='object'?{value:String(v.value??''),label:String(v.label??v.value??'')}:{value:String(v),label:String(v)});
     if(context==='demand'&&col.key==='workPackage.architectureOwner')rows=rows.map(x=>({value:x.label,label:x.label}));
     return [...new Map(rows.filter(x=>x.label!=='—').map(x=>[x.label,{value:x.label,label:x.label}])).values()];
@@ -54,7 +56,7 @@
     if(type==='number'){const n=Number(value);if(!Number.isFinite(n))return false;const min=filter.min===''||filter.min==null?null:Number(filter.min),max=filter.max===''||filter.max==null?null:Number(filter.max);return(min==null||n>=min)&&(max==null||n<=max)}
     return true;
   }
-  function rowMatches(context,row,cols,filters,valueGetter){return cols.every(col=>matches(valueGetter(row,col),filters[col.key],kind(context,col)))}
+  function rowMatches(context,row,cols,filters,valueGetter,exclude=new Set()){return cols.every(col=>exclude.has(col.key)||matches(valueGetter(row,col),filters[col.key],kind(context,col)))}
   function schedule(context,key,state,render,value){state.filters[key]=value;clearTimeout(debounce[`${context}:${key}`]);debounce[`${context}:${key}`]=setTimeout(render,260)}
   function wire(root,context,cols,state,render){
     if(!root)return;
@@ -76,18 +78,19 @@
     renderGrid=function(name){const result=priorRenderGrid(name);if(name==='team')wire($('teamTable'),'team',teamCols,gridState.team,()=>renderGrid('team'));return result};
   }
 
-  /* Demand: integrated register owns display values, so prefilter before its legacy renderer. */
+  /* Demand: prefilter semantic fields while retaining lifecycle Phase/Status handling underneath. */
   if(typeof integratedDemandFilter==='function'&&typeof renderIntegratedDemandGrid==='function'){
     integratedDemandFilter=function(col){return control('demand',col,gridState.demand.filters[col.key])};
-    const priorIntegratedDemandGrid=renderIntegratedDemandGrid;
+    const priorIntegratedDemandGrid=renderIntegratedDemandGrid,lifecycleKeys=new Set(['phase','status']);
     renderIntegratedDemandGrid=function(){
-      const s=gridState.demand,cols=integratedDemandCols(),allDemand=db.demand,allDraft=s.draft,filters=s.filters;
-      const source=s.editing?(allDraft||[]):allDemand,visible=source.filter(r=>(!s.editing||!s.deleted.has(r.id))&&rowMatches('demand',r,cols,filters,(row,col)=>integratedDemandValue(row,col)));
-      db.demand=s.editing?allDemand:visible;if(s.editing)s.draft=visible;s.filters={};
+      const s=gridState.demand,cols=integratedDemandCols(),allDemand=db.demand,allDraft=s.draft,filters=s.filters,source=s.editing?(allDraft||[]):allDemand;
+      const visible=source.filter(r=>(!s.editing||!s.deleted.has(r.id))&&rowMatches('demand',r,cols,filters,(row,col)=>integratedDemandValue(row,col),lifecycleKeys));
+      const lifecycleFilters={};if(filters.phase!==undefined)lifecycleFilters.phase=filters.phase;if(filters.status!==undefined)lifecycleFilters.status=filters.status;
+      db.demand=s.editing?allDemand:visible;if(s.editing)s.draft=visible;s.filters=lifecycleFilters;
       try{priorIntegratedDemandGrid()}finally{db.demand=allDemand;s.draft=allDraft;s.filters=filters}
       const row=$('demandTable')?.tHead?.querySelector('.filter-row');if(row){const cells=[...row.cells];cols.forEach((c,i)=>{if(cells[i])cells[i].innerHTML=integratedDemandFilter(c)})}
       wire($('demandTable'),'demand',cols,s,()=>renderGrid('demand'));
-      const count=$('demandCount');if(count&&workspaceHandle)count.textContent=`Showing ${visible.length} of ${source.length-(s.editing?s.deleted.size:0)} records`;
+      const count=$('demandCount'),shown=$('demandTable')?.tBodies?.[0]?.rows?.length||0;if(count&&workspaceHandle)count.textContent=`Showing ${shown} of ${source.length-(s.editing?s.deleted.size:0)} records`;
     };
   }
 
@@ -104,4 +107,6 @@
     .filter-row .semantic-filter-popover{position:absolute;z-index:650;top:calc(100% + 4px);left:0;min-width:205px;max-width:320px;max-height:310px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:7px}.filter-row .semantic-filter-search{width:100%;margin-bottom:5px}.filter-row .semantic-filter-options label{display:flex;gap:7px;align-items:center;padding:5px 3px;white-space:nowrap;font-size:.75rem}.filter-row .semantic-filter-clear{margin-top:5px;border:0;background:transparent;color:var(--accent2);cursor:pointer;font-weight:700;font-size:.72rem;padding:4px}
     .filter-row .semantic-range-fields{display:grid;gap:7px;min-width:225px}.filter-row .semantic-range-fields label{display:grid;grid-template-columns:42px 1fr;gap:7px;align-items:center;font-size:.72rem;color:var(--muted)}.filter-row .semantic-range-fields input{min-width:150px}.filter-row input[data-sem-text],.filter-row select[data-sem-boolean]{min-width:92px;max-width:150px}
   `;document.head.appendChild(style)}
+
+  if(typeof refreshAll==='function')refreshAll();else if(typeof renderIdeas==='function')renderIdeas();
 })();
