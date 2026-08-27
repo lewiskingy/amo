@@ -16,7 +16,8 @@
 // Load compatibility UX layers after every core module has initialised.
 // Modules already loaded statically by index.html are intentionally excluded here.
 window.addEventListener('load',()=>{
+  const COMPAT_ASSET_VERSION='20260827-roles-1';
   for(const src of ['app-branding.js','app-team-scope-clarity.js','app-ui-polish.js','app-status-rag-sync.js','app-workspace-memory.js','app-role-model.js','app-workspace-startup.js','app-status-report-ui.js','app-attention-health.js','app-assistant-link.js','app-command-menu.js','app-roadmap-groups.js','app-readme-embedded.js','app-readme-assistant.js','app-config-settings.js','app-role-config.js','app-config-organization-effective.js','app-semantic-filters.js','app-semantic-filter-polish.js','app-financial-planning.js']){
-    const s=document.createElement('script');s.src=src;s.async=false;document.body.appendChild(s)
+    const s=document.createElement('script');s.src=`${src}?v=${COMPAT_ASSET_VERSION}`;s.async=false;document.body.appendChild(s)
   }
 });
