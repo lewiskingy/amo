@@ -14,7 +14,7 @@
     for(const p of db.team||[])if(p.roleId&&!roles.some(r=>r.id===p.roleId))return`Cannot remove Role ${p.roleId}; user ${p.id} still references it.`;
     return null
   }
-  function syncPersonRoleAliases(){for(const p of db.team||[]){const name=roleById(p.roleId)?.name||'';if(String(p.role||'')!==name){p.role=name;markDirty?.('team',p.id,`Aligned ${p.id} Role display name to ${name||'Unassigned'}.`)}}}
+  function syncPersonRoleAliases(){for(const p of db.team||[]){const name=roleById(p.roleId)?.name||'';if(String(p.role||'')!==name){p.role=name;if(typeof markDirty==='function')markDirty('team',p.id,`Aligned ${p.id} Role display name to ${name||'Unassigned'}.`)}}}
   function roleCard(){
     const editing=state?.editingTab==='organization',roles=rolesForPage();
     const rows=roles.map((r,i)=>`<tr><td><strong>${escHtml(r.id)}</strong></td><td>${editing?`<input class="cell-input" data-role-name="${i}" value="${escHtml(r.name)}">`:escHtml(r.name)}</td><td>${editing?`<input class="cell-input role-rate-input" type="number" min="0" step="25" data-role-rate="${i}" value="${Number(r.dayRate)||0}">`:`£${(Number(r.dayRate)||0).toLocaleString('en-GB')} / day`}</td>${editing?`<td><button class="btn danger" data-role-delete="${i}">Delete</button></td>`:''}</tr>`).join('');
@@ -26,7 +26,7 @@
     document.querySelectorAll('[data-role-rate]').forEach(el=>el.oninput=e=>s.roles[Number(e.target.dataset.roleRate)].dayRate=Math.max(0,Number(e.target.value)||0));
     document.querySelectorAll('[data-role-delete]').forEach(b=>b.onclick=()=>{const role=s.roles[Number(b.dataset.roleDelete)],used=(db.team||[]).find(p=>p.roleId===role?.id);if(used){alert(`Cannot remove Role ${role.id}; user ${used.id} still references it.`);return}s.roles.splice(Number(b.dataset.roleDelete),1);renderConfig()});
     $('settingsAddRole')?.addEventListener('click',()=>{const id=nextId(s.roles);s.roles.push({id,name:'New Role',dayRate:0});renderConfig()});
-    const save=$('saveSettingsTab');if(save){const clean=save.cloneNode(true);save.replaceWith(clean);clean.addEventListener('click',async()=>{const error=validateRoles();if(error){alert(error);return}await saveConfigChanges();if(!state.editingTab)syncPersonRoleAliases()})}
+    const save=$('saveSettingsTab');if(save){const clean=save.cloneNode(true);save.replaceWith(clean);clean.addEventListener('click',async()=>{const error=validateRoles();if(error){alert(error);return}await saveConfigChanges();if(!state.editingTab)syncPersonRoleAliases();renderConfig()})}
   }
   const baseRenderRoleConfig=renderConfig;
   renderConfig=function(){const result=baseRenderRoleConfig();if(!workspaceHandle||state?.activeTab!=='organization')return result;const grid=$('configContent')?.querySelector('.settings-grid');if(grid&&!grid.querySelector('.roles-settings-card')){grid.insertAdjacentHTML('beforeend',roleCard());wireRoleEditor()}return result};
