@@ -15,19 +15,27 @@
        should always read naturally: checkbox first, then left-aligned text. */
     .semantic-filter-popover,
     .semantic-filter-options{ text-align:left!important; }
+    .semantic-filter-popover{ overflow-x:hidden!important; }
     .semantic-filter-options label{
       display:flex!important;
       flex-direction:row!important;
-      align-items:center!important;
+      align-items:flex-start!important;
       justify-content:flex-start!important;
       gap:7px!important;
       width:100%;
       box-sizing:border-box;
       text-align:left!important;
+      white-space:normal!important;
     }
-    .semantic-filter-options label > input[type="checkbox"]{
-      flex:0 0 auto;
-      margin:0!important;
+    /* app.css gives every filter-row input width:100%. Reset that for checkboxes so the
+       checkbox occupies only its natural control width rather than consuming the whole row. */
+    .filter-row .semantic-filter-options label > input[type="checkbox"]{
+      width:auto!important;
+      min-width:0!important;
+      max-width:none!important;
+      flex:0 0 auto!important;
+      margin:2px 0 0!important;
+      padding:0!important;
       order:0;
     }
     .semantic-filter-options label > span{
@@ -35,6 +43,8 @@
       min-width:0;
       order:1;
       text-align:left!important;
+      white-space:normal!important;
+      overflow-wrap:anywhere;
     }
   `;
   document.head.appendChild(style);
