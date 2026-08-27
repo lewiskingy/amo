@@ -1,6 +1,6 @@
 const CURRENT_YEAR=new Date().getFullYear();
 const CURRENT_SCHEMA_VERSION=2;
-const DEFAULT_SETTINGS={schemaVersion:CURRENT_SCHEMA_VERSION,planningWindow:{fromMonth:'',toMonth:''},statuses:[],services:[],businessAreas:[],initiatives:[],priorities:[],healthStates:[],ideaStatuses:['New','Under Review','Planned','Implemented','Closed']};
+const DEFAULT_SETTINGS={schemaVersion:CURRENT_SCHEMA_VERSION,planningWindow:{fromMonth:'',toMonth:''},financialPlanning:{roleDayRates:{}},statuses:[],services:[],businessAreas:[],initiatives:[],priorities:[],healthStates:[],ideaStatuses:['New','Under Review','Planned','Implemented','Closed']};
 function emptyDb(){return{schemaVersion:CURRENT_SCHEMA_VERSION,workspace:null,settings:structuredClone(DEFAULT_SETTINGS),team:[],demand:[],allocations:[],ideas:[],configFiles:{}}}
 let db=emptyDb(),workspaceHandle=null,selectedDemandId=null,activity=[],configDirty=false;
 const dirtyRecords={demand:new Set(),team:new Set(),allocations:new Set(),ideas:new Set()},deletedDemand=new Set(),deletedTeam=new Set(),deletedAllocations=new Set(),deletedIdeas=new Set();
@@ -38,66 +38,23 @@ function clearDirty(){Object.values(dirtyRecords).forEach(s=>s.clear());deletedD
 
 /* Legacy low-level helpers remain temporarily for compatibility with UI extensions that have not yet
    been moved to named repository capabilities. Core workspace open/save no longer uses them. */
-async function readJsonFile(h){const f=await h.getFile();return JSON.parse(await f.text())}
-async function readNamedJson(dir,name,required=false){try{return await readJsonFile(await dir.getFileHandle(name))}catch(e){if(required)throw new Error(`Required file ${name} not found or invalid.`);return null}}
-async function readEntityFolder(root,name){const repo=window.workspaceRepositoryForHandle?workspaceRepositoryForHandle(root):null;if(repo)return repo.listJsonRecords(name);const dir=await root.getDirectoryHandle(name),out=[];for await(const [fn,h] of dir.entries())if(h.kind==='file'&&fn.endsWith('.json'))out.push(await readJsonFile(h));return out}
-async function readOptionalEntityFolder(root,name){try{return await readEntityFolder(root,name)}catch(e){if(e.name==='NotFoundError')return[];throw e}}
-async function readConfigFolder(root){const repo=window.workspaceRepositoryForHandle?workspaceRepositoryForHandle(root):null;if(repo)return repo.readConfigFiles();const out={};try{const dir=await root.getDirectoryHandle('config');for await(const [fn,h] of dir.entries())if(h.kind==='file'&&fn.endsWith('.json'))out[fn]=await readJsonFile(h)}catch(e){}return out}
-async function writeJson(dir,name,data){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(JSON.stringify(data,null,2)+'\n');await w.close()}
-async function ensureRW(h){const repo=window.workspaceRepositoryForHandle?workspaceRepositoryForHandle(h):null;if(repo)return repo.ensureWritePermission();const o={mode:'readwrite'};if(h.queryPermission&&await h.queryPermission(o)==='granted')return true;return h.requestPermission&&await h.requestPermission(o)==='granted'}
-function migrateInitiatives(settings,demand){const items=normalizeInitiatives(settings.initiatives||[]);for(const i of items){if(i.businessArea)continue;const areas=[...new Set(demand.filter(d=>d.initiative===i.name).map(d=>d.businessArea).filter(Boolean))];if(areas.length===1)i.businessArea=areas[0]}return items}
-function allocationForecastTotal(allocations){return(allocations||[]).reduce((sum,a)=>sum+Object.values(a.forecast||{}).reduce((n,v)=>n+(Number(v)||0),0),0)}
-function migrateWorkspaceBundle(rawBundle){
-  const bundle=clone(rawBundle),settings=bundle.configFiles?.['settings.json'];if(!settings)throw new Error('Required config/settings.json not found or invalid.');
-  const sourceVersion=Number(bundle.workspace?.schemaVersion||settings.schemaVersion||1);if(sourceVersion>CURRENT_SCHEMA_VERSION)throw new Error(`Workspace schema v${sourceVersion} is newer than this application supports (v${CURRENT_SCHEMA_VERSION}).`);
-  const migratedAllocationIds=[];let migrated=false,migrationNote='';
-  if(sourceVersion<2){
-    const legacy=[...new Set((settings.planningMonths||[]).map(String))].sort();if(!legacy.length||legacy.some(m=>!/^\d{4}-\d{2}$/.test(m)))throw new Error('Schema v1 workspace must define valid planningMonths using YYYY-MM.');
-    settings.planningWindow={fromMonth:normalizeMonthStart(legacy[0]),toMonth:normalizeMonthStart(legacy[legacy.length-1])};delete settings.planningMonths;
-    const before=allocationForecastTotal(bundle.allocations);
-    for(const a of bundle.allocations||[]){const next={};for(const [rawKey,value] of Object.entries(a.forecast||{})){const key=normalizeMonthStart(rawKey);if(!key)throw new Error(`Allocation ${a.id} contains invalid forecast month ${rawKey}.`);if(Object.prototype.hasOwnProperty.call(next,key)&&Number(next[key])!==Number(value))throw new Error(`Allocation ${a.id} contains conflicting values for ${key}.`);next[key]=value}if(JSON.stringify(next)!==JSON.stringify(a.forecast||{})){a.forecast=next;migratedAllocationIds.push(a.id)}}
-    const after=allocationForecastTotal(bundle.allocations);if(Math.abs(before-after)>.0000001)throw new Error('Planning-period migration failed integrity check: allocation totals changed.');
-    const contiguous=monthsBetween(normalizeMonthStart(legacy[0]),normalizeMonthStart(legacy[legacy.length-1]));const gaps=contiguous.filter(m=>!legacy.includes(m.slice(0,7)));
-    migrationNote=`Schema v1 → v2: ${legacy.length} configured planning months became ${settings.planningWindow.fromMonth} → ${settings.planningWindow.toMonth}; ${migratedAllocationIds.length} allocation record(s) migrated.${gaps.length?` The new continuous window also includes ${gaps.map(monthLabel).join(', ')}.`:''}`;migrated=true
-  }else{
-    settings.planningWindow=settings.planningWindow||{};settings.planningWindow.fromMonth=normalizeMonthStart(settings.planningWindow.fromMonth);settings.planningWindow.toMonth=normalizeMonthStart(settings.planningWindow.toMonth)
-  }
-  settings.schemaVersion=CURRENT_SCHEMA_VERSION;bundle.workspace={...bundle.workspace,schemaVersion:CURRENT_SCHEMA_VERSION};bundle.configFiles['settings.json']=settings;
-  return{bundle,migrated,migratedAllocationIds,migrationNote}
-}
-function validateWorkspaceSettings(settings){
-  if(!settings)throw new Error('Required config/settings.json not found or invalid.');
-  for(const key of ['statuses','services','businessAreas','priorities','healthStates'])if(!Array.isArray(settings[key])||!settings[key].length)throw new Error(`config/settings.json must define at least one ${key} value.`);
-  const from=normalizeMonthStart(settings.planningWindow?.fromMonth),to=normalizeMonthStart(settings.planningWindow?.toMonth);if(!from||!to||from>to)throw new Error('config/settings.json planningWindow must define valid fromMonth and toMonth month-start dates, with fromMonth <= toMonth.');
-  if(!settings.services.includes('Strategy'))throw new Error('config/settings.json services must include Strategy.')
-}
-function prepareLoadedWorkspace(rawBundle){const migration=migrateWorkspaceBundle(rawBundle),bundle=migration.bundle,{workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles['settings.json'];validateWorkspaceSettings(settings);const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.planningWindow={...settings.planningWindow};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);demand.forEach(d=>{d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.costCentreOrProjectCode=d.costCentreOrProjectCode||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||'';d.azureDevOps=d.azureDevOps||{id:null,type:null,url:'',title:''};d.azureDevOps.url=d.azureDevOps.url||'';d.azureDevOps.title=d.azureDevOps.title||''});return{...migration,workspace,demand,team,allocations,ideas,configFiles,loadedSettings}}
-function applyMigrationDirtyState(prepared){if(!prepared.migrated)return;configDirty=true;for(const id of prepared.migratedAllocationIds)dirtyRecords.allocations.add(id);updateBanner();log(prepared.migrationNote)}
-async function openWorkspace(){
-  if(!('showDirectoryPicker'in window)){alert('Folder access is not supported in this browser.');return}
-  const connectionToken=workspaceConnectionIntent.mode==='local'?workspaceConnectionIntent.token:beginWorkspaceConnection('local');
-  try{
-    const h=await showDirectoryPicker({mode:'readwrite'});
-    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
-    if(!window.LocalWorkspaceRepository)throw new Error('Workspace repository layer has not loaded.');
-    const repo=new LocalWorkspaceRepository(h),rawBundle=await repo.loadWorkspace();
-    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
-    await backupWorkspaceOnOpen(h);
-    const prepared=prepareLoadedWorkspace(rawBundle),{workspace,demand,team,allocations,ideas,configFiles,loadedSettings}=prepared;
-    if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
-    workspaceHandle=h;setWorkspaceRepository(repo);setLastConnectionPreference({mode:'local',name:h.name||'Workspace'});
-    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);selectedDemandId=null;resetEdits();refreshAll();log(`Loaded ${demand.length} demand, ${team.length} team, ${allocations.length} allocations and ${ideas.length} ideas through LocalWorkspaceRepository. Safety backup created.`);if(prepared.migrated&&typeof requestAutosave==='function')requestAutosave()
-  }catch(e){if(e.name!=='AbortError'){alert(e.message);log(`ERROR: ${e.message}`)}}
-}
-async function saveWorkspace(options={}){
-  if(!workspaceHandle)return;const opts=options instanceof Event?{}:options,{silent=false,reason='Manual save'}=opts,saveSerial=typeof workspaceChangeSerial==='number'?workspaceChangeSerial:0;
-  try{
-    const repo=window.workspaceRepository||new LocalWorkspaceRepository(workspaceHandle);if(!window.workspaceRepository)setWorkspaceRepository(repo);
-    await repo.saveChanges({workspace:db.workspace,settings:db.settings,collections:{demand:db.demand,team:db.team,allocations:db.allocations,ideas:db.ideas},dirty:dirtyRecords,deleted:{demand:deletedDemand,team:deletedTeam,allocations:deletedAllocations,ideas:deletedIdeas},configDirty});
-    if(configDirty)db.configFiles['settings.json']=clone(db.settings);
-    const changedDuringSave=typeof workspaceChangeSerial==='number'&&workspaceChangeSerial!==saveSerial;if(!changedDuringSave)clearDirty();else{updateBanner();if(typeof requestAutosave==='function')requestAutosave(250)}
-    log(reason==='Autosave'?(changedDuringSave?'Autosave completed; newer changes remain queued.':'Autosaved workspace changes.'):'Workspace saved successfully.');return true
-  }catch(e){if(!silent)alert(`Could not save workspace: ${e.message}`);log(`ERROR saving: ${e.message}`);return false}
-}
-function getPath(o,path){return path.split('.').reduce((v,k)=>v?.[k],o)}
-function setPath(o,path,value){const p=path.split('.');let x=o;while(p.length>1){const k=p.shift();x[k]=x[k]||{};x=x[k]}x[p[0]]=value}
+async function getDirHandle(root,pathParts,create=false){let dir=root;for(const p of pathParts)dir=await dir.getDirectoryHandle(p,{create});return dir}
+async function readJson(root,path){let dir=root;for(let i=0;i<path.length-1;i++)dir=await dir.getDirectoryHandle(path[i]);const fh=await dir.getFileHandle(path[path.length-1]),file=await fh.getFile();return JSON.parse(await file.text())}
+async function writeJson(root,path,obj){let dir=root;for(let i=0;i<path.length-1;i++)dir=await dir.getDirectoryHandle(path[i],{create:true});const fh=await dir.getFileHandle(path[path.length-1],{create:true}),w=await fh.createWritable();await w.write(JSON.stringify(obj,null,2)+'\n');await w.close()}
+async function deleteFileIfExists(root,path){try{let dir=root;for(let i=0;i<path.length-1;i++)dir=await dir.getDirectoryHandle(path[i]);await dir.removeEntry(path[path.length-1])}catch(e){if(e.name!=='NotFoundError')throw e}}
+async function listJson(root,pathParts){const dir=await getDirHandle(root,pathParts),rows=[];for await(const [name,h]of dir.entries())if(h.kind==='file'&&name.endsWith('.json')){const f=await h.getFile();rows.push(JSON.parse(await f.text()))}return rows}
+function workspaceRepositoryFor(handle=workspaceHandle){if(window.workspaceRepository?.handle===handle)return window.workspaceRepository;if(typeof LocalWorkspaceRepository==='function'&&handle)return new LocalWorkspaceRepository(handle);return null}
+function repositorySettings(){return window.workspaceRepository?.getSettings?.()}
+function repositorySaveSettings(settings){return window.workspaceRepository?.saveSettings?.(settings)}
+
+function normalizeInitiatives(values){return(values||[]).map(v=>typeof v==='string'?{name:v,businessArea:''}:{name:String(v?.name||''),businessArea:String(v?.businessArea||'')}).filter(v=>v.name)}
+function initiativesForBusinessArea(area){return normalizeInitiatives(db.settings.initiatives||[]).filter(i=>!i.businessArea||i.businessArea===area)}
+function getPath(o,path){return path.split('.').reduce((a,k)=>a?.[k],o)}function setPath(o,path,v){const p=path.split('.');let x=o;for(let i=0;i<p.length-1;i++)x=x[p[i]]??=(Number.isInteger(+p[i+1])?[]:{});x[p.at(-1)]=v}
+function mergeSettings(base,patch){const out=clone(base);for(const[k,v]of Object.entries(patch||{}))out[k]=clone(v);return out}
+function totalForecastFte(rows){return(rows||[]).reduce((total,a)=>total+Object.values(a.forecast||{}).reduce((n,v)=>n+(Number(v)||0),0),0)}
+function canonicalizeForecast(forecast){const out={};for(const[key,value]of Object.entries(forecast||{})){const month=normalizeMonthStart(key);if(!month)continue;if(Object.prototype.hasOwnProperty.call(out,month)&&Number(out[month])!==Number(value))throw new Error(`Allocation contains conflicting values for ${month}.`);out[month]=value}return out}
+function migrateWorkspaceBundle(rawBundle){const bundle=clone(rawBundle),settings=bundle.configFiles?.['settings.json']||bundle.settings||{},version=Number(settings.schemaVersion||1);if(version>CURRENT_SCHEMA_VERSION)throw new Error(`Workspace schema ${version} is newer than this application supports (${CURRENT_SCHEMA_VERSION}).`);let changed=false,migration=null;if(version<2){const months=[...new Set((settings.planningMonths||[]).map(normalizeMonthStart).filter(Boolean))].sort();if(!months.length)throw new Error('Legacy Planning Months is empty; cannot derive a planning window.');const before=totalForecastFte(bundle.allocations);bundle.allocations=(bundle.allocations||[]).map(a=>({...a,forecast:canonicalizeForecast(a.forecast)}));const after=totalForecastFte(bundle.allocations);if(Math.abs(before-after)>1e-9)throw new Error('Allocation FTE changed during planning-window migration.');delete settings.planningMonths;settings.planningWindow={fromMonth:months[0],toMonth:months.at(-1)};settings.schemaVersion=2;bundle.schemaVersion=2;changed=true;migration={fromVersion:version,toVersion:2,planningWindow:clone(settings.planningWindow)}}else{const w=settings.planningWindow||{};const normalized={fromMonth:normalizeMonthStart(w.fromMonth),toMonth:normalizeMonthStart(w.toMonth)};if(normalized.fromMonth!==w.fromMonth||normalized.toMonth!==w.toMonth){settings.planningWindow=normalized;changed=true}const allocations=(bundle.allocations||[]).map(a=>({...a,forecast:canonicalizeForecast(a.forecast)}));if(JSON.stringify(allocations)!==JSON.stringify(bundle.allocations||[])){bundle.allocations=allocations;changed=true}}
+  if(!settings.financialPlanning||typeof settings.financialPlanning!=='object'){settings.financialPlanning={roleDayRates:{}};changed=true}
+  bundle.configFiles=bundle.configFiles||{};bundle.configFiles['settings.json']=settings;bundle.settings=settings;return{bundle,changed,migration}}
+function prepareLoadedWorkspace(rawBundle){const result=migrateWorkspaceBundle(rawBundle);const b=result.bundle;return{...result,db:{schemaVersion:Number(b.configFiles?.['settings.json']?.schemaVersion||b.schemaVersion||CURRENT_SCHEMA_VERSION),workspace:b.workspace,settings:b.configFiles?.['settings.json']||clone(DEFAULT_SETTINGS),team:b.team||[],demand:b.demand||[],allocations:b.allocations||[],ideas:b.ideas||[],configFiles:b.configFiles||{}}}}
+function applyMigrationDirtyState(result){if(!result.changed)return;configDirty=true;for(const a of result.db.allocations)dirtyRecords.allocations.add(a.id)}
