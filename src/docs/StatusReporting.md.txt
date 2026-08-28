@@ -73,6 +73,20 @@ Two users can therefore edit different Demand entries, or different fields on th
 
 Publish, Unpublish and New Draft use the same short-lived commit-lock resource to prevent lifecycle transitions racing with a concurrent Draft save.
 
+## Report composition
+
+The live Status Report page, Preview and Published/Final report views use the same management-report sequence:
+
+1. **Demand highlights** — headline Demand metrics such as Active Demand and other portfolio counts;
+2. **Capacity outlook** — FTE capacity and allocation position across the Planning Window;
+3. **Portfolio forecast** — best available total forecast using ROM, Estimate or Complete Allocations;
+4. **Allocation outlook** — phased role-rated allocation values across the Planning Window;
+5. **Architecture Status Report** — the Demand-level Health and narrative.
+
+**Attention Required is intentionally not included in Status Reporting.** It remains a Dashboard management view so the status report reaches authored narrative more quickly and avoids duplicating operational exception reporting.
+
+The same composition is used for the current working report and for generated Preview/Published/Final reports. Historical snapshots retain the portfolio values captured when they were published rather than being recalculated from today's live data.
+
 ## Health semantics and accessibility
 
 Status Reporting uses the same controlled Health model as Demand:
@@ -83,7 +97,7 @@ Status Reporting uses the same controlled Health model as Demand:
 
 Health is never communicated by colour alone. Text remains visible in the table and report viewer.
 
-For scanability, the Status Report table uses a coloured rail/tint on the Health cell. Published/preview report entries use a wider semantic left rail plus a subtle header tint. This gives Health stronger visual presence without applying saturated colour to whole report rows.
+For scanability, the Status Report table uses a coloured rail/tint on the Health cell. Preview, Published and Final report entries use the same semantic treatment: a wider Health-coloured left rail plus a subtle corresponding header tint. The semantic styling is part of the generated report HTML so it is retained in the modal viewer, standalone window and print/PDF output rather than depending on a page-only decorator.
 
 ## Report viewer
 
