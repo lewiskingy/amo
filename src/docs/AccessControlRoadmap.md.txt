@@ -1,0 +1,1355 @@
+# AMO Authentication, Authorization and Organisational Access Control Roadmap
+
+Status: **Planned implementation**
+
+This document records the intended direction for authentication, organisational scoping and authorization in Architecture Management Office (AMO). It is a design baseline for incremental implementation. Unless a capability is explicitly described elsewhere as current behaviour, the controls in this document should be treated as **target state rather than implemented security**.
+
+The purpose is to support AMO moving from a largely single-user / trusted-department workspace into a multi-user departmental application without losing the intentionally open, collaborative nature of the tool.
+
+The core design principle is:
+
+> **Authentication identifies the person. Membership describes where they belong. Scoped role assignments grant bundles of capabilities. Capabilities govern individual actions and sensitive data.**
+
+This deliberately avoids hard-coding application behaviour directly to a small set of named roles. Roles remain useful and understandable to administrators, but authorization is ultimately capability- and scope-based.
+
+---
+
+## 1. Why this change is needed
+
+AMO is evolving from a personal/tactical architecture-management workspace into a shared operating tool.
+
+The expected operating environment includes:
+
+- multiple users;
+- multiple Architecture teams;
+- potentially multiple Architecture departments or comparable organisational units;
+- broad visibility across teams for collaboration and management transparency;
+- narrower edit rights so users do not change another team's operational data;
+- potentially restricted visibility for sensitive information, particularly financial data and some status-report information;
+- different levels of administration;
+- explicit control over department-level reporting lifecycle actions such as Publish, Unpublish and New Draft;
+- a real authentication boundary for the hosted Remote workspace;
+- a pragmatic compatibility model for Local Workspace, where filesystem access prevents AMO from being a hard security boundary.
+
+At present AMO already has useful organisational concepts such as Department, Teams, People/Home Team, Demand/Owning Team and Team View. The intended change is to add identity and authorization around those concepts rather than redesign the application around security.
+
+---
+
+## 2. Design principles
+
+### 2.1 Broad read, narrow write
+
+AMO should remain intentionally open where practical.
+
+A user assigned to Team A may be allowed to see operational information for Teams B and C, while only being allowed to modify Team A data.
+
+This supports collaboration and avoids creating information silos merely because edit responsibility differs.
+
+The default design direction is therefore:
+
+- **operational read visibility can be broad**;
+- **write authority is scoped**;
+- **sensitive information receives separate capability controls**.
+
+This is preferable to making every role a self-contained security island.
+
+### 2.2 Authentication and authorization are separate concerns
+
+Authentication answers:
+
+> Who is this person?
+
+Authorization answers:
+
+> What can this person do, and against which organisational scope?
+
+AMO should keep an internal user record even when authentication is delegated to an external identity provider. This means authorization remains an AMO concern and is not encoded directly into Google, Entra ID or another provider's groups unless a later integration deliberately maps them.
+
+### 2.3 Membership and authority are separate
+
+A user's organisational membership should not determine all of their permissions.
+
+For example, a person may:
+
+- belong to Team A;
+- have read/reporting authority across a whole Department;
+- temporarily administer Team B;
+- publish a department-wide Status Report.
+
+Therefore:
+
+> **Membership = where the person belongs.**
+>
+> **Role assignment = where the person has authority.**
+
+This distinction is fundamental to the model.
+
+### 2.4 Roles are bundles, capabilities are the enforcement unit
+
+The application should not scatter logic such as:
+
+```text
+if user.role == "Team Admin"
+```
+
+throughout the UI and API.
+
+Instead, named roles should resolve to capabilities such as:
+
+```text
+demand.read
+demand.write
+allocation.read
+allocation.write
+financial.read
+status.update
+status.publish
+system.configure
+system.restore
+```
+
+Authorization then becomes:
+
+> Does this user have capability X for resource/scope Y?
+
+This provides a stable foundation even when role definitions change later.
+
+### 2.5 Server-side enforcement for Remote Workspace
+
+Hiding or disabling UI controls is useful UX, but is not security.
+
+For Remote Workspace, the API must enforce authorization independently of the browser.
+
+For example, a manually constructed request to update a Demand record must still be rejected if the authenticated user does not have `demand.write` for the Demand's owning scope.
+
+Expected result:
+
+```text
+403 Forbidden
+```
+
+where appropriate.
+
+### 2.6 Local Workspace is not a hard security boundary
+
+Local Workspace can use the same conceptual user/role/capability model for consistent behaviour, but it cannot provide strong access security when a user has direct filesystem access to the workspace JSON.
+
+A person with access to the files can potentially read or modify them outside AMO.
+
+Therefore Local Workspace authorization should be described as:
+
+> **application-enforced cooperative control**
+
+rather than a secure authorization boundary.
+
+This is acceptable for development, personal use and trusted-team scenarios, but should not be confused with the hosted Remote security model.
+
+---
+
+## 3. Organisational model
+
+The first implementation should avoid an unnecessarily generic organisation tree.
+
+A simple model is sufficient:
+
+```text
+Department
+  ├─ Team A
+  ├─ Team B
+  └─ Team C
+```
+
+Current AMO can start with a single Department representing the existing **Whole Department** view.
+
+Over time multiple Departments may be introduced without changing the authorization concepts.
+
+### 3.1 Department
+
+A Department is a top-level AMO organisational scope for the first implementation.
+
+Suggested shape:
+
+```json
+{
+  "id": "DEP-001",
+  "name": "Architecture",
+  "active": true
+}
+```
+
+A Department owns one or more Teams.
+
+### 3.2 Team
+
+Teams remain stable organisational units within a Department.
+
+Suggested shape:
+
+```json
+{
+  "id": "TEAM-A",
+  "departmentId": "DEP-001",
+  "name": "Enterprise Architecture",
+  "active": true
+}
+```
+
+Existing Team IDs should remain stable where possible.
+
+### 3.3 User / Person
+
+Long term it may be useful to distinguish an authenticated AMO User from a Person used in resource planning, although these concepts can initially share a close relationship.
+
+An authenticated user needs at least:
+
+```json
+{
+  "id": "USR-001",
+  "name": "Example User",
+  "email": "user@example.com",
+  "active": true,
+  "primaryDepartmentId": "DEP-001",
+  "primaryTeamId": "TEAM-A",
+  "externalIdentities": []
+}
+```
+
+The existing People model continues to carry operational resource attributes such as role, FTE and Home Team.
+
+A future design decision is whether `User` and `Person` are permanently one document type or separate linked concepts. The first implementation can keep them closely aligned to minimise disruption.
+
+### 3.4 Membership
+
+Membership records where someone organisationally belongs.
+
+The minimum model may be embedded in the user/person document:
+
+```json
+{
+  "primaryDepartmentId": "DEP-001",
+  "primaryTeamId": "TEAM-A",
+  "additionalTeamIds": []
+}
+```
+
+If more complex membership is later required it can become its own document type.
+
+Membership must not itself grant administrative authority.
+
+---
+
+## 4. Scoped role assignments
+
+A role assignment associates:
+
+- user;
+- role;
+- scope type;
+- scope ID.
+
+Example:
+
+```json
+{
+  "id": "RA-001",
+  "userId": "USR-001",
+  "roleId": "team-admin",
+  "scopeType": "team",
+  "scopeId": "TEAM-A"
+}
+```
+
+The same user might also have:
+
+```json
+{
+  "id": "RA-002",
+  "userId": "USR-001",
+  "roleId": "status-publisher",
+  "scopeType": "department",
+  "scopeId": "DEP-001"
+}
+```
+
+This allows one person to hold several responsibilities without inventing a new composite role for every combination.
+
+### 4.1 Initial scope types
+
+The first implementation should support:
+
+```text
+system
+department
+team
+```
+
+A more generic arbitrary hierarchy is unnecessary until a real use case requires it.
+
+### 4.2 Scope inheritance
+
+A Department-scoped permission should normally apply to Teams beneath that Department.
+
+For example:
+
+```text
+Department Admin @ DEP-001
+```
+
+can administer Team A, Team B and Team C inside DEP-001.
+
+Team-scoped authority does not automatically rise to Department scope.
+
+System scope applies across the AMO instance.
+
+---
+
+## 5. Capability model
+
+The exact capability catalogue should be refined during implementation, but the following gives the intended shape.
+
+### 5.1 System administration
+
+```text
+system.configure
+system.security.manage
+system.restore
+audit.read
+```
+
+`system.configure` covers application-wide/process configuration where appropriate.
+
+`system.security.manage` should control users, roles and role assignments once security administration exists.
+
+`system.restore` controls AMO forward Restore/recovery operations.
+
+### 5.2 Organisation and people
+
+```text
+organization.read
+organization.manage
+people.read
+people.manage
+```
+
+These should be scope-aware.
+
+### 5.3 Demand
+
+```text
+demand.read
+demand.write
+```
+
+Potential future capabilities could separate create, update, delete or archive, but this is probably unnecessary for the first version.
+
+### 5.4 Allocation and capacity
+
+```text
+allocation.read
+allocation.write
+capacity.read
+```
+
+Allocation write should be checked against the relevant owning Team / Department scope rather than merely against the current UI Team View.
+
+### 5.5 Financial information
+
+```text
+financial.read
+```
+
+This should be independent of ordinary Demand/Allocation read permission.
+
+Fields and metrics potentially protected by this capability include:
+
+- day rates;
+- ROM and estimate monetary values;
+- funding amounts;
+- billable/funded/unfunded forecast values;
+- allocation £ values;
+- portfolio forecast cost information;
+- other future commercial or cost-sensitive measures.
+
+A later requirement may justify `financial.export` separately from on-screen visibility.
+
+### 5.6 Status reporting
+
+The current Whole Department Status Report should remain structurally simple initially.
+
+Permissions should separate contribution from publication lifecycle:
+
+```text
+status.read
+status.update
+status.publish
+```
+
+`status.update` allows a contributor to update report content for Demand in their authorized scope.
+
+`status.publish` controls department-level actions such as:
+
+- Publish;
+- Unpublish;
+- New Draft.
+
+This prevents reporting contribution rights from implicitly granting authority to release the official departmental report.
+
+Potential future permissions include:
+
+```text
+status.admin
+status.financial.read
+```
+
+if report-level sensitivity becomes more complex.
+
+### 5.7 Reporting
+
+```text
+reports.read
+```
+
+This is distinct from financial visibility. A user may be allowed to view operational dashboards but not the £ elements embedded within them.
+
+---
+
+## 6. Default role templates
+
+Roles should be configurable eventually, but AMO should ship with understandable defaults.
+
+### 6.1 System Admin
+
+Purpose: administer the AMO instance rather than merely a business scope.
+
+Typical capabilities:
+
+```text
+system.configure
+system.security.manage
+system.restore
+audit.read
+organization.read
+organization.manage
+people.read
+people.manage
+demand.read
+demand.write
+allocation.read
+allocation.write
+capacity.read
+financial.read
+status.read
+status.update
+status.publish
+reports.read
+```
+
+System Admin is usually system-scoped.
+
+### 6.2 Department Admin
+
+Purpose: administer the whole Department.
+
+Typical capabilities:
+
+```text
+organization.read
+organization.manage
+people.read
+people.manage
+demand.read
+demand.write
+allocation.read
+allocation.write
+capacity.read
+financial.read
+status.read
+status.update
+reports.read
+```
+
+A Department Admin does **not necessarily** receive `status.publish` automatically. This should remain an explicit assignment/role unless the business later decides otherwise.
+
+### 6.3 Team Admin
+
+Purpose: manage a Team's operational data.
+
+Typical capabilities:
+
+```text
+organization.read
+people.read
+people.manage
+demand.read
+demand.write
+allocation.read
+allocation.write
+capacity.read
+financial.read
+status.read
+status.update
+reports.read
+```
+
+Write and sensitive capabilities apply to the assigned Team scope.
+
+The user can still be granted broad read visibility across other teams separately.
+
+### 6.4 Team Analyst
+
+Purpose: consume full operational reporting and contribute status information without general operational administration.
+
+Typical capabilities:
+
+```text
+organization.read
+people.read
+demand.read
+allocation.read
+capacity.read
+financial.read
+status.read
+status.update
+reports.read
+```
+
+The intended distinction from Team Admin is that Team Analyst cannot generally maintain Demand, allocations or team records.
+
+### 6.5 Team Member
+
+Purpose: normal operational visibility without sensitive financial access.
+
+Typical capabilities:
+
+```text
+organization.read
+people.read
+demand.read
+allocation.read
+capacity.read
+status.read
+status.update
+reports.read
+```
+
+The principal difference from Team Analyst in the first model is absence of `financial.read`.
+
+If experience shows Team Member should also lose `status.update`, that can be changed in the role template without changing the authorization engine.
+
+### 6.6 Status Publisher
+
+Purpose: explicitly control the official Status Report lifecycle.
+
+Typical capability:
+
+```text
+status.publish
+```
+
+Usually assigned at Department scope.
+
+This role is deliberately compositional. A person can be a Team Analyst plus Status Publisher, or Department Admin plus Status Publisher, without requiring new combined roles.
+
+---
+
+## 7. Read visibility versus write authority
+
+The expected operating model is not strict team isolation.
+
+A useful default is:
+
+```text
+Team A Admin
+
+Operational read:
+  Team A       yes
+  Team B       yes
+  Team C       yes
+
+Write:
+  Team A       yes
+  Team B       no
+  Team C       no
+
+Financial read:
+  Team A       yes
+  Team B       configurable / no by default
+  Team C       configurable / no by default
+
+Status update:
+  Team A       yes
+  Team B       no
+  Team C       no
+```
+
+The exact broad-read policy should remain configurable, but this illustrates the intended separation.
+
+### 7.1 Team View is not the security boundary
+
+Selecting Team A in the UI is a presentation/reporting choice.
+
+It must not itself grant or remove authority.
+
+Authorization should be evaluated from the user's assignments and the resource's actual scope.
+
+### 7.2 Sensitive fields may need projection/filtering
+
+If a user has `demand.read` but not `financial.read`, the API should eventually avoid returning sensitive financial fields where practical, not merely hide them with CSS.
+
+Possible implementation strategies include:
+
+- server-side DTO/projection filtering;
+- endpoint-specific summary models;
+- capability-aware report generation.
+
+The first implementation may begin by hiding financial UI and constraining reporting endpoints, but the target for Remote Workspace is server-side data minimisation.
+
+---
+
+## 8. Status Report authorization model
+
+The current direction is to keep one Department-level report while allowing scoped contribution.
+
+Conceptually:
+
+```text
+Team A contributors ─┐
+Team B contributors ─┼─> Whole Department Draft
+Team C contributors ─┘
+                           ↓
+                    Status Publisher
+                           ↓
+                       Published
+```
+
+### 8.1 Contribution
+
+A user with `status.update` at Team A scope can edit report fields for Demand owned by Team A.
+
+Typical editable fields include:
+
+- Health;
+- Status Update;
+- Achievements;
+- Issues / Risks.
+
+They should not be able to alter another Team's Demand reporting content merely because the whole report is visible.
+
+### 8.2 Publication lifecycle
+
+Only a user with `status.publish` at the relevant Department scope can:
+
+- Publish;
+- Unpublish;
+- create New Draft.
+
+This should be enforced in the API as well as the browser.
+
+### 8.3 Future report hierarchy
+
+No separate Team Status Report model is required initially.
+
+If later required, the scoped-role/capability model can support Team and Department report objects without changing the basic security architecture.
+
+---
+
+## 9. Identity model
+
+AMO should maintain an internal user identity independent of the external authentication mechanism.
+
+Suggested future document:
+
+```json
+{
+  "_id": "user:USR-001",
+  "documentType": "user",
+  "id": "USR-001",
+  "name": "Example User",
+  "email": "user@example.com",
+  "active": true,
+  "primaryDepartmentId": "DEP-001",
+  "primaryTeamId": "TEAM-A",
+  "externalIdentities": [
+    {
+      "provider": "google",
+      "subject": "external-provider-subject"
+    }
+  ]
+}
+```
+
+Later an Entra identity could be added without changing the AMO user:
+
+```json
+{
+  "provider": "entra",
+  "subject": "entra-object-or-subject-id"
+}
+```
+
+The preferred long-term lookup key is the provider's immutable subject/object identifier, with email used for discovery/mapping rather than as the sole permanent identity key.
+
+---
+
+## 10. Authentication strategy
+
+Authentication should be introduced before attempting the complete authorization model if that gives a simpler implementation path.
+
+### 10.1 Hosted application opportunity
+
+Even when using a Local Workspace, the browser application itself is loaded from a hosted AMO domain.
+
+That means hosted authentication can potentially identify the browser user before the application opens a Local folder.
+
+This allows a useful intermediate stage:
+
+```text
+Hosted AMO UI
+   ↓
+OIDC / OAuth sign-in
+   ↓
+Authenticated browser identity
+   ↓
+Local Workspace or Remote Workspace
+```
+
+Authentication does not make Local filesystem data secure, but it gives AMO a consistent identity to use for role simulation, audit attribution and future migration.
+
+### 10.2 Early identity provider
+
+For the personal/test deployment, a standards-based OIDC provider such as Google could be used as an interim identity provider.
+
+The implementation should avoid binding AMO business logic directly to Google-specific concepts.
+
+The browser/API should consume standard identity claims and map the external subject/email to an AMO user.
+
+### 10.3 Enterprise target
+
+When AMO is deployed into an enterprise environment, Entra ID is the natural target identity provider.
+
+The application architecture should make changing providers largely a configuration/mapping change rather than a rewrite of authorization.
+
+### 10.4 Browser token flow
+
+Target Remote flow:
+
+```text
+Browser
+  ↓
+Identity Provider
+  ↓
+OIDC/OAuth access token
+  ↓
+AMO API
+  ↓
+Validate issuer/audience/signature/expiry
+  ↓
+Map external subject -> AMO user
+  ↓
+Resolve scoped assignments
+  ↓
+Authorize request
+  ↓
+Mongo/Cosmos
+```
+
+The API should never trust a user ID supplied by the browser as proof of identity.
+
+---
+
+## 11. Temporary Local Workspace identity
+
+Before real authentication is complete, Local Workspace still needs a usable development/testing approach.
+
+The current browser identity concept can be evolved into an explicit AMO user selector.
+
+Possible first-run experience:
+
+```text
+Who are you?
+
+[ Select AMO user ]
+
+or
+
+Enter name/email
+```
+
+The selected user ID can be stored in browser local storage, for example:
+
+```text
+amo.currentUserId
+```
+
+### 11.1 Bootstrap behaviour
+
+If a brand-new workspace contains no users, an interim bootstrap could:
+
+1. ask for the first user's name/email;
+2. create the first user;
+3. assign that user `System Admin` at system scope.
+
+This is a convenience bootstrap only and is not secure against someone with filesystem access.
+
+### 11.2 Local authorization behaviour
+
+Once a user is selected, the browser can apply the same capability resolver used conceptually by Remote.
+
+This is valuable because it lets the UX and role model be exercised before strong server-side authentication is complete.
+
+### 11.3 Local security warning
+
+The UI/documentation should explicitly state that Local access restrictions are advisory/application-enforced because direct JSON access bypasses them.
+
+---
+
+## 12. Remote Workspace authorization
+
+Remote Workspace is the real security boundary.
+
+### 12.1 API middleware / request context
+
+Every authenticated request should produce an authorization context conceptually similar to:
+
+```json
+{
+  "userId": "USR-001",
+  "assignments": [
+    {
+      "scopeType": "department",
+      "scopeId": "DEP-001",
+      "capabilities": [
+        "demand.read",
+        "allocation.read",
+        "reports.read"
+      ]
+    },
+    {
+      "scopeType": "team",
+      "scopeId": "TEAM-A",
+      "capabilities": [
+        "demand.write",
+        "allocation.write",
+        "financial.read",
+        "status.update"
+      ]
+    }
+  ]
+}
+```
+
+Authorization helpers should answer questions such as:
+
+```text
+can(user, "demand.write", demandScope)
+can(user, "financial.read", teamScope)
+can(user, "status.publish", departmentScope)
+```
+
+### 12.2 Resource scope resolution
+
+The server must determine resource scope from persisted data rather than trusting a scope sent by the browser.
+
+Examples:
+
+- Demand scope comes from its owning Team / Department;
+- Status Update scope comes from the associated Demand;
+- Team administration comes from the target Team;
+- Department publication comes from the report's Department;
+- Allocation authority should resolve from the relevant Demand/team rules and any future cross-team allocation policy.
+
+### 12.3 Read filtering
+
+List endpoints should filter or project data according to the requester's capabilities.
+
+This avoids loading all data into the browser and relying entirely on UI hiding.
+
+### 12.4 Write rejection
+
+Unauthorized writes should return clear API errors, normally HTTP 403.
+
+Optimistic-concurrency conflicts remain HTTP 409 and are a separate concern.
+
+---
+
+## 13. Mongo/Cosmos persistence model
+
+The new Mongo Remote model uses one recoverable `amoDocuments` collection. The access-control model fits naturally into that collection.
+
+New logical document types may include:
+
+```text
+user
+department
+team
+roleAssignment
+```
+
+Role definitions may initially remain application defaults/configuration rather than stored documents.
+
+Example role assignment:
+
+```json
+{
+  "_id": "role-assignment:RA-001",
+  "documentType": "roleAssignment",
+  "entityId": "RA-001",
+  "userId": "USR-001",
+  "roleId": "team-admin",
+  "scopeType": "team",
+  "scopeId": "TEAM-A"
+}
+```
+
+Because these are ordinary recoverable workspace documents, changes to security assignments can participate in the existing AMO transaction/audit model.
+
+This means actions such as:
+
+```text
+Admin granted Sarah Team Admin for Team B
+Admin removed financial.read role assignment
+Admin disabled User X
+```
+
+can themselves be auditable forward transactions.
+
+### 13.1 Audit attribution
+
+The transaction actor should eventually come from the validated authenticated principal, not from a browser-provided display name or `X-AMO-Actor` header.
+
+That is an important hardening step when authentication is introduced.
+
+---
+
+## 14. UI behaviour
+
+The UI should adapt to the resolved capabilities but should not become the security authority.
+
+### 14.1 Commands
+
+Examples:
+
+- hide/disable **New Demand** without `demand.write` for the current scope;
+- hide/disable allocation editing without `allocation.write`;
+- hide Configuration administration without the relevant system capability;
+- hide Restore without `system.restore`;
+- hide Publish/Unpublish/New Draft without `status.publish`.
+
+### 14.2 Financial visibility
+
+Without `financial.read`, financial cards, columns and details should be omitted or replaced with an appropriate non-sensitive presentation.
+
+Examples include:
+
+- Portfolio Forecast £ values;
+- funded/unfunded forecast;
+- rates;
+- cost estimates;
+- allocation monetary values.
+
+### 14.3 Team View
+
+The Team View selector should show only organisational scopes the user is entitled to see.
+
+However, broad departmental read access may legitimately mean that most users can still select all Teams.
+
+The selector is a view filter, not an authorization grant.
+
+### 14.4 Administration UI
+
+A future security administration surface should support:
+
+- Users;
+- Department/Team membership;
+- role assignments;
+- effective permissions inspection;
+- account disable/reactivate;
+- external identity mapping;
+- possibly audit history for security changes.
+
+A useful diagnostic view is:
+
+```text
+User: Sarah
+
+Membership
+  Department: DEP-001
+  Team: TEAM-A
+
+Assignments
+  Team Analyst @ TEAM-A
+  Status Publisher @ DEP-001
+
+Effective capabilities
+  ...
+```
+
+This will make a compositional model understandable to administrators.
+
+---
+
+## 15. Initial role/capability matrix
+
+This is an initial design, not a frozen contract.
+
+| Capability | System Admin | Department Admin | Team Admin | Team Analyst | Team Member | Status Publisher |
+| --- | --- | --- | --- | --- | --- | --- |
+| system.configure | Yes | No | No | No | No | No |
+| system.security.manage | Yes | No | No | No | No | No |
+| system.restore | Yes | No | No | No | No | No |
+| audit.read | Yes | Optional | No | No | No | No |
+| organization.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| organization.manage | Yes | Yes | No/limited | No | No | No |
+| people.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| people.manage | Yes | Yes | Yes, scoped | No | No | No |
+| demand.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| demand.write | Yes | Yes | Yes, scoped | No | No | No |
+| allocation.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| allocation.write | Yes | Yes | Yes, scoped | No | No | No |
+| capacity.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| financial.read | Yes | Yes | Yes, scoped | Yes, scoped | No | No additional |
+| status.read | Yes | Yes | Yes | Yes | Yes | No additional |
+| status.update | Yes | Yes | Yes, scoped | Yes, scoped | Initially Yes, scoped | No additional |
+| status.publish | Yes | Explicit assignment preferred | Explicit assignment preferred | No | No | Yes |
+| reports.read | Yes | Yes | Yes | Yes | Yes | No additional |
+
+Important notes:
+
+- "scoped" means the capability applies only within the role assignment's Team/Department scope;
+- broad read visibility may be granted independently of a user's write scope;
+- the difference between Team Analyst and Team Member is initially driven primarily by financial visibility;
+- Team Member `status.update` remains an open policy decision and can be removed from the default role without changing the architecture;
+- Status Publisher is intended as a compositional role rather than a standalone persona.
+
+---
+
+## 16. Proposed implementation sequence
+
+This should be implemented in deliberately small increments.
+
+### Phase 0 — document and stabilise the model
+
+This document is the baseline.
+
+Before implementation, avoid introducing unrelated ad-hoc role checks that would conflict with the capability model.
+
+### Phase 1 — authentication foundation
+
+Goal: establish a trustworthy current identity for the hosted application.
+
+Possible steps:
+
+1. add OIDC/OAuth authentication to hosted AMO;
+2. begin with a suitable test identity provider such as Google for the personal deployment;
+3. expose a small current-user/session model to the browser;
+4. ensure Remote API can validate the token independently;
+5. keep provider-specific code behind an identity adapter/configuration boundary;
+6. retain Local Workspace support after authentication.
+
+At this stage AMO may still have permissive authorization while identity is proven.
+
+### Phase 2 — internal Users and memberships
+
+Goal: map authenticated people to AMO organisational records.
+
+Steps:
+
+1. introduce Department document(s), initially one current Department;
+2. ensure Teams reference Department;
+3. introduce/clarify AMO User identity;
+4. map external identity subject/email to an AMO user;
+5. add primary Department and Team membership;
+6. provide first-user/System Admin bootstrap for development as needed.
+
+### Phase 3 — capability resolver and default roles
+
+Goal: introduce authorization without immediately changing every screen.
+
+Steps:
+
+1. define capability constants/catalogue;
+2. define default role templates;
+3. introduce roleAssignment documents;
+4. create a shared capability resolver;
+5. add an "effective permissions" diagnostic for developers/admins;
+6. preserve a temporary compatibility mode if no assignments exist, to avoid locking out existing test workspaces during rollout.
+
+### Phase 4 — API enforcement for Remote Workspace
+
+Goal: make Remote authorization real.
+
+Suggested order:
+
+1. System/configuration/recovery endpoints;
+2. Demand writes;
+3. Allocation writes;
+4. People/organisation administration;
+5. Status update/publish operations;
+6. read filtering and financial projections;
+7. audit/security administration endpoints.
+
+The server must determine scope from the target records.
+
+### Phase 5 — authorization-aware UI
+
+Goal: make the user experience reflect effective authority.
+
+Steps include:
+
+- action visibility/disabled state;
+- scope-aware Team View;
+- financial field/card filtering;
+- status contribution restrictions;
+- security administration UI;
+- clear access-denied/conflict handling.
+
+### Phase 6 — Status Report controls
+
+Goal: enforce the department report collaboration model.
+
+Implement:
+
+```text
+status.update
+status.publish
+```
+
+with Team-scoped contribution and Department-scoped publication.
+
+Keep one Whole Department report initially.
+
+### Phase 7 — Local Workspace compatibility
+
+Goal: provide comparable behaviour for trusted/local use without pretending it is secure.
+
+Options:
+
+- use hosted authenticated identity when available;
+- otherwise select/remember a local AMO user;
+- resolve the same role assignments client-side;
+- show an explicit Local security-boundary warning;
+- never claim Local data restrictions protect against direct filesystem access.
+
+### Phase 8 — enterprise identity transition
+
+When AMO moves into a corporate environment:
+
+1. configure Entra ID / enterprise OIDC;
+2. map Entra identities to existing AMO users;
+3. retire test-provider mappings where appropriate;
+4. optionally integrate directory/group information if there is a clear administrative benefit;
+5. retain AMO as the source of truth for application authorization unless a deliberate external RBAC model replaces it.
+
+---
+
+## 17. Compatibility and migration considerations
+
+### 17.1 Existing workspace with no security data
+
+A new security implementation must not accidentally make an existing test workspace inaccessible.
+
+Possible transitional policies include:
+
+- first authenticated user becomes bootstrap System Admin if no users/assignments exist;
+- explicit administrator bootstrap secret/configuration for Remote;
+- temporary permissive mode only while zero security assignments exist.
+
+The chosen method must be documented and removed/disabled after bootstrap.
+
+### 17.2 Existing People records
+
+Existing People are already operational resources.
+
+The implementation should avoid destructive migration.
+
+Likely approach:
+
+- add identity/access fields incrementally;
+- create User records linked to People where needed;
+- or initially treat a Person with authentication metadata as the User representation.
+
+This remains an implementation decision.
+
+### 17.3 Existing Teams
+
+Existing Team IDs should be preserved and assigned to the initial Department.
+
+### 17.4 Current Whole Department concept
+
+The existing Whole Department view should initially map to the one bootstrapped Department rather than creating a generic organisation tree.
+
+---
+
+## 18. Security considerations
+
+### 18.1 Never trust browser identity headers in production
+
+The current Remote audit actor mechanism may use browser-supplied identity metadata. Once authentication exists, the API must derive actor identity from the validated token/session.
+
+### 18.2 Least privilege for administrative capabilities
+
+`system.restore` and `system.security.manage` should remain narrow capabilities.
+
+A Team or Department administrator should not automatically gain database recovery authority.
+
+### 18.3 Financial data is a separate sensitivity dimension
+
+Financial visibility should not be inferred from generic report access.
+
+This is one of the main reasons the model uses capabilities rather than a simple role hierarchy.
+
+### 18.4 Status reporting may contain sensitive narrative
+
+The initial assumption is broad status-read visibility, with restricted update/publication.
+
+If real usage demonstrates that some status content itself requires confidentiality, add a separate capability/projection rather than overloading `status.update` or `financial.read`.
+
+### 18.5 Audit security changes
+
+User, membership and role-assignment changes should be included in the AMO transaction journal where possible.
+
+Security audit records should include the authenticated actor and affected assignment/user.
+
+### 18.6 Restore and authorization
+
+A Restore may revert user/role documents if those documents are part of recoverable state. This creates an important future design question:
+
+- should security configuration participate fully in point-in-time Restore;
+- or should some identity/security documents be protected from ordinary workspace Restore?
+
+The safer likely direction is to distinguish operational workspace recovery from security administration recovery, but this requires deliberate design before security documents are added to the recoverable collection.
+
+This is an explicit open decision.
+
+---
+
+## 19. Open design decisions
+
+The following should be resolved during implementation rather than guessed now.
+
+### 19.1 User versus Person
+
+Should authenticated User be:
+
+- the existing Person record extended with identity/security properties; or
+- a separate User document linked to Person?
+
+Separate concepts are cleaner long term, but extending Person is cheaper initially.
+
+### 19.2 Financial scope semantics
+
+Should Team Admin/Analyst financial access default to:
+
+- own Team only; or
+- all operationally readable Teams?
+
+Current preference is **own assigned scope only**, with Department-level financial visibility requiring a Department-scoped assignment.
+
+### 19.3 Team Member status contribution
+
+Should Team Member have `status.update`, or should that remain Team Analyst and above?
+
+The model supports either without architectural change.
+
+### 19.4 Department Admin publication
+
+Should every Department Admin automatically receive `status.publish`?
+
+Current preference is **no**: publication should be an explicit Status Publisher capability/assignment.
+
+### 19.5 Security documents and Restore
+
+Should role assignments/users be included in ordinary point-in-time workspace Restore?
+
+This needs a considered safety model before implementation.
+
+### 19.6 Role customisation
+
+Should administrators be able to create arbitrary custom roles initially?
+
+Current preference is **no** for the first implementation: ship fixed role templates over a capability engine, then add custom roles only when there is a real need.
+
+### 19.7 Authentication provider for development
+
+A Google/OIDC implementation may be suitable for the current hosted personal deployment, while Entra is the likely enterprise target.
+
+The authentication layer should be provider-neutral enough to support that transition.
+
+### 19.8 Department hierarchy depth
+
+Do not build arbitrary nested organisational units yet.
+
+Start with Department -> Team and extend only when a genuine hierarchy requirement appears.
+
+---
+
+## 20. Definition of a successful first security release
+
+A useful first end-to-end release would demonstrate all of the following:
+
+1. a hosted user signs into AMO through an external OIDC provider;
+2. the API independently validates that identity;
+3. the identity maps to an internal AMO User;
+4. the User has membership in a Department/Team;
+5. scoped role assignments resolve to capabilities;
+6. a Team Admin can edit their own Team's Demand but not another Team's Demand;
+7. both Teams can remain broadly visible for read-only operational information;
+8. a Team Member cannot see financial values;
+9. a Team Analyst can see financial values and submit scoped status updates;
+10. only a Status Publisher can Publish/Unpublish/New Draft;
+11. only a System Admin can administer system Configuration/security and invoke Restore;
+12. unauthorized direct API calls return 403;
+13. authorized changes continue to use optimistic concurrency and the Mongo transaction audit journal;
+14. the audit actor is the authenticated AMO user;
+15. Local Workspace can emulate the same role behaviour but clearly identifies its weaker security boundary.
+
+That would represent a meaningful transition from a trusted shared workspace to a proper multi-user departmental application without sacrificing AMO's collaborative operating model.
+
+---
+
+## 21. Summary target architecture
+
+```text
+                         ┌─────────────────────────┐
+                         │ External Identity       │
+                         │ Google / Entra / OIDC   │
+                         └────────────┬────────────┘
+                                      │ authenticate
+                                      ▼
+┌─────────────────────────────────────────────────────────┐
+│                     AMO browser                         │
+│                                                         │
+│ current identity                                        │
+│ capability-aware navigation/actions                     │
+│ Team / Department views                                 │
+└───────────────────────┬─────────────────────────────────┘
+                        │ access token
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│                       AMO API                           │
+│                                                         │
+│ validate identity                                       │
+│ map external subject -> AMO User                        │
+│ resolve membership + scoped role assignments            │
+│ capability + resource-scope authorization               │
+│ financial/status projections                            │
+│ optimistic concurrency                                  │
+│ atomic business + audit transactions                    │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│              Cosmos DB / Mongo API                      │
+│                                                         │
+│ amoDocuments                                             │
+│   Department / Team                                      │
+│   User / Person                                          │
+│   RoleAssignment                                         │
+│   Demand / Allocation / Config / Status Report           │
+│   Audit transactions                                     │
+│                                                         │
+│ managed backup / PITR remains infrastructure DR         │
+└─────────────────────────────────────────────────────────┘
+```
+
+Local Workspace can reuse the conceptual identity/capability model, but the browser and local filesystem remain outside a strong server-enforced security boundary.
