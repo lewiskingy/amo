@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          providers=(Microsoft.App Microsoft.ContainerRegistry Microsoft.Storage)
+          providers=(Microsoft.App Microsoft.ContainerRegistry Microsoft.Storage Microsoft.DocumentDB)
 
           for provider in "${providers[@]}"; do
             state=$(az provider show --namespace "$provider" --query registrationState -o tsv 2>/dev/null || true)
@@ -106,6 +106,8 @@ jobs:
           echo "acr_server=$(echo "$OUTPUT" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
           echo "container_app=$(echo "$OUTPUT" | jq -r '.containerAppName.value')" >> "$GITHUB_OUTPUT"
           echo "container_app_fqdn=$(echo "$OUTPUT" | jq -r '.containerAppFqdn.value')" >> "$GITHUB_OUTPUT"
+          echo "repository_mode=$(echo "$OUTPUT" | jq -r '.repositoryMode.value')" >> "$GITHUB_OUTPUT"
+          echo "cosmos_account=$(echo "$OUTPUT" | jq -r '.cosmosAccountName.value')" >> "$GITHUB_OUTPUT"
 
       - name: Wait for Container App after infrastructure deployment
         shell: bash
@@ -226,9 +228,10 @@ jobs:
           URL="https://${{ steps.infra.outputs.container_app_fqdn }}/api/info"
           echo "Waiting for $URL"
           for attempt in {1..18}; do
-            if curl --fail --silent --show-error "$URL"; then
-              echo
-              echo "AMO API is responding on generated hostname."
+            if BODY=$(curl --fail --silent --show-error "$URL"); then
+              echo "$BODY"
+              echo "$BODY" | jq -e --arg mode "${{ steps.infra.outputs.repository_mode }}" '(.product == "AMO") and (($mode != "mongo") or (.storage == "mongodb" and .capabilities.recovery == true and .capabilities.databaseTransactions == true))' > /dev/null
+              echo "AMO API is responding with the expected repository capabilities."
               exit 0
             fi
             sleep 10
