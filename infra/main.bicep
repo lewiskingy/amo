@@ -12,10 +12,21 @@ param allowedOrigin string = 'https://amo.theflat.me.uk'
 @description('Initial image used only while bootstrapping the Container App. GitHub Actions replaces it with the AMO API image.')
 param bootstrapImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
+@description('Remote persistence implementation. mongo is the Azure default; json retains the Azure Files proof as an explicit fallback.')
+@allowed([
+  'mongo'
+  'json'
+])
+param repositoryMode string = 'mongo'
+
 var compactPrefix = toLower(replace(namePrefix, '-', ''))
 var globalSuffix = uniqueString(subscription().subscriptionId, resourceGroup().id)
 var acrName = take('${compactPrefix}acr${globalSuffix}', 50)
 var storageAccountName = take('${compactPrefix}data${globalSuffix}', 24)
+var cosmosAccountName = take('${compactPrefix}-mongo-${globalSuffix}', 44)
+var mongoDatabaseName = 'amo'
+var documentsCollectionName = 'amoDocuments'
+var runtimeCollectionName = 'amoRuntime'
 var fileShareName = 'amo-workspace'
 var environmentName = '${namePrefix}-env'
 var containerAppName = '${namePrefix}-api'
@@ -34,6 +45,7 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   }
 }
 
+// Retained as the explicit JSON repository fallback and for future JSON import/export.
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
   location: location
@@ -59,6 +71,119 @@ resource workspaceShare 'Microsoft.Storage/storageAccounts/fileServices/shares@2
   properties: {
     enabledProtocols: 'SMB'
     accessTier: 'TransactionOptimized'
+  }
+}
+
+// Serverless Mongo API keeps the personal/test AMO footprint pay-per-use. The main collection is
+// deliberately unsharded because Cosmos Mongo multi-document transactions are collection-scoped.
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+  name: cosmosAccountName
+  location: location
+  kind: 'MongoDB'
+  properties: {
+    databaseAccountOfferType: 'Standard'
+    apiProperties: {
+      serverVersion: '7.0'
+    }
+    capabilities: [
+      {
+        name: 'EnableMongo'
+      }
+      {
+        name: 'EnableServerless'
+      }
+      {
+        name: 'EnableTtlOnCustomPath'
+      }
+    ]
+    consistencyPolicy: {
+      defaultConsistencyLevel: 'Session'
+    }
+    locations: [
+      {
+        locationName: location
+        failoverPriority: 0
+        isZoneRedundant: false
+      }
+    ]
+    backupPolicy: {
+      type: 'Continuous'
+      continuousModeProperties: {
+        tier: 'Continuous7Days'
+      }
+    }
+    publicNetworkAccess: 'Enabled'
+    enableAutomaticFailover: false
+    enableMultipleWriteLocations: false
+  }
+}
+
+resource mongoDatabase 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases@2024-11-15' = {
+  parent: cosmos
+  name: mongoDatabaseName
+  properties: {
+    resource: {
+      id: mongoDatabaseName
+    }
+    options: {}
+  }
+}
+
+resource documentsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2024-11-15' = {
+  parent: mongoDatabase
+  name: documentsCollectionName
+  properties: {
+    resource: {
+      id: documentsCollectionName
+      indexes: [
+        {
+          key: {
+            keys: [
+              '_id'
+            ]
+          }
+        }
+        {
+          key: {
+            keys: [
+              'documentType'
+              'timestamp'
+            ]
+          }
+        }
+        {
+          key: {
+            keys: [
+              'expiresAt'
+            ]
+          }
+          options: {
+            expireAfterSeconds: 0
+          }
+        }
+      ]
+    }
+    options: {}
+  }
+}
+
+resource runtimeCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2024-11-15' = {
+  parent: mongoDatabase
+  name: runtimeCollectionName
+  properties: {
+    resource: {
+      id: runtimeCollectionName
+      indexes: [
+        {
+          key: {
+            keys: [
+              '_id'
+            ]
+          }
+        }
+      ]
+    }
+    options: {}
   }
 }
 
@@ -97,6 +222,12 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'auto'
         allowInsecure: false
       }
+      secrets: [
+        {
+          name: 'mongo-connection'
+          value: cosmos.listConnectionStrings().connectionStrings[0].connectionString
+        }
+      ]
     }
     template: {
       containers: [
@@ -107,6 +238,18 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'PORT'
               value: '8080'
+            }
+            {
+              name: 'AMO_REPOSITORY'
+              value: repositoryMode
+            }
+            {
+              name: 'AMO_MONGO_DATABASE'
+              value: mongoDatabaseName
+            }
+            {
+              name: 'AMO_MONGO_CONNECTION_STRING'
+              secretRef: 'mongo-connection'
             }
             {
               name: 'AMO_WORKSPACE_ROOT'
@@ -142,6 +285,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       ]
     }
   }
+  dependsOn: [
+    documentsCollection
+    runtimeCollection
+  ]
 }
 
 resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -161,3 +308,7 @@ output containerAppFqdn string = app.properties.configuration.ingress.fqdn
 output storageAccountName string = storage.name
 output fileShareName string = workspaceShare.name
 output workspaceMountPath string = workspaceMountPath
+output repositoryMode string = repositoryMode
+output cosmosAccountName string = cosmos.name
+output mongoDatabaseName string = mongoDatabase.name
+output mongoBackupPolicy string = 'Continuous7Days'
