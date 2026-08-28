@@ -3,6 +3,7 @@
   const REMOTE_URL_KEY='amo.remoteWorkspaceUrl';
   const currentRemoteUrl=()=>{try{return localStorage.getItem(REMOTE_URL_KEY)||getLastConnectionPreference()?.url||window.AMO_CONFIG?.defaultRemoteUrl||''}catch{return window.AMO_CONFIG?.defaultRemoteUrl||''}};
   const connected=()=>!!window.workspaceRepository;
+  const remoteUsesOptimisticConcurrency=()=>window.workspaceRepository?.mode==='remote'&&window.workspaceRepository?.info?.capabilities?.locking===false;
 
   async function activateRemote(repo,rawBundle,connectionToken){
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
@@ -43,12 +44,30 @@
   }
 
   const oldEnsureRW=typeof ensureRW==='function'?ensureRW:null;if(oldEnsureRW)ensureRW=async function(handle){if(window.workspaceRepository?.mode==='remote')return true;return oldEnsureRW(handle)};
+  if(typeof acquireWorkspaceLock==='function'){
+    const localAcquire=acquireWorkspaceLock;
+    acquireWorkspaceLock=async function(){if(remoteUsesOptimisticConcurrency())return true;return localAcquire()}
+  }
+  if(typeof lockDescription==='function'){
+    const localLockDescription=lockDescription;
+    lockDescription=function(lock){if(remoteUsesOptimisticConcurrency())return'Editing · Optimistic concurrency';return localLockDescription(lock)}
+  }
+  if(typeof renderWorkspaceIdentityCard==='function'){
+    const localIdentityCard=renderWorkspaceIdentityCard;
+    renderWorkspaceIdentityCard=function(){
+      if(!remoteUsesOptimisticConcurrency())return localIdentityCard();
+      const data=document.getElementById('data');if(!data)return;let card=document.getElementById('workspaceIdentityCard');if(!card){card=document.createElement('div');card.id='workspaceIdentityCard';card.className='card';card.style.marginTop='16px';data.querySelector('.card')?.after(card)}
+      const user=typeof localWorkspaceUser==='function'?localWorkspaceUser():null;
+      card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Editing identity & concurrency</h2><p class="muted">Mongo Remote Workspace uses optimistic document versions and atomic database transactions instead of a workspace edit lock.</p></div><button class="btn" id="changeWorkspaceUser">Change identity</button></div><div class="mini-stat"><span>Browser identity</span><strong>${typeof escHtml==='function'?escHtml(user?.displayName||'Not set'):(user?.displayName||'Not set')}</strong></div><div class="mini-stat"><span>Workspace state</span><strong>Editing · Optimistic concurrency</strong></div><div class="muted" style="margin-top:10px">Conflicting writes are rejected and must be reloaded/merged rather than overwriting a newer document.</div>`;
+      document.getElementById('changeWorkspaceUser')?.addEventListener('click',setWorkspaceUser)
+    }
+  }
   if(typeof persistStatusReports==='function'){
     const localPersist=persistStatusReports;persistStatusReports=async function(){const repo=window.workspaceRepository;if(repo?.mode!=='remote')return localPersist();if(statusReportState.draftDirty)await repo.saveStatusReport('draft.json',statusReportDraft);for(const id of statusReportState.publishedDirty){const r=statusReports.find(x=>x.id===id);if(r)await repo.saveStatusReport(id,r)}}
   }
   if(typeof readWorkspaceLock==='function'){const localRead=readWorkspaceLock;readWorkspaceLock=async function(){const repo=window.workspaceRepository;return repo?.mode==='remote'?repo.readLock():localRead()}}
   if(typeof writeWorkspaceLock==='function'){const localWrite=writeWorkspaceLock;writeWorkspaceLock=async function(lock){const repo=window.workspaceRepository;return repo?.mode==='remote'?repo.writeLock(lock):localWrite(lock)}}
-  if(typeof removeWorkspaceLock==='function'){const localRemove=removeWorkspaceLock;removeWorkspaceLock=async function(){const repo=window.workspaceRepository;if(repo?.mode!=='remote')return localRemove();const current=await repo.readLock();if(current&&current.sessionId!==lockSessionId)return;return repo.deleteLock()}}
+  if(typeof removeWorkspaceLock==='function'){const localRemove=removeWorkspaceLock;removeWorkspaceLock=async function(){const repo=window.workspaceRepository;if(repo?.mode!=='remote')return localRemove();if(remoteUsesOptimisticConcurrency())return;const current=await repo.readLock();if(current&&current.sessionId!==lockSessionId)return;return repo.deleteLock()}}
 
   function installButtons(){
     const local=document.getElementById('openWorkspaceBtn'),actions=local?.parentElement;if(!local||!actions)return;
