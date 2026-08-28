@@ -1,0 +1,117 @@
+# AMO Status Reporting
+
+## Purpose
+
+Status Reporting is the collaborative management-reporting layer for active Architecture Demand. It is not a replacement for Azure DevOps work-item workflow. The report captures management narrative, Health and a portfolio snapshot for a reporting cycle.
+
+## Reporting-cycle lifecycle
+
+AMO uses one active reporting cycle plus historical report snapshots.
+
+```text
+Draft
+  | Publish
+  v
+Published
+  | Unpublish
+  +-----------------> Draft
+  |
+  | New Draft
+  v
+Final
+  |
+  +-----------------> next Draft
+```
+
+### Draft
+
+`status-reports/draft.json` is the active working cycle. Multiple contributors may edit it. Draft narrative does not change Demand Health until the report is published.
+
+### Published
+
+Publish uses the latest committed Draft. The active cycle remains in `draft.json`, but becomes read-only and records `publishedReportId`, `publishedAt`, `publishedBy` and `revision`. A corresponding `SR-*.json` snapshot is written with state `Published`.
+
+Published is intentionally reversible. If a contribution was missed or a correction is required, **Unpublish** reopens the active cycle as Draft. Republishing updates the same report ID and increments its revision rather than creating a duplicate historical report.
+
+### Final
+
+**New Draft** is the finalisation boundary. It changes the current Published snapshot to `Final` and creates the next `draft.json`.
+
+A Final report is historical and read-only. It cannot be unpublished. The new Draft records:
+
+- `previousReportId` — the Final report that preceded it;
+- `previousEntries` — a copy of the previous report entries used for comparison and optional copy-forward.
+
+This makes the previous/current relationship explicit without automatically presenting last period's narrative as freshly authored.
+
+## Previous-report editing experience
+
+When a Draft has a previous report baseline, each current reporting field can show the previous value. Contributors can copy an individual previous value or copy all previous narrative/Health for one Demand item into the current Draft.
+
+AMO also derives simple change semantics from previous versus current content, for example Changed or Unchanged. These are presentation semantics and do not require additional authored data.
+
+## Collaborative draft saves
+
+Editing is optimistic; AMO does not hold a workspace lock for the whole editing session.
+
+When Edit Draft begins, AMO retains a baseline copy. Save Draft:
+
+1. acquires a short-lived commit lock for `status-report--draft`;
+2. rereads the latest shared `draft.json`;
+3. performs a three-way comparison of baseline, local changes and latest shared state;
+4. merges non-conflicting changes;
+5. writes the merged Draft and releases the lock.
+
+Merge granularity is per Demand entry and field:
+
+- `health`
+- `statusUpdate`
+- `achievements`
+- `issues`
+
+Two users can therefore edit different Demand entries, or different fields on the same Demand, without overwriting one another. If both users changed the same field from the same baseline to different values, Save is blocked and the user is asked to reload/reconcile that field.
+
+Publish, Unpublish and New Draft use the same short-lived commit-lock resource to prevent lifecycle transitions racing with a concurrent Draft save.
+
+## Health semantics and accessibility
+
+Status Reporting uses the same controlled Health model as Demand:
+
+- **On Track**
+- **At Risk**
+- **Off Track**
+
+Health is never communicated by colour alone. Text remains visible in the table and report viewer.
+
+For scanability, the Status Report table uses a coloured rail/tint on the Health cell. Published/preview report entries use a wider semantic left rail plus a subtle header tint. This gives Health stronger visual presence without applying saturated colour to whole report rows.
+
+## Report viewer
+
+Historical, Published and Preview reports use the enhanced viewer:
+
+- responsive wide modal on desktop;
+- Maximize / Restore;
+- Open in New Window;
+- Print / Save PDF;
+- Department/Team scope selector where available;
+- Escape closes the report modal.
+
+The standalone report remains responsive and printable. Narrative line width is constrained for readability even when the overall viewer is wide.
+
+## Persistence model
+
+Typical status-report storage:
+
+```text
+status-reports/
+  draft.json                 active cycle: Draft or Published
+  SR-YYYYMMDD-HHMMSS.json   Published or Final snapshot
+```
+
+During Unpublish, the corresponding snapshot is temporarily marked `Unpublished` while `draft.json` returns to Draft. It is not shown as normal report history. Republishing updates that same snapshot back to Published. New Draft changes it to Final.
+
+Status Reporting uses the `WorkspaceRepository` status-report read/write capabilities in both Local and Remote modes. Collaborative saves and lifecycle transitions use the same commit-lock mechanism used by other optimistic AMO configuration writes.
+
+## Future direction
+
+Scheduled publication can be added later without changing the model: a scheduler would publish the latest committed Draft on the configured cadence. The current implementation deliberately keeps publication user-driven while the collaborative lifecycle and reporting semantics are established.
