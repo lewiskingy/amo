@@ -97,20 +97,56 @@ Status Reporting uses the same controlled Health model as Demand:
 
 Health is never communicated by colour alone. Text remains visible in the table and report viewer.
 
-For scanability, the Status Report table uses a coloured rail/tint on the Health cell. Preview, Published and Final report entries use the same semantic treatment: a wider Health-coloured left rail plus a subtle corresponding header tint. The semantic styling is part of the generated report HTML so it is retained in the modal viewer, standalone window and print/PDF output rather than depending on a page-only decorator.
+For scanability, the Status Report table uses a coloured rail/tint on the Health cell. Preview, Published and Final report entries use the same semantic treatment: a wider Health-coloured left rail plus a subtle corresponding header tint. The semantic styling is part of the generated report HTML so it is retained in the modal viewer, standalone report page and print/PDF output rather than depending on a page-only decorator.
 
-## Report viewer
+## Report viewer and deep links
 
-Historical, Published and Preview reports use the enhanced viewer:
+Published and Final reports have a canonical route:
 
-- responsive wide modal on desktop;
-- Maximize / Restore;
-- Open in New Window;
-- Print / Save PDF;
-- Department/Team scope selector where available;
-- Escape closes the report modal.
+```text
+/reports/{reportId}
+```
 
-The standalone report remains responsive and printable. Narrative line width is constrained for readability even when the overall viewer is wide.
+For example:
+
+```text
+/reports/SR-20260828-153012
+```
+
+The report route opens a lightweight report-only page. It does **not** call the AMO workspace `loadWorkspace()` path and therefore does not run workspace migrations, safety backups, archive maintenance, autosave or normal workspace startup. The viewer resolves exactly one report through `WorkspaceRepository.getStatusReport(id)`.
+
+The main AMO viewer and the lightweight report page share `app-report-renderer.js`, so Preview, Published/Final modal views and deep-linked report pages use the same persisted-snapshot renderer and Health semantics.
+
+### Remote workspace
+
+A normal `/reports/{id}` link resolves through `RemoteWorkspaceRepository`. The viewer uses the remote URL already remembered by the browser when available, otherwise the configured AMO API default. Only the identified report endpoint is requested.
+
+Remote report links are the shareable form intended for recipients such as management readers.
+
+### Local workspace
+
+When the current AMO workspace is local, **Open Report** and **Copy Local Link** generate:
+
+```text
+/reports/{reportId}?source=local
+```
+
+The URL identifies the report and the storage mode; it does not encode a local filesystem path. The viewer reads the same remembered File System Access directory handle stored by the main AMO application in browser IndexedDB and calls `LocalWorkspaceRepository.getStatusReport(id)` directly.
+
+If browser permission for that directory is no longer active, the report page shows **Reconnect Workspace**. A user gesture is then used to restore permission to the remembered handle or select the workspace again. Reconnection remains report-only and does not open/load the full AMO workspace.
+
+A Local Link is browser/workspace contextual and should not be represented as externally shareable. A remote Published/Final report should be used when a report link needs to be shared with another person.
+
+## In-application report actions
+
+Published/Final report views provide:
+
+- **View** — existing modal report view;
+- **Open Report** — opens the canonical lightweight report page;
+- **Copy Link** for remote workspaces, or **Copy Local Link** when using a local workspace;
+- **Print / Save PDF**.
+
+Draft Preview has no persisted report identity, so its existing generated-window/print behaviour remains separate from canonical deep linking.
 
 ## Persistence model
 
