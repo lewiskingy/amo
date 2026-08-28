@@ -147,6 +147,14 @@ resource documentsCollection 'Microsoft.DocumentDB/databaseAccounts/mongodbDatab
           key: {
             keys: [
               'documentType'
+              'entityId'
+            ]
+          }
+        }
+        {
+          key: {
+            keys: [
+              'documentType'
               'timestamp'
             ]
           }
