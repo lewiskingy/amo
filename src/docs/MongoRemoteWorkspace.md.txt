@@ -1,0 +1,150 @@
+# AMO Mongo Remote Workspace
+
+## Purpose
+
+Remote Workspace now supports a Mongo-backed server repository. Azure deploys this mode by default using Azure Cosmos DB for MongoDB. The browser continues to use `RemoteWorkspaceRepository`; persistence choice remains a server concern.
+
+Local Workspace is unchanged and continues to use folder-backed JSON with the Local weekly snapshot / delta recovery model.
+
+## Azure deployment
+
+The default Azure topology is:
+
+```text
+Cloudflare-hosted AMO UI
+        |
+        v
+Azure Container App / AMO API
+        |
+        v
+Azure Cosmos DB for MongoDB
+        |
+        +-- amoDocuments
+        +-- amoRuntime
+```
+
+Cosmos is configured as:
+
+- MongoDB RU API;
+- Mongo server version 7.0;
+- Serverless capacity;
+- one Azure region;
+- Session consistency;
+- Continuous 7-day backup / point-in-time restore;
+- custom-path TTL capability for the AMO transaction audit expiry.
+
+Azure Files remains deployed during the first Mongo rollout. `repositoryMode=json` can therefore be used as an explicit fallback without rebuilding the previous infrastructure. No automatic JSON-to-Mongo migration is performed.
+
+## Bootstrap
+
+An empty Mongo database bootstraps only:
+
+- one Workspace document;
+- the required default Configuration document.
+
+Demand, People, Allocations, Ideas and Status Reports start empty.
+
+This is intentionally equivalent to opening a newly-created Remote workspace rather than migrating the previous Azure Files proof data.
+
+## Collections
+
+### `amoDocuments`
+
+This is the single atomic/recoverable collection. It is deliberately unsharded so Mongo multi-document transactions can cover all AMO workspace changes in one collection.
+
+Logical `documentType` values include:
+
+- `workspace`;
+- `configuration`;
+- `demand`;
+- `team`;
+- `allocations`;
+- `ideas`;
+- `statusReport`;
+- `archive`;
+- `transaction`.
+
+Normal documents use a stable `_id` such as:
+
+```text
+demand:DEM-104
+configuration:settings
+statusReport:draft.json
+```
+
+Business JSON is held in the document `data` property. Persistence metadata such as the Mongo document version is kept outside the business payload.
+
+### `amoRuntime`
+
+Reserved for genuinely ephemeral or operational coordination state. Ordinary edits do not use persisted workspace locks in Mongo mode.
+
+## Optimistic concurrency
+
+Every recoverable document has an integer persistence `version`.
+
+The Remote browser adapter caches versions returned by workspace load or explicit record/config/status-report reads. It sends the expected version back on writes.
+
+The Mongo repository rejects a stale write with HTTP 409 rather than overwriting a newer document.
+
+This replaces persisted edit/workspace locking for ordinary Mongo changes. Existing commit-lock API calls remain temporarily compatible with older client workflows, but in Mongo mode the returned token is only a lightweight database-transaction marker; no lock document is persisted.
+
+## Atomic commit + audit
+
+Every Mongo persistence operation runs in a Mongo session transaction against `amoDocuments`:
+
+```text
+read current versions
+validate expected versions
+apply document changes
+append audit transaction
+commit
+```
+
+The audit transaction stores complete before/after logical document images for every affected document.
+
+A failed transaction commits neither the business changes nor its audit record.
+
+## Audit retention
+
+Audit transaction documents have an expiry timestamp and are retained for 28 days. The `amoDocuments` TTL index removes expired transaction documents automatically.
+
+Normal workspace documents do not have an expiry timestamp and are unaffected by the TTL policy.
+
+## Recovery
+
+Mongo Remote Workspace exposes:
+
+```text
+GET  /api/recovery
+GET  /api/recovery/points
+POST /api/recovery/preview
+POST /api/recovery/restore
+```
+
+Admin -> Restore lists retained audit transactions.
+
+For a selected point AMO:
+
+1. starts with current workspace state;
+2. walks all later retained transactions backwards using `before` images;
+3. calculates the current-to-target document differences;
+4. previews create/update/delete impact;
+5. commits those differences as a new transaction with `type: restore`.
+
+Restore therefore never deletes audit history or rewinds the transaction stream. It moves the live workspace forward to match an earlier state.
+
+## Backup vs AMO recovery
+
+Two different mechanisms deliberately coexist:
+
+**Cosmos continuous backup / PITR** is infrastructure disaster recovery. It protects the database/account from storage failure, destructive mistakes and database-level recovery scenarios.
+
+**AMO transaction recovery** is application-level audit and undo. It is human-readable, retained for 28 days, and supports an auditable forward restore from the AMO Admin UI.
+
+The AMO UI does not invoke Cosmos PITR for ordinary undo/recovery.
+
+## JSON fallback
+
+`ServerJsonWorkspaceRepository` and the Azure Files share remain available during the first deployment. Set the Bicep `repositoryMode` parameter to `json` to run the previous Remote repository.
+
+The fallback does not migrate or synchronize data between Mongo and Azure Files. They are separate workspace stores.
