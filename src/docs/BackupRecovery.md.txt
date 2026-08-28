@@ -1,0 +1,157 @@
+# AMO Backup, Transaction Journal and Point-in-Time Recovery
+
+## Purpose
+
+AMO no longer needs a full physical workspace copy on every successful open. Local persistence already writes only changed JSON documents, and collaborative areas such as Config and Status Reporting use short-lived commit locking / optimistic merge semantics.
+
+Recovery therefore uses two complementary mechanisms:
+
+1. **Start-of-Week full snapshot** — a bounded whole-workspace recovery anchor.
+2. **Transaction journal** — complete before/after images for only the JSON documents changed by each committed Local transaction.
+
+The journal is append-only. Restore never rewrites history; it computes the desired historical state and commits that state forward as a new `restore` transaction.
+
+## Folder layout
+
+```text
+backups/
+  2026-08-24/                    # Start-of-Week full snapshot
+    backup-manifest.json
+    workspace.json
+    demand/
+    team/
+    allocations/
+    ideas/
+    config/
+    status-reports/
+
+  deltas/
+    2026-08-28/
+      2026-08-28T14-42-11-193--TX-...--workspace-save.json
+      2026-08-28T15-07-03-414--TX-...--configuration.json
+```
+
+Legacy timestamp-named full backups remain readable by the backup inventory / retention parser.
+
+## Start-of-Week full backup
+
+On the first writable Local AMO session in a new ISO week (Monday-start), AMO checks whether a full backup named for that week's Monday already exists.
+
+If it exists, no full copy is made.
+
+If it does not exist, AMO creates one and records both:
+
+- `backupForWeekStarting`: the logical Monday recovery anchor;
+- `createdAt`: the actual timestamp when the first writable session occurred.
+
+The snapshot includes:
+
+- `workspace.json`;
+- Demand;
+- People / Team;
+- Allocations;
+- Ideas;
+- Config JSON;
+- all Status Report JSON, including published/final snapshots and the active cycle.
+
+Archive, locks and the transaction journal itself are excluded.
+
+The Start-of-Week run also performs retention cleanup.
+
+## Retention
+
+### Full snapshots
+
+AMO retains the most recent eight weekly full snapshots. Older full snapshots are compacted to the first retained backup per calendar month.
+
+### Transaction deltas
+
+Daily delta folders are retained for:
+
+- the current week; and
+- the immediately preceding week.
+
+When a new Start-of-Week full backup is successfully created, daily delta folders older than the preceding week are removed.
+
+## Transaction journal
+
+Each Local commit writes a journal record beneath `backups/deltas/YYYY-MM-DD/`.
+
+The record contains:
+
+- transaction ID;
+- transaction type;
+- `pending` / `committed` state;
+- timestamp;
+- actor;
+- reason;
+- optional metadata;
+- the complete `before` and `after` JSON document image for every affected path.
+
+Document operations are classified as:
+
+- `create` — `before: null`, `after: <document>`;
+- `update` — both images present;
+- `delete` — `before: <document>`, `after: null`.
+
+The journal deliberately stores whole JSON documents rather than JSON Patch operations. This keeps recovery independent of field-level schema evolution and makes every transaction independently understandable.
+
+## Commit safety
+
+The transaction record is first written with `state: pending` and its intended before/after images. Active documents are then written. Finally the transaction record is rewritten as `state: committed`.
+
+A stale `pending` transaction therefore signals that a browser/process interruption may have occurred during persistence. Restore currently surfaces incomplete transactions as a warning and does not silently treat them as committed history.
+
+## Journalled Local operations
+
+The Local repository recovery layer journals:
+
+- normal batch workspace saves / autosaves as one multi-document transaction;
+- single-record creates, edits and deletes;
+- Configuration saves;
+- Status Report JSON saves;
+- archive removal of active records;
+- point-in-time restore itself.
+
+The Remote repository does not yet implement the journal/recovery API. Remote recovery remains a server/repository roadmap capability; the UI explicitly states this rather than emulating Local filesystem behaviour in the client.
+
+## Point-in-time Restore
+
+Admin → Restore presents available journal commits and Start-of-Week full backups.
+
+For a recent transaction recovery point, AMO starts from the current Local workspace state and walks later committed transactions backwards by applying their `before` images.
+
+For a full-backup recovery point, AMO reads the selected full snapshot as the desired state.
+
+The desired historical state is then compared with the current state to produce an impact preview:
+
+- documents updated;
+- documents recreated;
+- documents deleted.
+
+Restore requires no unsaved in-memory changes and takes a short-lived workspace restore lock before committing.
+
+## Restore is a forward transaction
+
+A restore does **not** delete or rewind journal history.
+
+If history is conceptually:
+
+```text
+A -> B -> C -> D
+```
+
+and the operator restores the workspace to B, the persisted history becomes:
+
+```text
+A -> B -> C -> D -> Restore(B)
+```
+
+The Restore transaction contains its own complete before/after images. This means:
+
+- the historical audit remains intact;
+- the restore itself can be reversed using the journal;
+- full-backup restores and delta-based restores have the same commit semantics;
+- recovery remains compatible with later optimistic/shared transaction handling.
+
+After a successful restore AMO reloads so the in-memory model is rebuilt from the restored persisted workspace.
