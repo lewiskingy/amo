@@ -19,6 +19,18 @@ param bootstrapImage string = 'mcr.microsoft.com/azuredocs/containerapps-hellowo
 ])
 param repositoryMode string = 'mongo'
 
+@description('Enable Microsoft Entra authentication for the AMO API. Leave false until the browser client is ready to authenticate.')
+param authEnabled bool = false
+
+@description('Microsoft Entra tenant containing the AMO API app registration.')
+param entraTenantId string = '5fbb0478-1d93-4701-ab39-1df8234dbbf5'
+
+@description('Application (client) ID of the single-tenant amo-prod-api app registration.')
+param amoApiClientId string = '0cd6fc39-7f31-49f6-ae75-7f95add7a566'
+
+@description('Application ID URI accepted as the AMO API token audience. This is the base resource URI, not the delegated scope URI.')
+param amoApiAudience string = 'api://0cd6fc39-7f31-49f6-ae75-7f95add7a566'
+
 var compactPrefix = toLower(replace(namePrefix, '-', ''))
 var globalSuffix = uniqueString(subscription().subscriptionId, resourceGroup().id)
 var acrName = take('${compactPrefix}acr${globalSuffix}', 50)
@@ -299,6 +311,40 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   ]
 }
 
+// Container Apps Authentication/Authorization (Easy Auth). The configuration is deployed even
+// while disabled so enabling Entra protection later is a deliberate one-parameter infrastructure
+// change rather than portal click-ops. The API audience is the base Application ID URI; the
+// delegated access_as_user scope is requested by clients but is not itself the JWT audience.
+resource apiAuth 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: app
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: authEnabled
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'Return401'
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: amoApiClientId
+          openIdIssuer: 'https://login.microsoftonline.com/${entraTenantId}/v2.0'
+        }
+        validation: {
+          allowedAudiences: [
+            amoApiAudience
+          ]
+        }
+      }
+    }
+  }
+}
+
 resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(registry.id, app.id, 'AcrPull')
   scope: registry
@@ -320,3 +366,7 @@ output repositoryMode string = repositoryMode
 output cosmosAccountName string = cosmos.name
 output mongoDatabaseName string = mongoDatabase.name
 output mongoBackupPolicy string = 'Continuous7Days'
+output authEnabled bool = authEnabled
+output entraTenantId string = entraTenantId
+output amoApiClientId string = amoApiClientId
+output amoApiAudience string = amoApiAudience
