@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>AMO Status Report</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/app-theme.css">
+  <link rel="stylesheet" href="/reports/report-viewer.css">
+</head>
+<body class="report-viewer-body">
+  <header class="report-viewer-topbar">
+    <div class="report-viewer-brand"><img src="/assets/amo-icon.png" alt=""><div><strong>Architecture Management Office</strong><span>Status Report</span></div></div>
+    <div class="report-viewer-actions"><button class="btn" id="reportPrint" hidden>Print / Save PDF</button><button class="btn" id="reportCopyLink" hidden>Copy Link</button></div>
+  </header>
+  <main class="report-viewer-shell">
+    <div id="reportViewerState" class="report-viewer-state"><span class="report-viewer-spinner" aria-hidden="true"></span>Loading report…</div>
+    <div id="reportViewerReconnect" class="card report-reconnect" hidden></div>
+    <div id="reportViewerContent"></div>
+  </main>
+  <script src="/app-workspace-repository.js"></script>
+  <script src="/app-workspace-remote-repository.js"></script>
+  <script src="/app-report-renderer.js"></script>
+  <script src="/reports/report-viewer.js"></script>
+</body>
+</html>
