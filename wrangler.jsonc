@@ -1,7 +1,9 @@
 {
   "name": "amo",
   "compatibility_date": "2026-08-20",
+  "main": "./worker.js",
   "assets": {
-    "directory": "./src"
+    "directory": "./src",
+    "binding": "ASSETS"
   }
 }
