@@ -16,7 +16,16 @@
     "team": {"idPrefix": "USR-", "required": ["id", "teamId", "name", "roleId", "fte", "active"]},
     "allocation": {"idPrefix": "ALLOC-", "required": ["id", "demandId", "teamMemberId", "forecast"]},
     "idea": {"idPrefix": "IDEA-", "required": ["id", "raisedBy", "raisedDate", "title", "description", "status"]},
-    "statusReport": {"idPrefix": "SR-", "required": ["id", "status", "reportingDate", "publishedAt", "entries"]}
+    "statusReport": {
+      "idPrefix": "SR-",
+      "states": ["Draft", "Published", "Final"],
+      "activeCycleFile": "status-reports/draft.json",
+      "required": ["id", "status", "reportingDate", "entries"],
+      "publishedRequired": ["publishedReportId", "publishedAt", "publishedBy"],
+      "optional": ["previousReportId", "previousEntries", "revision", "modifiedAt", "modifiedBy", "finalizedAt", "finalizedBy", "unpublishedAt", "unpublishedBy"],
+      "lifecycle": "Draft can be published and unpublished repeatedly. New Draft finalises the current Published report and starts the next Draft with previousReportId/previousEntries as its comparison baseline.",
+      "draftConcurrency": "Optimistic three-way merge at status-report entry field level; conflicting edits to the same field require user reconciliation."
+    }
   },
   "workspace": {"required": ["department"]},
   "config": {
