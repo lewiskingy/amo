@@ -1,8 +1,21 @@
 /* HTTP implementation of the WorkspaceRepository contract. */
 (function initRemoteWorkspaceRepository(){
+  let authLoadPromise=null;
+  function ensureAmoAuth(){
+    if(window.amoAuth)return Promise.resolve(window.amoAuth);
+    if(authLoadPromise)return authLoadPromise;
+    authLoadPromise=new Promise(resolve=>{
+      let script=document.querySelector('script[data-amo-auth]');
+      if(script){script.addEventListener('load',()=>resolve(window.amoAuth||null),{once:true});script.addEventListener('error',()=>resolve(null),{once:true});return}
+      script=document.createElement('script');script.src=typeof amoAsset==='function'?amoAsset('app-auth.js'):'app-auth.js';script.dataset.amoAuth='true';script.async=false;
+      script.onload=()=>resolve(window.amoAuth||null);script.onerror=()=>resolve(null);document.head.appendChild(script)
+    });
+    return authLoadPromise
+  }
+
   class RemoteWorkspaceRepository extends WorkspaceRepository{
     constructor(baseUrl){super('remote');this.baseUrl=String(baseUrl||'').replace(/\/+$/,'');this.name='Remote Workspace';this.info=null;this.versions={}}
-    actor(){try{const u=typeof localWorkspaceUser==='function'?localWorkspaceUser():null;return u?.name||u?.email||'Remote user'}catch{return'Remote user'}}
+    actor(){try{const authUser=window.amoAuth?.currentIdentity?.();if(authUser)return authUser.name||authUser.email||'Entra user';const u=typeof localWorkspaceUser==='function'?localWorkspaceUser():null;return u?.name||u?.email||'Remote user'}catch{return'Remote user'}}
     headers(extra={}){return{'Content-Type':'application/json','X-AMO-Actor':this.actor(),...extra}}
     rememberVersions(result){if(result?.versions)Object.assign(this.versions,result.versions);return result}
     async request(path,options={}){
@@ -13,9 +26,18 @@
         let payload={};try{payload=options.body?JSON.parse(options.body):{}}catch{payload={}};
         requestPath='/api/commit-locks';requestOptions={...options,body:JSON.stringify({...payload,resource})}
       }
-      const response=await fetch(`${this.baseUrl}${requestPath}`,{...requestOptions,headers:this.headers(requestOptions.headers||{})});
+      const auth=await ensureAmoAuth();
+      let token=null;
+      try{token=await auth?.getApiToken?.({interactive:false})||null}catch(e){console.warn('AMO could not acquire an API access token silently.',e)}
+      const authHeaders=token?{Authorization:`Bearer ${token}`}:{},headers=this.headers({...requestOptions.headers,...authHeaders});
+      const response=await fetch(`${this.baseUrl}${requestPath}`,{...requestOptions,headers});
       const text=await response.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
-      if(!response.ok){const e=new Error(data?.error||`Remote workspace request failed (${response.status}).`);e.status=response.status;e.details=data?.details;throw e}return data
+      if(!response.ok){
+        const message=response.status===401&&!auth?.isSignedIn?.()
+          ?'AMO API requires authentication. Sign in with Microsoft from the menu and try again.'
+          :(data?.error||`Remote workspace request failed (${response.status}).`);
+        const e=new Error(message);e.status=response.status;e.details=data?.details;throw e
+      }return data
     }
     async connect(){this.info=await this.request('/api/info');if(this.info?.product!=='AMO')throw new Error('The remote URL is not an AMO API.');this.name=this.info.workspaceName||'Remote Workspace';return this.info}
     async loadWorkspace(){const bundle=await this.request('/api/workspace');this.versions={...(bundle?.versions||{})};if(bundle&&Object.prototype.hasOwnProperty.call(bundle,'versions'))delete bundle.versions;return bundle}
