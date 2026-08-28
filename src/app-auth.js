@@ -7,10 +7,27 @@
   const API_SCOPE='api://0cd6fc39-7f31-49f6-ae75-7f95add7a566/access_as_user';
   const AUTHORITY=`https://login.microsoftonline.com/${TENANT_ID}`;
   const REDIRECT_URI=`${window.location.origin}/`;
+  const MSAL_SRC='https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js';
   const listeners=new Set();
   let client=null;
   let ready=false;
   let unavailableReason='';
+  let msalLoadPromise=null;
+
+  function loadMsal(){
+    if(window.msal?.PublicClientApplication)return Promise.resolve(true);
+    if(msalLoadPromise)return msalLoadPromise;
+    msalLoadPromise=new Promise(resolve=>{
+      let script=document.querySelector('script[data-amo-msal]');
+      if(script){script.addEventListener('load',()=>resolve(!!window.msal?.PublicClientApplication),{once:true});script.addEventListener('error',()=>resolve(false),{once:true});return}
+      script=document.createElement('script');
+      script.src=MSAL_SRC;script.async=true;script.dataset.amoMsal='true';
+      script.onload=()=>resolve(!!window.msal?.PublicClientApplication);
+      script.onerror=()=>resolve(false);
+      document.head.appendChild(script)
+    });
+    return msalLoadPromise
+  }
 
   function notify(){
     const identity=currentIdentity();
@@ -44,7 +61,7 @@
 
   async function initialise(){
     if(ready)return true;
-    if(!window.msal?.PublicClientApplication){
+    if(!await loadMsal()){
       unavailableReason='Microsoft authentication library did not load.';
       return false
     }
