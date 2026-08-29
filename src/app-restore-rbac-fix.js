@@ -84,10 +84,19 @@
   }
 
   function queueRender(){if(renderQueued)return;renderQueued=true;setTimeout(renderRestoreBody,0)}
+  function activateRestore(){
+    if(typeof window.switchView==='function')window.switchView('restore');
+    if(!restoreSectionActive()){
+      document.querySelectorAll('section.view').forEach(section=>section.classList.toggle('active',section.id==='restore'));
+      document.querySelectorAll('.sidebar nav [data-view]').forEach(button=>button.classList.toggle('active',button.dataset.view==='restore'))
+    }
+    queueRender()
+  }
   function bindRestoreNavigation(){
     const button=document.querySelector('.sidebar nav [data-view="restore"]');if(!button)return;
     button.dataset.amoReadonlyAllow='true';if(button.dataset.amoRestoreRenderBound==='true')return;
-    button.dataset.amoRestoreRenderBound='true';button.addEventListener('click',queueRender)
+    button.dataset.amoRestoreRenderBound='true';
+    button.addEventListener('click',activateRestore)
   }
 
   bindRestoreNavigation();
