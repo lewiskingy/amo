@@ -7,7 +7,7 @@
 
   const clean=v=>String(v??'').trim();
   const lower=v=>clean(v).toLowerCase();
-  const esc=v=>typeof escHtml==='function'?escHtml(v):clean(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>typeof escHtml==='function'?escHtml(v):clean(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const settings=()=>{try{return db?.settings||null}catch{return null}};
   const tenantDomain=()=>lower(settings()?.tenantDomain||'').replace(/^@/,'');
   const users=()=>Array.isArray(settings()?.users)?settings().users:[];
@@ -41,7 +41,7 @@
     window.amoAccess?.require?.('system.configure');const domain=validateDomain(value);if(domain)validateExistingAgainstDomain(domain);
     const repo=window.workspaceRepository;if(!repo)throw new Error('Open a workspace first.');
     const latest=await repo.getSettings();latest.tenantDomain=domain;await repo.saveSettings(latest);
-    db.settings={...db.settings,...structuredClone(latest)};db.configFiles=db.configFiles||{};db.configFiles['settings.json']=structuredClone(latest);configDirty=false;
+    db.settings={...db.settings,...structuredClone(latest)};db.configFiles=db.configFiles||{};db.configFiles['settings.json']=structuredClone(latest);
     log?.(domain?`Tenant Domain set to ${domain}.`:'Tenant Domain cleared.');window.amoAccess?.refresh?.();renderConfig?.();renderGrid?.('team')
   }
 
@@ -92,7 +92,7 @@
     [...table.querySelectorAll('tbody tr')].forEach((tr,index)=>{
       if(tr.querySelector('[data-amo-person-link-cell]'))return;const user=users()[index];if(!user)return;const td=document.createElement('td');td.dataset.amoPersonLinkCell='true';
       const current=personForUser(user.id),canLink=window.amoAccess?.can?.('people.write')===true;
-      if(canLink){const select=document.createElement('select');select.className='cell-input';select.innerHTML=`<option value="">Not linked</option>${people().map(p=>`<option value="${esc(p.id)}" ${current?.id===p.id?'selected':''} ${p.userId&&String(p.userId)!==String(user.id)?'disabled':''}>${esc(p.name||p.id)}</option>`).join('')}`;select.title='Optional 1:1 link to a Person';select.addEventListener('change',()=>{try{linkUserToPerson(user.id,select.value)}catch(e){alert(e.message);decorateUsersTable()}});td.appendChild(select)}else td.innerHTML=current?'<span class="pill green">Linked</span>':'<span class="pill gray">No</span>';
+      if(canLink){const select=document.createElement('select');select.className='cell-input';select.innerHTML=`<option value="">Not linked</option>${people().map(p=>`<option value="${esc(p.id)}" ${current?.id===p.id?'selected':''} ${p.userId&&String(p.userId)!==String(user.id)?'disabled':''}>${esc(p.name||p.id)}</option>`).join('')}`;select.title='Optional 1:1 link to a Person';select.addEventListener('change',()=>{try{linkUserToPerson(user.id,select.value)}catch(e){alert(e.message)}});td.appendChild(select)}else td.innerHTML=current?'<span class="pill green">Linked</span>':'<span class="pill gray">No</span>';
       tr.insertBefore(td,tr.lastElementChild)
     })
   }
@@ -102,7 +102,7 @@
     root.querySelectorAll('[data-user-field="companyAccount"]').forEach(input=>{if(input.dataset.amoTenantBound)return;input.dataset.amoTenantBound='true';input.placeholder=tenantDomain()?`username or username@${tenantDomain()}`:'Company / Entra account';input.addEventListener('blur',()=>{try{input.value=normalizeEnterpriseAccount(input.value,{allowBlank:false});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}))}catch(e){alert(e.message);input.focus()}})});
     decorateUsersTable()
   }
-  function bindUsers(){const root=document.getElementById('usersContent');if(!root)return false;const o=new MutationObserver(()=>{wireUserAccounts()});o.observe(root,{childList:true,subtree:true});wireUserAccounts();return true}
+  function bindUsers(){const root=document.getElementById('usersContent');if(!root)return false;const o=new MutationObserver(()=>wireUserAccounts());o.observe(root,{childList:true,subtree:true});wireUserAccounts();return true}
   if(!bindUsers()){let tries=0;const t=setInterval(()=>{if(bindUsers()||++tries>40)clearInterval(t)},100)}
 
   /* Capture Save Users so a typed local-part is normalized even if the field never lost focus. */
