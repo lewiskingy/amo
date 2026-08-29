@@ -2,7 +2,8 @@
    Recovery modules historically populate the Restore body by wrapping switchView(). The RBAC
    layer exposed a timing/load-order weakness where the Restore shell could open without invoking
    either Local or Remote renderer. Keep navigation independent of those wrapper chains and mark
-   destructive Restore actions with the explicit system.restore capability. */
+   destructive Restore actions with the explicit system.restore capability. Also refresh access
+   state when a workspace connection completes so Admin pages do not retain pre-load settings. */
 (function initRestoreRbacFix(){
   const RESTORE_CAPABILITY='system.restore';
   let renderQueued=false;
@@ -50,6 +51,12 @@
 
   bindRestoreNavigation();tagRestoreControls();
   window.addEventListener('amo-access-changed',()=>{tagRestoreControls();if(restoreSectionActive())queueRender()});
-  window.addEventListener('amo-workspace-connected',()=>{if(restoreSectionActive())queueRender()});
+  window.addEventListener('amo-workspace-connected',()=>{
+    // db.settings has now been replaced by the connected workspace settings. Re-broadcast the
+    // access state so Users/Admin screens re-render from the authoritative loaded configuration.
+    window.amoAccess?.refresh?.();
+    if(restoreSectionActive())queueRender()
+  });
+  document.querySelector('.sidebar nav [data-view="users"]')?.addEventListener('click',()=>setTimeout(()=>window.amoAccess?.refresh?.(),0));
   if(restoreSectionActive())queueRender()
 })();
