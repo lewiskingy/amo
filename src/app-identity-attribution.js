@@ -57,15 +57,22 @@
   function stampNewIdea(idea){const a=currentActor();if(!idea||!a.userId)return idea;return{...idea,raisedBy:a.displayName,raisedByUserId:a.userId,raisedByAccount:a.companyAccount||undefined}}
   if(typeof window.defaultIdea==='function'&&!window.defaultIdea.__amoIdentity){const base=window.defaultIdea,wrapped=function(){return stampNewIdea(base())};wrapped.__amoIdentity=true;window.defaultIdea=wrapped}
 
-  function lockIdeaIdentity(){
-    document.querySelectorAll('[data-idea-modal-field="raisedBy"],[data-idea-field="raisedBy"]').forEach(el=>{el.disabled=true;el.title='Raised By is taken from the authenticated AMO User.'});
+  function applyIdentityUi(){
+    document.querySelectorAll('[data-idea-modal-field="raisedBy"],[data-idea-field="raisedBy"]').forEach(el=>{
+      if(!el.disabled)el.disabled=true;
+      const title='Raised By is taken from the authenticated AMO User.';if(el.title!==title)el.title=title
+    });
     document.querySelectorAll('#changeWorkspaceUser').forEach(b=>b.remove());
-    const card=document.getElementById('workspaceIdentityCard');if(card){const h=card.querySelector('h2');if(h)h.textContent='Authenticated editing identity';const labels=[...card.querySelectorAll('.mini-stat span')];for(const label of labels)if(/Browser identity/i.test(label.textContent||''))label.textContent='AMO User'}
+    const card=document.getElementById('workspaceIdentityCard');if(card){
+      const h=card.querySelector('h2');if(h&&h.textContent!=='Authenticated editing identity')h.textContent='Authenticated editing identity';
+      const labels=[...card.querySelectorAll('.mini-stat span')];for(const label of labels)if(/Browser identity/i.test(label.textContent||'')&&label.textContent!=='AMO User')label.textContent='AMO User'
+    }
   }
-  if(typeof window.renderIdeaModal==='function'&&!window.renderIdeaModal.__amoIdentity){const base=window.renderIdeaModal,wrapped=function(){const r=base.apply(this,arguments);lockIdeaIdentity();return r};wrapped.__amoIdentity=true;window.renderIdeaModal=wrapped}
-  if(typeof window.renderIdeas==='function'&&!window.renderIdeas.__amoIdentity){const base=window.renderIdeas,wrapped=function(){const r=base.apply(this,arguments);lockIdeaIdentity();return r};wrapped.__amoIdentity=true;window.renderIdeas=wrapped}
+  if(typeof window.renderIdeaModal==='function'&&!window.renderIdeaModal.__amoIdentity){const base=window.renderIdeaModal,wrapped=function(){const r=base.apply(this,arguments);applyIdentityUi();return r};wrapped.__amoIdentity=true;window.renderIdeaModal=wrapped}
+  if(typeof window.renderIdeas==='function'&&!window.renderIdeas.__amoIdentity){const base=window.renderIdeas,wrapped=function(){const r=base.apply(this,arguments);applyIdentityUi();return r};wrapped.__amoIdentity=true;window.renderIdeas=wrapped}
+  if(typeof window.renderWorkspaceIdentityCard==='function'&&!window.renderWorkspaceIdentityCard.__amoIdentity){const base=window.renderWorkspaceIdentityCard,wrapped=function(){const r=base.apply(this,arguments);applyIdentityUi();return r};wrapped.__amoIdentity=true;window.renderWorkspaceIdentityCard=wrapped}
 
-  function install(){installLocalAudit();installRemoteAudit();installStatusAttribution(window.LocalWorkspaceRepository);installStatusAttribution(window.RemoteWorkspaceRepository);lockIdeaIdentity()}
-  const observer=new MutationObserver(lockIdeaIdentity);observer.observe(document.body,{childList:true,subtree:true});
-  window.addEventListener('amo-auth-changed',install);window.addEventListener('amo-access-changed',install);window.addEventListener('amo-workspace-connected',install);install();setTimeout(install,100)
+  function install(){installLocalAudit();installRemoteAudit();installStatusAttribution(window.LocalWorkspaceRepository);installStatusAttribution(window.RemoteWorkspaceRepository);applyIdentityUi()}
+  window.addEventListener('amo-auth-changed',install);window.addEventListener('amo-access-changed',install);window.addEventListener('amo-workspace-connected',install);
+  install();setTimeout(install,100);setTimeout(install,500)
 })();
