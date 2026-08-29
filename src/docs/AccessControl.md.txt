@@ -1,0 +1,67 @@
+# AMO Access Control Foundation
+
+## Current phase
+
+The initial access policy is intentionally simple:
+
+- anonymous users can read the workspace;
+- users authenticated with Google can read and write;
+- both Local Workspace and Remote Workspace apply the same client capability check;
+- Remote Workspace API authorization is not yet the security boundary. Server-side enforcement will be added separately before private API routes are protected.
+
+The client exposes a provider-neutral `amoAccess` facade. Application code should ask for a capability (for example `workspace.write`) rather than test Google authentication directly.
+
+## Capability vocabulary
+
+The source-controlled vocabulary currently includes:
+
+- `workspace.read`
+- `workspace.write`
+- `demand.read`
+- `demand.write`
+- `allocation.read`
+- `allocation.write`
+- `status.read`
+- `status.update`
+- `status.publish`
+- `financial.read`
+- `system.configure`
+- `system.restore`
+
+At this phase all read capabilities are available anonymously and all mutation capabilities resolve to the same authenticated-write decision. The vocabulary exists now so scoped RBAC can be introduced later without rewriting feature code around `isSignedIn()` tests.
+
+## Identity binding configuration
+
+The framework reads optional identity bindings from `config/settings.json` under `accessControl`:
+
+```json
+{
+  "accessControl": {
+    "writeRequiresMapping": false,
+    "identityBindings": [
+      {
+        "provider": "google",
+        "subject": "google-immutable-subject-id",
+        "email": "somebody@gmail.com",
+        "companyAccount": "some.body@company.com",
+        "userId": "some.body@company.com",
+        "enabled": true
+      }
+    ]
+  }
+}
+```
+
+`subject` is the preferred identity key because it is immutable at the provider. `email` is retained as a readable administrative aid and fallback during initial setup. `companyAccount` is the canonical work identity AMO can use for People linkage, ownership, audit and future role assignments.
+
+With `writeRequiresMapping: false` (the initial default), any authenticated Google user receives write capability. Anonymous users remain read-only.
+
+When the mappings have been populated and tested, setting `writeRequiresMapping: true` changes the same capability engine so that only authenticated identities with an enabled binding receive write capability. An authenticated but unmapped user then remains read-only.
+
+## Local versus Remote Workspace
+
+Client-side capability control applies to both workspace modes and is important for Local Workspace because there is no API authorization layer. It disables normal mutation UI and prevents repository writes from the application.
+
+Local Workspace remains a cooperative application boundary: a user with direct filesystem access can still modify the underlying JSON outside AMO.
+
+For Remote Workspace, client-side checks are UX and defence in depth only. The API must independently authenticate the caller, resolve the canonical AMO user and authorize the operation. Future `/api/public/*` routes should expose read-only operations, while authenticated `/api/private/*` routes enforce mutation permissions server-side.
