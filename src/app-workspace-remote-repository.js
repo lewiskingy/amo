@@ -15,7 +15,7 @@
 
   class RemoteWorkspaceRepository extends WorkspaceRepository{
     constructor(baseUrl){super('remote');this.baseUrl=String(baseUrl||'').replace(/\/+$/,'');this.name='Remote Workspace';this.info=null;this.versions={}}
-    actor(){try{const authUser=window.amoAuth?.currentIdentity?.();if(authUser)return authUser.name||authUser.email||'Entra user';const u=typeof localWorkspaceUser==='function'?localWorkspaceUser():null;return u?.name||u?.email||'Remote user'}catch{return'Remote user'}}
+    actor(){try{const authUser=window.amoAuth?.currentIdentity?.();if(authUser)return authUser.name||authUser.email||'Authenticated user';const u=typeof localWorkspaceUser==='function'?localWorkspaceUser():null;return u?.name||u?.email||'Remote user'}catch{return'Remote user'}}
     headers(extra={}){return{'Content-Type':'application/json','X-AMO-Actor':this.actor(),...extra}}
     rememberVersions(result){if(result?.versions)Object.assign(this.versions,result.versions);return result}
     async request(path,options={}){
@@ -28,13 +28,13 @@
       }
       const auth=await ensureAmoAuth();
       let token=null;
-      try{token=await auth?.getApiToken?.({interactive:false})||null}catch(e){console.warn('AMO could not acquire an API access token silently.',e)}
+      try{token=await auth?.getApiToken?.({interactive:false})||null}catch(e){console.warn('AMO could not obtain the current authentication token.',e)}
       const authHeaders=token?{Authorization:`Bearer ${token}`}:{},headers=this.headers({...requestOptions.headers,...authHeaders});
       const response=await fetch(`${this.baseUrl}${requestPath}`,{...requestOptions,headers});
       const text=await response.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
       if(!response.ok){
         const message=response.status===401&&!auth?.isSignedIn?.()
-          ?'AMO API requires authentication. Sign in with Microsoft from the menu and try again.'
+          ?'AMO API requires authentication. Sign in with Google from the menu and try again.'
           :(data?.error||`Remote workspace request failed (${response.status}).`);
         const e=new Error(message);e.status=response.status;e.details=data?.details;throw e
       }return data
