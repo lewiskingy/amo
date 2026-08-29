@@ -1,46 +1,110 @@
 # AMO Access Control Foundation
 
-## Current phase
+## Current client-side policy
 
-The initial access policy is intentionally simple:
+AMO now uses an explicit workspace-claim and minimal RBAC model:
 
-- anonymous users can read the workspace;
-- users authenticated with Google can read and write;
-- both Local Workspace and Remote Workspace apply the same client capability check;
-- Remote Workspace API authorization is not yet the security boundary. Server-side enforcement will be added separately before private API routes are protected.
+- everyone, including anonymous users, can read the workspace;
+- an unclaimed workspace is read-only;
+- any Google-authenticated user can explicitly Claim Workspace;
+- claiming creates or binds an authoritative AMO User and grants that User the `admin` role;
+- after claim, authenticated users do not receive write access merely by signing in;
+- only enabled, mapped AMO Users with an assigned role or capability can write;
+- the same client capability checks apply to Local and Remote Workspace modes.
 
-The client exposes a provider-neutral `amoAccess` facade. Application code should ask for a capability (for example `workspace.write`) rather than test Google authentication directly.
+Remote Workspace API authorization is not yet the security boundary. Server-side enforcement will be added separately; the current model is application/client enforcement and defence in depth.
+
+## Bootstrap claim
+
+Claim is intentionally explicit rather than automatic first-login ownership.
+
+The Users page shows Claim Workspace only while `accessControl.claimed !== true`. The claimant must be signed in with Google and supply their Company / Entra account. Claiming persists:
+
+```json
+{
+  "accessControl": {
+    "claimed": true,
+    "claimedAt": "...",
+    "claimedByUserId": "user-stable-id",
+    "writeRequiresMapping": true
+  }
+}
+```
+
+and creates or updates the claimant User with:
+
+```json
+{
+  "roles": ["admin"]
+}
+```
+
+Claim is a bootstrap mechanism only. There is no permanent special Owner permission: after claim the ordinary role/capability model applies. A claimed workspace must always retain at least one enabled Admin.
+
+For Remote Workspace the later server implementation must make claim atomic so two users cannot claim concurrently. Local Workspace remains a cooperative application boundary.
+
+## Roles
+
+Roles are source-controlled application definitions rather than editable configuration.
+
+### Read-Write User (`contributor`)
+
+The normal operational role grants:
+
+- `demand.write`
+- `allocation.write`
+- `people.write`
+- `ideas.write`
+- `status.update`
+
+All read capabilities remain implicit for everyone.
+
+### Admin (`admin`)
+
+Admin grants every current write capability, including the Read-Write User capabilities plus:
+
+- `status.publish`
+- `system.configure`
+- `users.manage`
+- `system.restore`
+
+Admins can add Users, map authentication identities, grant or remove roles, and grant additional capabilities.
 
 ## Capability vocabulary
 
 The source-controlled vocabulary currently includes:
 
 - `workspace.read`
-- `workspace.write`
+- `workspace.write` (aggregate compatibility check: true when the User has any write capability)
+- `workspace.claim`
 - `demand.read`
 - `demand.write`
 - `allocation.read`
 - `allocation.write`
+- `people.read`
+- `people.write`
+- `ideas.read`
+- `ideas.write`
 - `status.read`
 - `status.update`
 - `status.publish`
 - `financial.read`
 - `system.configure`
+- `users.manage`
 - `system.restore`
 
-At this phase all read capabilities are available anonymously and all mutation capabilities resolve to the same authenticated-write decision. The vocabulary exists now so scoped RBAC can be introduced later without rewriting feature code around `isSignedIn()` tests.
+Feature UI asks `amoAccess.can(capability)` rather than testing Google authentication directly. This lets the capability vocabulary later gain Department / Team scopes without replacing feature code.
 
 ## Authoritative Users
 
-AMO now has an Admin -> Users page. A User is the authoritative application identity and is deliberately separate from the existing People records.
-
-Conceptually:
+Admin -> Users is the authoritative application identity store and remains deliberately separate from existing People records.
 
 ```text
 User
   -> canonical company identity
   -> authentication identities (Google now, Entra later)
-  -> future role assignments
+  -> roles
+  -> additional capabilities
 
 Team Member (future People refactor)
   -> userId
@@ -49,46 +113,36 @@ Team Member (future People refactor)
   -> FTE / capacity metadata
 ```
 
-This keeps identity, authorization and organisational membership separate. Existing People records are not changed in this release.
-
-Users are stored in `config/settings.json`:
+Example persisted User:
 
 ```json
 {
-  "users": [
+  "id": "user-stable-id",
+  "displayName": "Some Body",
+  "companyAccount": "some.body@company.com",
+  "enabled": true,
+  "roles": ["contributor"],
+  "capabilities": ["status.publish"],
+  "identities": [
     {
-      "id": "user-stable-id",
-      "displayName": "Some Body",
-      "companyAccount": "some.body@company.com",
-      "enabled": true,
-      "identities": [
-        {
-          "provider": "google",
-          "subject": "google-immutable-subject-id",
-          "email": "somebody@gmail.com",
-          "enabled": true
-        }
-      ]
+      "provider": "google",
+      "subject": "google-immutable-subject-id",
+      "email": "somebody@gmail.com",
+      "enabled": true
     }
-  ],
-  "accessControl": {
-    "writeRequiresMapping": false
-  }
+  ]
 }
 ```
 
-`companyAccount` is the canonical work identity AMO can use for ownership, audit and future role assignments. Google is an authentication binding only. `subject` is the preferred provider identity key because it is immutable; Google email is retained as an administrative aid and setup fallback.
-
-The Users page supports adding, editing, enabling/disabling and deleting User profiles. When signed in, `Use my Google identity` can populate the current Google email and immutable subject into a User profile.
-
-With `writeRequiresMapping: false` (the initial default), any authenticated Google user receives write capability. Anonymous users remain read-only.
-
-When approved Users have been populated and tested, `writeRequiresMapping` can be enabled from the Users page. The UI prevents enabling it unless the currently signed-in Google identity is mapped to an enabled User, reducing accidental administrative lockout. Once enabled, an authenticated but unmapped user remains read-only.
+`companyAccount` is the canonical work identity for future ownership, audit and Entra linkage. Google is an authentication binding only. The immutable provider `subject` is preferred for identity resolution; Google email is retained as an administrative aid and bootstrap fallback.
 
 ## Local versus Remote Workspace
 
-Client-side capability control applies to both workspace modes and is important for Local Workspace because there is no API authorization layer. It disables normal mutation UI and prevents repository writes from the application.
+Client-side capability control applies to both workspace modes. In Local Workspace it disables mutation UI and guards application persistence, but a person with direct filesystem access can still modify the JSON outside AMO.
 
-Local Workspace remains a cooperative application boundary: a user with direct filesystem access can still modify the underlying JSON outside AMO.
+For Remote Workspace these checks improve UX and prevent the normal application from issuing operations the User is not entitled to perform, but they are not a security boundary. The API must later independently authenticate the Google token, resolve the same canonical AMO User and enforce the same capability decision. The planned API split is:
 
-For Remote Workspace, client-side checks are UX and defence in depth only. The API must independently authenticate the caller, resolve the canonical AMO User and authorize the operation. Future `/api/public/*` routes should expose read-only operations, while authenticated `/api/private/*` routes enforce mutation permissions server-side.
+- `/api/public/*`: anonymous read operations;
+- `/api/private/*`: authenticated/authorized mutation operations.
+
+Read filtering/redaction, when introduced for sensitive data such as financial information, must also be enforced by the API rather than relying on browser hiding.
