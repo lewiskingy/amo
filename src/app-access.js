@@ -76,15 +76,31 @@
     modal.querySelectorAll('input,select,textarea,[contenteditable="true"]').forEach(el=>{if(el.dataset.amoReadonlyAllow==='true')return;if('disabled'in el)setAccessDisabled(el,!allowed,required);else if(!allowed){el.dataset.amoAccessContenteditable=el.getAttribute('contenteditable')||'true';el.setAttribute('contenteditable','false')}else if(el.dataset.amoAccessContenteditable){el.setAttribute('contenteditable',el.dataset.amoAccessContenteditable);delete el.dataset.amoAccessContenteditable}});
     modal.querySelectorAll('button').forEach(button=>{if(mutationButton(button)){const capability=button.dataset.amoCapability||required;setAccessDisabled(button,!can(capability),capability)}})
   }
+  function setIfChanged(element,key,value){if(element[key]!==value)element[key]=value}
   function renderAccessBadge(){
     const host=document.querySelector('.workspace-banner .flex');if(!host)return;let badge=document.getElementById('amoAccessMode');if(!badge){badge=document.createElement('span');badge.id='amoAccessMode';badge.className='pill';host.appendChild(badge)}const principal=currentPrincipal();
-    if(!workspaceClaimed()){badge.className='pill';badge.textContent=principal.authenticated?'Unclaimed · claim to administer':'Unclaimed · read only'}else if(can(CAPABILITIES.workspaceWrite)){badge.className='pill green';badge.textContent=principal.roles.includes('admin')?'Admin access':'Edit enabled'}else{badge.className='pill';badge.textContent=principal.authenticated?'Read only · access not granted':'Read only'}badge.title=principal.companyAccount?`Acting as ${principal.companyAccount}`:(principal.identity?.email||'')
+    let className='pill',text='Read only';
+    if(!workspaceClaimed())text=principal.authenticated?'Unclaimed · claim to administer':'Unclaimed · read only';
+    else if(can(CAPABILITIES.workspaceWrite)){className='pill green';text=principal.roles.includes('admin')?'Admin access':'Edit enabled'}
+    else text=principal.authenticated?'Read only · access not granted':'Read only';
+    setIfChanged(badge,'className',className);setIfChanged(badge,'textContent',text);setIfChanged(badge,'title',principal.companyAccount?`Acting as ${principal.companyAccount}`:(principal.identity?.email||''))
   }
   function applyUiState(){
     refreshQueued=false;document.documentElement.dataset.amoAccessMode=accessMode();document.querySelectorAll('button').forEach(button=>{if(!mutationButton(button))return;const capability=capabilityForElement(button);setAccessDisabled(button,!can(capability),capability)});applyModalAccess();renderAccessBadge()
   }
   function scheduleUiRefresh(){if(refreshQueued)return;refreshQueued=true;requestAnimationFrame(applyUiState)}
-  function observeUi(){if(observer)return;observer=new MutationObserver(scheduleUiRefresh);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','contenteditable']});scheduleUiRefresh()}
+  function observeUi(){
+    if(observer)return;
+    observer=new MutationObserver(records=>{
+      const relevant=records.some(record=>{
+        const target=record.target instanceof Element?record.target:record.target?.parentElement;
+        if(target?.closest?.('#amoAccessMode,#amoCurrentUser'))return false;
+        return true
+      });
+      if(relevant)scheduleUiRefresh()
+    });
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','contenteditable']});scheduleUiRefresh()
+  }
 
   function persistenceWriteAllowed(){return claimDepth>0&&canClaim()||can(CAPABILITIES.workspaceWrite)}
   function guardLocalRepository(){
@@ -110,5 +126,5 @@
   function onChange(fn){listeners.add(fn);return()=>listeners.delete(fn)}
 
   window.amoAccess={CAPABILITIES,ROLE_DEFINITIONS,WRITE_CAPABILITIES:[...WRITE_CAPABILITIES],CONTRIBUTOR_CAPABILITIES:[...CONTRIBUTOR_CAPABILITIES],can,require:requireCapability,canClaim,claimed:workspaceClaimed,runClaim,mode:accessMode,currentPrincipal,users,resolveUser,resolveIdentityBinding,effectiveCapabilities,config:accessConfig,refresh:()=>{installGuards();scheduleUiRefresh();notify()},onChange};
-  installGuards();ensureAuth().then(auth=>{auth?.onChange?.(()=>{installGuards();scheduleUiRefresh();notify()});installGuards();scheduleUiRefresh();notify()});window.addEventListener('amo-auth-changed',()=>{installGuards();scheduleUiRefresh();notify()});window.addEventListener('amo-workspace-connected',installGuards);observeUi()
+  installGuards();ensureAuth().then(auth=>{auth?.onChange?.(()=>{installGuards();scheduleUiRefresh();notify()});installGuards();scheduleUiRefresh();notify()});window.addEventListener('amo-auth-changed',()=>{installGuards();scheduleUiRefresh();notify()});window.addEventListener('amo-workspace-connected',()=>{installGuards();scheduleUiRefresh();notify()});observeUi()
 })();
