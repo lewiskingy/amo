@@ -3,7 +3,9 @@
 (function initRemoteRecovery(){
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const activeRepo=()=>window.workspaceRepository;
-  const supportsRemoteRecovery=()=>activeRepo()?.mode==='remote'&&activeRepo()?.info?.capabilities?.recovery&&typeof activeRepo()?.listRecoveryPoints==='function';
+  /* The repository contract is authoritative here. A stale/missing /api/info capability flag must
+     not suppress a recovery API that the connected repository actually exposes. */
+  const supportsRemoteRecovery=()=>activeRepo()?.mode==='remote'&&typeof activeRepo()?.listRecoveryPoints==='function'&&typeof activeRepo()?.previewRestore==='function'&&typeof activeRepo()?.restorePoint==='function';
 
   function ensureNav(){
     const nav=[...document.querySelectorAll('details.nav-group')].find(d=>/Admin/i.test(d.querySelector('summary')?.textContent||''))?.querySelector('.nav-group-items');
@@ -12,7 +14,9 @@
   }
 
   async function renderRemoteRestore(){
-    ensureNav();const host=document.getElementById('restoreContent'),repo=activeRepo();if(!host||!supportsRemoteRecovery())return;
+    ensureNav();const host=document.getElementById('restoreContent'),repo=activeRepo();if(!host)return;
+    if(!repo||repo.mode!=='remote'){host.innerHTML='<div class="notice">Open a Remote workspace to view Remote recovery history.</div>';return}
+    if(!supportsRemoteRecovery()){host.innerHTML='<div class="notice bad">The connected Remote repository does not expose the AMO recovery API.</div>';return}
     host.innerHTML='<div class="notice">Loading Remote recovery history…</div>';
     try{
       const points=await repo.listRecoveryPoints(250),retention=repo.info?.capabilities?.auditRetentionDays||28,backup=repo.info?.capabilities?.managedBackup||'managed database backup';
@@ -49,6 +53,6 @@
     }
   `;document.head.appendChild(style);
 
-  ensureNav();const previousSwitch=window.switchView;if(typeof previousSwitch==='function')window.switchView=function(id){const result=previousSwitch.apply(this,arguments);if(id==='restore'&&supportsRemoteRecovery())renderRemoteRestore();return result};
+  ensureNav();const previousSwitch=window.switchView;if(typeof previousSwitch==='function')window.switchView=function(id){const result=previousSwitch.apply(this,arguments);if(id==='restore'&&activeRepo()?.mode==='remote')renderRemoteRestore();return result};
   window.AmoRemoteRecovery={render:renderRemoteRestore};
 })();
