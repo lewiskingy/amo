@@ -1,132 +1,98 @@
-/* Microsoft Entra authentication facade for hosted AMO.
-   Authentication is deliberately optional until the API auth gate is enabled. Other AMO
-   modules consume the small amoAuth facade rather than depending directly on MSAL objects. */
+/* Google authentication facade for hosted AMO.
+   Authentication remains optional while server-side RBAC enforcement is introduced. Other AMO
+   modules consume this small amoAuth facade rather than depending directly on Google objects. */
 (function initAmoAuth(){
-  const TENANT_ID='5fbb0478-1d93-4701-ab39-1df8234dbbf5';
-  const CLIENT_ID='e78adcd0-b55f-44e8-a968-cd66799f47f8';
-  const API_SCOPE='api://0cd6fc39-7f31-49f6-ae75-7f95add7a566/access_as_user';
-  const AUTHORITY=`https://login.microsoftonline.com/${TENANT_ID}`;
-  const REDIRECT_URI=`${window.location.origin}/`;
-  const MSAL_SRC='https://alcdn.msauth.net/browser/2.35.0/js/msal-browser.min.js';
+  const CLIENT_ID='440124391886-shmkseqvousplhc89fvb52gckahq4ml1.apps.googleusercontent.com';
+  const GIS_SRC='https://accounts.google.com/gsi/client';
+  const CREDENTIAL_KEY='amo.googleCredential';
   const listeners=new Set();
-  let client=null;
   let ready=false;
   let unavailableReason='';
-  let msalLoadPromise=null;
+  let gisLoadPromise=null;
+  let credential=null;
+  let claims=null;
 
-  function loadMsal(){
-    if(window.msal?.PublicClientApplication)return Promise.resolve(true);
-    if(msalLoadPromise)return msalLoadPromise;
-    msalLoadPromise=new Promise(resolve=>{
-      let script=document.querySelector('script[data-amo-msal]');
-      if(script){script.addEventListener('load',()=>resolve(!!window.msal?.PublicClientApplication),{once:true});script.addEventListener('error',()=>resolve(false),{once:true});return}
-      script=document.createElement('script');
-      script.src=MSAL_SRC;script.async=true;script.dataset.amoMsal='true';
-      script.onload=()=>resolve(!!window.msal?.PublicClientApplication);
-      script.onerror=()=>resolve(false);
-      document.head.appendChild(script)
-    });
-    return msalLoadPromise
+  function decodeJwt(token){
+    try{
+      const part=String(token||'').split('.')[1];if(!part)return null;
+      const json=decodeURIComponent(atob(part.replace(/-/g,'+').replace(/_/g,'/')).split('').map(c=>`%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`).join(''));
+      return JSON.parse(json)
+    }catch{return null}
   }
-
-  function notify(){
-    const identity=currentIdentity();
-    listeners.forEach(fn=>{try{fn(identity)}catch(_e){}});
-    try{window.dispatchEvent(new CustomEvent('amo-auth-changed',{detail:identity}))}catch(_e){}
+  function tokenValid(token){const c=decodeJwt(token);return !!c&&c.aud===CLIENT_ID&&(!c.exp||c.exp*1000>Date.now()+15000)}
+  function remember(token){
+    credential=tokenValid(token)?token:null;claims=credential?decodeJwt(credential):null;
+    try{if(credential)sessionStorage.setItem(CREDENTIAL_KEY,credential);else sessionStorage.removeItem(CREDENTIAL_KEY)}catch{}
+    notify()
   }
-
-  function account(){
-    if(!client)return null;
-    const active=client.getActiveAccount?.();
-    if(active)return active;
-    const accounts=client.getAllAccounts?.()||[];
-    if(accounts.length===1){client.setActiveAccount?.(accounts[0]);return accounts[0]}
-    return accounts[0]||null
-  }
+  function restore(){try{const saved=sessionStorage.getItem(CREDENTIAL_KEY);if(saved&&tokenValid(saved)){credential=saved;claims=decodeJwt(saved)}else sessionStorage.removeItem(CREDENTIAL_KEY)}catch{}}
+  function notify(){const identity=currentIdentity();listeners.forEach(fn=>{try{fn(identity)}catch(_e){}});try{window.dispatchEvent(new CustomEvent('amo-auth-changed',{detail:identity}))}catch(_e){}}
 
   function currentIdentity(){
-    const a=account();
-    if(!a)return null;
-    const claims=a.idTokenClaims||{};
+    if(!credential||!claims||!tokenValid(credential)){if(credential)remember(null);return null}
     return {
-      provider:'entra',
-      name:a.name||claims.name||a.username||'Microsoft user',
-      email:claims.email||claims.preferred_username||a.username||'',
-      username:a.username||'',
-      tenantId:claims.tid||a.tenantId||TENANT_ID,
-      objectId:claims.oid||claims.sub||a.localAccountId||'',
-      homeAccountId:a.homeAccountId||''
+      provider:'google',
+      subject:claims.sub||'',
+      name:claims.name||claims.email||'Google user',
+      email:claims.email||'',
+      username:claims.email||'',
+      picture:claims.picture||'',
+      emailVerified:claims.email_verified===true
     }
+  }
+
+  function loadGoogleIdentity(){
+    if(window.google?.accounts?.id)return Promise.resolve(true);
+    if(gisLoadPromise)return gisLoadPromise;
+    gisLoadPromise=new Promise(resolve=>{
+      let script=document.querySelector('script[data-amo-google-identity]');
+      if(script){script.addEventListener('load',()=>resolve(!!window.google?.accounts?.id),{once:true});script.addEventListener('error',()=>resolve(false),{once:true});return}
+      script=document.createElement('script');script.src=GIS_SRC;script.async=true;script.dataset.amoGoogleIdentity='true';
+      script.onload=()=>resolve(!!window.google?.accounts?.id);script.onerror=()=>resolve(false);document.head.appendChild(script)
+    });
+    return gisLoadPromise
   }
 
   async function initialise(){
     if(ready)return true;
-    if(!await loadMsal()){
-      unavailableReason='Microsoft authentication library did not load.';
-      return false
+    restore();
+    if(!await loadGoogleIdentity()){
+      unavailableReason='Google authentication library did not load.';return false
     }
     try{
-      client=new window.msal.PublicClientApplication({
-        auth:{clientId:CLIENT_ID,authority:AUTHORITY,redirectUri:REDIRECT_URI,navigateToLoginRequestUrl:false},
-        cache:{cacheLocation:'localStorage',storeAuthStateInCookie:false}
+      window.google.accounts.id.initialize({
+        client_id:CLIENT_ID,
+        callback:response=>{if(response?.credential)remember(response.credential)},
+        auto_select:false,
+        cancel_on_tap_outside:true
       });
-      const accounts=client.getAllAccounts?.()||[];
-      if(accounts.length)client.setActiveAccount?.(accounts[0]);
       ready=true;notify();return true
-    }catch(e){
-      unavailableReason=e?.message||String(e);
-      console.warn('AMO Entra authentication could not initialise.',e);
-      return false
-    }
+    }catch(e){unavailableReason=e?.message||String(e);console.warn('AMO Google authentication could not initialise.',e);return false}
   }
 
-  async function signIn(){
-    if(!await initialise())throw new Error(unavailableReason||'Microsoft authentication is unavailable.');
-    const result=await client.loginPopup({scopes:['openid','profile','email',API_SCOPE],prompt:'select_account'});
-    if(result?.account)client.setActiveAccount?.(result.account);
-    notify();
-    return currentIdentity()
+  async function renderSignInButton(element,options={}){
+    if(!element)throw new Error('A sign-in button container is required.');
+    if(!await initialise())throw new Error(unavailableReason||'Google authentication is unavailable.');
+    element.innerHTML='';
+    window.google.accounts.id.renderButton(element,{
+      type:'standard',theme:'outline',size:'medium',text:'signin_with',shape:'rectangular',logo_alignment:'left',width:Math.max(180,Math.min(260,options.width||220))
+    })
   }
 
   async function signOut(){
-    if(!await initialise())return;
-    const a=account();
-    if(!a)return;
-    await client.logoutPopup({account:a,postLogoutRedirectUri:REDIRECT_URI,mainWindowRedirectUri:REDIRECT_URI});
-    notify()
+    remember(null);
+    try{window.google?.accounts?.id?.disableAutoSelect?.()}catch{}
   }
-
-  async function getApiToken(options={}){
+  async function getApiToken(){
     if(!await initialise())return null;
-    const a=account();
-    if(!a)return null;
-    try{
-      const result=await client.acquireTokenSilent({account:a,scopes:[API_SCOPE]});
-      return result?.accessToken||null
-    }catch(e){
-      const interactionRequired=e instanceof window.msal.InteractionRequiredAuthError || ['interaction_required','consent_required','login_required'].includes(e?.errorCode);
-      if(!options.interactive||!interactionRequired)return null;
-      const result=await client.acquireTokenPopup({account:a,scopes:[API_SCOPE]});
-      if(result?.account)client.setActiveAccount?.(result.account);
-      notify();
-      return result?.accessToken||null
-    }
+    if(!credential||!tokenValid(credential)){if(credential)remember(null);return null}
+    return credential
   }
-
   function onChange(fn){listeners.add(fn);return()=>listeners.delete(fn)}
 
   window.amoAuth={
-    tenantId:TENANT_ID,
-    clientId:CLIENT_ID,
-    apiScope:API_SCOPE,
-    initialise,
-    signIn,
-    signOut,
-    getApiToken,
-    currentIdentity,
-    isSignedIn:()=>!!account(),
-    onChange,
-    unavailableReason:()=>unavailableReason
+    provider:'google',clientId:CLIENT_ID,initialise,renderSignInButton,signOut,getApiToken,currentIdentity,
+    isSignedIn:()=>!!currentIdentity(),onChange,unavailableReason:()=>unavailableReason
   };
-  initialise();
+  initialise()
 })();
