@@ -3,7 +3,7 @@
    ordering is ever disrupted, never leave Restore behind an unresolved script-load promise. */
 (function initRestoreRbacFix(){
   const RESTORE_CAPABILITY='system.restore';
-  const LOAD_TIMEOUT_MS=4000;
+  const LOAD_TIMEOUT_MS=5000;
   let renderQueued=false;
   const moduleLoads=new Map();
 
@@ -22,28 +22,39 @@
     })
   }
 
+  function clearStaleLocalGuard(src,test){
+    if(src==='app-backup-recovery.js'&&!test()&&window.__amoBackupRecoveryLoaded===true){
+      window.__amoBackupRecoveryLoaded=false;
+      console.warn('AMO cleared a stale Local recovery loaded flag before retrying recovery initialisation.');
+    }
+  }
+
   function loadRecoveryScript(src,test){
     if(test())return Promise.resolve(true);
     if(moduleLoads.has(src))return moduleLoads.get(src);
     const promise=new Promise((resolve,reject)=>{
-      let settled=false;
+      let settled=false,retried=false;
       const finish=(error=null)=>{if(settled)return;settled=true;clearTimeout(timeout);if(error)reject(error);else resolve(true)};
       const timeout=setTimeout(()=>finish(new Error(`${src} did not initialise its recovery API within ${LOAD_TIMEOUT_MS/1000} seconds.`)),LOAD_TIMEOUT_MS);
       const existing=[...document.scripts].find(s=>String(s.src||'').includes(`/${src}`)||String(s.getAttribute('src')||'').split('?')[0]===src);
       const check=()=>{if(test())finish()};
+      const injectFresh=()=>{
+        if(settled||test())return check();if(retried)return;retried=true;clearStaleLocalGuard(src,test);
+        const script=document.createElement('script'),base=asset(src);script.src=`${base}${String(base).includes('?')?'&':'?'}restoreRetry=${Date.now()}`;script.async=false;script.dataset.amoRestoreModule='retry';
+        script.onload=()=>{if(test())finish();else finish(new Error(`${src} reloaded but did not initialise its recovery API.`))};
+        script.onerror=()=>finish(new Error(`Could not reload ${src}.`));document.body.appendChild(script)
+      };
 
       if(existing){
-        /* The script may already have completed before Restore attached handlers. Poll the actual
-           API rather than waiting forever for a load event that can never fire again. */
+        /* The compatibility bundle may have executed this script already. If the expected API is
+           still absent, waiting on the old script tag cannot repair a partial initialisation. Give
+           any in-flight execution a brief chance to finish, then deliberately retry once. */
         existing.addEventListener('load',check,{once:true});
-        existing.addEventListener('error',()=>finish(new Error(`Could not load ${src}.`)),{once:true});
-        let attempts=0;const poll=setInterval(()=>{if(settled){clearInterval(poll);return}if(test()){clearInterval(poll);finish();return}if(++attempts>=20)clearInterval(poll)},100);
-        check();return
+        existing.addEventListener('error',()=>injectFresh(),{once:true});
+        check();if(!settled)setTimeout(()=>{if(test())finish();else injectFresh()},200);return
       }
 
-      const script=document.createElement('script');const base=asset(src);script.src=`${base}${String(base).includes('?')?'&':'?'}restore=${Date.now()}`;script.async=false;script.dataset.amoRestoreModule='true';
-      script.onload=()=>{if(test())finish();else finish(new Error(`${src} loaded but did not initialise its recovery API.`))};
-      script.onerror=()=>finish(new Error(`Could not load ${src}.`));document.body.appendChild(script)
+      injectFresh()
     }).catch(error=>{moduleLoads.delete(src);throw error});
     moduleLoads.set(src,promise);return promise
   }
@@ -65,8 +76,6 @@
       if(output)output.innerHTML='<div class="notice">Loading recovery tools…</div>';
       const recovery=await ensureRecoveryModule(repo);
       if(repo.mode==='remote')await recovery.render();else await recovery.renderRestore();
-      /* A renderer must replace the loader. Treat a silent no-op as an error so Restore can never
-         appear to load forever again. */
       if(output&&/Loading recovery tools/i.test(output.textContent||''))throw new Error(`The ${repo.mode} recovery module loaded but did not render recovery information.`)
     }catch(error){
       if(output)output.innerHTML=`<div class="notice bad">Could not initialise Restore: ${esc(error?.message||error)}</div>`;
@@ -81,7 +90,6 @@
     button.dataset.amoRestoreRenderBound='true';button.addEventListener('click',queueRender)
   }
 
-  /* Observe only long enough to bind a Restore button that may be created by a recovery module. */
   bindRestoreNavigation();
   if(!document.querySelector('.sidebar nav [data-view="restore"]')){
     const startupObserver=new MutationObserver(()=>{bindRestoreNavigation();if(document.querySelector('.sidebar nav [data-view="restore"]'))startupObserver.disconnect()});
