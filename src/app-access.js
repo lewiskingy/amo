@@ -122,6 +122,45 @@
   function observeUi(){
     if(observer)return;observer=new MutationObserver(scheduleUiRefresh);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled','contenteditable']});scheduleUiRefresh()
   }
+
+  function guardLocalRepository(){
+    const C=window.LocalWorkspaceRepository;if(!C||C.prototype.__amoAccessGuarded)return;
+    const p=C.prototype,originalEnsure=p.ensureWritePermission,originalWrite=p.writeJson,originalDelete=p.deletePath;
+    p.ensureWritePermission=async function(...args){if(!can(CAPABILITIES.workspaceWrite))return false;return originalEnsure.apply(this,args)};
+    p.writeJson=async function(...args){requireCapability(CAPABILITIES.workspaceWrite);return originalWrite.apply(this,args)};
+    p.deletePath=async function(...args){requireCapability(CAPABILITIES.workspaceWrite);return originalDelete.apply(this,args)};
+    p.__amoAccessGuarded=true
+  }
+  function guardRemoteInstance(repo){
+    if(!repo||repo.mode!=='remote'||repo.__amoAccessGuardedRequest||typeof repo.request!=='function')return repo;
+    const original=repo.request.bind(repo);
+    repo.request=async function(path,options={}){
+      const method=String(options.method||'GET').toUpperCase();
+      if(!['GET','HEAD','OPTIONS'].includes(method))requireCapability(CAPABILITIES.workspaceWrite);
+      return original(path,options)
+    };
+    repo.__amoAccessGuardedRequest=true;return repo
+  }
+  function guardRepositorySelection(){
+    guardLocalRepository();guardRemoteInstance(window.workspaceRepository);
+    if(typeof window.setWorkspaceRepository==='function'&&!window.setWorkspaceRepository.__amoAccessGuarded){
+      const original=window.setWorkspaceRepository;
+      const guarded=function(repo){return original(guardRemoteInstance(repo))};guarded.__amoAccessGuarded=true;window.setWorkspaceRepository=guarded
+    }
+  }
+  function guardGlobalWrites(){
+    if(typeof window.backupWorkspaceOnOpen==='function'&&!window.backupWorkspaceOnOpen.__amoAccessGuarded){
+      const original=window.backupWorkspaceOnOpen;const guarded=async function(...args){if(!can(CAPABILITIES.workspaceWrite)){if(typeof log==='function')log('Read-only session: workspace safety backup skipped.');return null}return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.backupWorkspaceOnOpen=guarded
+    }
+    if(typeof window.requestAutosave==='function'&&!window.requestAutosave.__amoAccessGuarded){
+      const original=window.requestAutosave;const guarded=function(...args){if(!can(CAPABILITIES.workspaceWrite))return;return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.requestAutosave=guarded
+    }
+    if(typeof window.flushAutosave==='function'&&!window.flushAutosave.__amoAccessGuarded){
+      const original=window.flushAutosave;const guarded=async function(...args){if(!can(CAPABILITIES.workspaceWrite))return false;return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.flushAutosave=guarded
+    }
+  }
+  function installGuards(){guardRepositorySelection();guardGlobalWrites()}
+
   function ensureAuth(){
     if(window.amoAuth)return Promise.resolve(window.amoAuth);if(authLoadPromise)return authLoadPromise;
     authLoadPromise=new Promise(resolve=>{
@@ -132,8 +171,10 @@
   }
   function onChange(fn){listeners.add(fn);return()=>listeners.delete(fn)}
 
-  window.amoAccess={CAPABILITIES,can,require:requireCapability,mode:accessMode,currentPrincipal,identityBindings,resolveIdentityBinding,config:accessConfig,refresh:()=>{scheduleUiRefresh();notify()},onChange};
-  ensureAuth().then(auth=>{auth?.onChange?.(()=>{scheduleUiRefresh();notify()});scheduleUiRefresh();notify()});
-  window.addEventListener('amo-auth-changed',()=>{scheduleUiRefresh();notify()});
+  window.amoAccess={CAPABILITIES,can,require:requireCapability,mode:accessMode,currentPrincipal,identityBindings,resolveIdentityBinding,config:accessConfig,refresh:()=>{installGuards();scheduleUiRefresh();notify()},onChange};
+  installGuards();
+  ensureAuth().then(auth=>{auth?.onChange?.(()=>{installGuards();scheduleUiRefresh();notify()});installGuards();scheduleUiRefresh();notify()});
+  window.addEventListener('amo-auth-changed',()=>{installGuards();scheduleUiRefresh();notify()});
+  window.addEventListener('amo-workspace-connected',installGuards);
   observeUi()
 })();
