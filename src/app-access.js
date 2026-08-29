@@ -23,8 +23,10 @@
   let authLoadPromise=null,observer=null,refreshQueued=false;
 
   function accessConfig(){
-    const raw=window.db?.settings?.accessControl;
-    return raw&&typeof raw==='object'?raw:{}
+    try{
+      const raw=typeof db!=='undefined'?db?.settings?.accessControl:null;
+      return raw&&typeof raw==='object'?raw:{}
+    }catch{return{}}
   }
   function identityBindings(){
     const bindings=accessConfig().identityBindings;
@@ -149,6 +151,12 @@
     }
   }
   function guardGlobalWrites(){
+    if(typeof window.ensureRW==='function'&&!window.ensureRW.__amoAccessGuarded){
+      const original=window.ensureRW;const guarded=async function(...args){if(!can(CAPABILITIES.workspaceWrite))return false;return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.ensureRW=guarded
+    }
+    if(typeof window.writeJson==='function'&&!window.writeJson.__amoAccessGuarded){
+      const original=window.writeJson;const guarded=async function(...args){requireCapability(CAPABILITIES.workspaceWrite);return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.writeJson=guarded
+    }
     if(typeof window.backupWorkspaceOnOpen==='function'&&!window.backupWorkspaceOnOpen.__amoAccessGuarded){
       const original=window.backupWorkspaceOnOpen;const guarded=async function(...args){if(!can(CAPABILITIES.workspaceWrite)){if(typeof log==='function')log('Read-only session: workspace safety backup skipped.');return null}return original.apply(this,args)};guarded.__amoAccessGuarded=true;window.backupWorkspaceOnOpen=guarded
     }
