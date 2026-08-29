@@ -20,11 +20,13 @@
     const identity=auth.currentIdentity?.();
     const block=document.createElement('div');block.dataset.amoAuthProfile='true';block.className='amo-auth-profile';
     if(identity){
-      block.innerHTML=`<div class="amo-auth-profile-card"><div class="amo-auth-avatar" aria-hidden="true">${esc((identity.name||'?').trim().charAt(0).toUpperCase())}</div><div class="amo-auth-copy"><strong>${esc(identity.name||'Microsoft user')}</strong><span>${esc(identity.email||identity.username||'Signed in with Microsoft')}</span></div></div><button type="button" class="command-menu-item amo-auth-signout"><span class="command-menu-icon">↪</span><span>Sign out</span></button>`;
+      const initial=(identity.name||identity.email||'?').trim().charAt(0).toUpperCase();
+      block.innerHTML=`<div class="amo-auth-profile-card"><div class="amo-auth-avatar" aria-hidden="true">${esc(initial)}</div><div class="amo-auth-copy"><strong>${esc(identity.name||'Google user')}</strong><span>${esc(identity.email||'Signed in with Google')}</span></div></div><button type="button" class="command-menu-item amo-auth-signout"><span class="command-menu-icon">↪</span><span>Sign out</span></button>`;
       block.querySelector('.amo-auth-signout')?.addEventListener('click',async()=>{closeMenu();try{await auth.signOut()}catch(e){alert(`Could not sign out: ${e.message}`)}})
     }else{
-      block.innerHTML='<button type="button" class="command-menu-item amo-auth-signin"><span class="command-menu-icon">◎</span><span>Sign in with Microsoft</span></button>';
-      block.querySelector('.amo-auth-signin')?.addEventListener('click',async e=>{const btn=e.currentTarget;btn.disabled=true;try{await auth.signIn();closeMenu();refreshProfile()}catch(err){alert(`Could not sign in with Microsoft: ${err.message}`)}finally{btn.disabled=false}})
+      block.innerHTML='<div class="amo-auth-signin-wrap"><div class="amo-auth-signin-label">Sign in with Google</div><div class="amo-google-signin"></div></div>';
+      const target=block.querySelector('.amo-google-signin');
+      try{await auth.renderSignInButton?.(target,{width:220})}catch(err){target.innerHTML=`<div class="muted" style="padding:6px 9px">${esc(err.message||'Google sign-in unavailable')}</div>`}
     }
     menu.prepend(block)
   }
@@ -41,6 +43,7 @@
     .amo-auth-profile-card{display:flex;align-items:center;gap:9px;padding:7px 9px 6px}
     .amo-auth-avatar{display:grid;place-items:center;width:30px;height:30px;min-width:30px;border-radius:50%;background:var(--soft);border:1px solid var(--line);color:var(--accent);font-size:.78rem;font-weight:900}
     .amo-auth-copy{display:flex;flex-direction:column;min-width:0;line-height:1.2}.amo-auth-copy strong{font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.amo-auth-copy span{margin-top:2px;color:var(--muted);font-size:.65rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .amo-auth-signin-wrap{padding:7px 9px 9px}.amo-auth-signin-label{font-size:.68rem;font-weight:800;color:var(--muted);margin:0 0 6px}.amo-google-signin{min-height:32px;display:flex;align-items:center}
     html[data-theme="dark"] .amo-auth-avatar{background:#182237;border-color:var(--line)}
   `;document.head.appendChild(style)
 })();
