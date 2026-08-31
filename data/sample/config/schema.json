@@ -5,6 +5,7 @@
       "idPrefix": "DEM-",
       "required": ["id", "teamId", "title", "businessArea", "status", "priority", "service", "source", "triage", "workPackage", "deliverables"],
       "optional": ["forecast", "funding"],
+      "departmentSemantics": "Department is derived from the Owning Team referenced by teamId.",
       "forecastSemantics": {
         "rom": ["triage.romDays", "triage.romAmount"],
         "estimate": ["workPackage.executionEstimateDays", "workPackage.executionEstimateAmount"],
@@ -13,7 +14,11 @@
         "currentForecastRule": "Complete allocations supersede Estimate amount; Estimate amount supersedes ROM amount"
       }
     },
-    "team": {"idPrefix": "USR-", "required": ["id", "teamId", "name", "roleId", "fte", "active"]},
+    "team": {
+      "idPrefix": "USR-",
+      "required": ["id", "teamId", "name", "roleId", "fte", "active"],
+      "departmentSemantics": "A Person belongs to one Home Team; Department is derived from that Team."
+    },
     "allocation": {"idPrefix": "ALLOC-", "required": ["id", "demandId", "teamMemberId", "forecast"]},
     "idea": {"idPrefix": "IDEA-", "required": ["id", "raisedBy", "raisedDate", "title", "description", "status"]},
     "statusReport": {
@@ -27,9 +32,14 @@
       "draftConcurrency": "Optimistic three-way merge at status-report entry field level; conflicting edits to the same field require user reconciliation."
     }
   },
-  "workspace": {"required": ["department"]},
+  "workspace": {
+    "legacyOptional": ["department"],
+    "note": "workspace.department is retained only as a migration seed for pre-hierarchy workspaces."
+  },
   "config": {
-    "required": ["teams", "roles"],
+    "required": ["departments", "teams", "roles"],
+    "department": {"required": ["id", "name"]},
+    "team": {"required": ["id", "name", "departmentId"]},
     "role": {"required": ["id", "name", "dayRate"]}
   }
 }

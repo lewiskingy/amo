@@ -3,10 +3,15 @@
   "applicationName": "Architecture Operations Hub",
   "appearance": "light",
   "planningMonths": ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
+  "departments": [
+    {"id": "DEPT-ARCH", "name": "Architecture"},
+    {"id": "DEPT-DATA", "name": "Data & AI"}
+  ],
   "teams": [
-    {"id": "TEAM-EA", "name": "Enterprise Architecture"},
-    {"id": "TEAM-BA", "name": "Business Architecture"},
-    {"id": "TEAM-DOM", "name": "Domain Architecture"}
+    {"id": "TEAM-EA", "name": "Enterprise Architecture", "departmentId": "DEPT-ARCH"},
+    {"id": "TEAM-BA", "name": "Business Architecture", "departmentId": "DEPT-ARCH"},
+    {"id": "TEAM-DOM", "name": "Domain Architecture", "departmentId": "DEPT-ARCH"},
+    {"id": "TEAM-DATA", "name": "Data Architecture", "departmentId": "DEPT-DATA"}
   ],
   "services": ["Triage", "Consultancy", "Assurance", "Design", "Strategy"],
   "serviceWorkflows": {
