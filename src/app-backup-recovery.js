@@ -29,6 +29,7 @@
     async function walk(path){
       let entries=[];try{entries=await localRepo.listEntries(path,{optional:true})}catch{return}
       for(const e of entries){const child=path?`${path}/${e.name}`:e.name;if(e.kind==='directory')await walk(child);else if(e.kind==='file'&&e.name.toLowerCase().endsWith('.json')){try{out.set(child,await localRepo.readJson(child,{required:true}))}catch{}}
+      }
     }
     await walk(basePath);return out
   }
