@@ -1,19 +1,30 @@
-name: Build and deploy AMO API
+name: Validate and release AMO
 
 on:
   pull_request:
     paths:
+      - 'src/**'
       - 'server/**'
       - 'infra/**'
+      - 'worker.js'
+      - 'wrangler.jsonc'
       - '.github/workflows/deploy-api.yml'
   push:
     branches:
       - main
     paths:
+      - 'src/**'
       - 'server/**'
       - 'infra/**'
+      - 'worker.js'
+      - 'wrangler.jsonc'
       - '.github/workflows/deploy-api.yml'
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tested commit SHA or tag to promote to Production'
+        required: true
+        default: 'main'
 
 permissions:
   contents: read
@@ -21,16 +32,16 @@ permissions:
 
 env:
   IMAGE_NAME: amo-api
-  API_HOSTNAME: api.amo.theflat.me.uk
-  CONTAINER_APP_ENVIRONMENT: amo-env
 
 jobs:
-  build:
+  validate:
     name: Validate and build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout candidate revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
       - name: Validate Bicep syntax
         run: az bicep build --file infra/main.bicep --stdout > /dev/null
@@ -38,15 +49,30 @@ jobs:
       - name: Build API image
         run: docker build -f server/Dockerfile -t amo-api:${{ github.sha }} .
 
-  deploy:
-    name: Deploy to Azure Container Apps
+      - name: Validate browser compatibility scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in src/*.js worker.js; do
+            node --check "$file"
+          done
+
+  deploy-api:
+    name: Deploy API · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
     if: github.event_name != 'pull_request'
-    needs: build
+    needs: validate
     runs-on: ubuntu-latest
-    environment: prod-amo
+    environment: ${{ github.event_name == 'workflow_dispatch' && 'prod-amo' || 'test-amo' }}
     steps:
-      - name: Checkout
+      - name: Checkout release revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+
+      - name: Resolve release SHA
+        id: release
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Azure login using OIDC
         uses: azure/login@v2
@@ -60,26 +86,14 @@ jobs:
         run: |
           set -euo pipefail
           providers=(Microsoft.App Microsoft.ContainerRegistry Microsoft.Storage Microsoft.DocumentDB)
-
           for provider in "${providers[@]}"; do
             state=$(az provider show --namespace "$provider" --query registrationState -o tsv 2>/dev/null || true)
             echo "$provider initial state: ${state:-unknown}"
-
             if [ "$state" != "Registered" ]; then
-              echo "Registering $provider..."
-              if ! az provider register --namespace "$provider" --wait; then
-                echo "::error::Unable to register $provider. The GitHub deployment identity may need subscription-level permission for Microsoft.Resources/subscriptions/providers/register/action, or the provider can be registered once by a subscription administrator."
-                exit 1
-              fi
+              az provider register --namespace "$provider" --wait
             fi
-
             state=$(az provider show --namespace "$provider" --query registrationState -o tsv)
-            if [ "$state" != "Registered" ]; then
-              echo "::error::$provider is not Registered (state: $state)."
-              exit 1
-            fi
-
-            echo "$provider: Registered"
+            [ "$state" = "Registered" ] || { echo "::error::$provider is not Registered (state: $state)."; exit 1; }
           done
 
       - name: Ensure Container Apps CLI extension
@@ -90,8 +104,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEPLOYMENT_NAME="amo-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "Azure deployment: $DEPLOYMENT_NAME"
+          DEPLOYMENT_NAME="${{ vars.AMO_AZURE_NAME_PREFIX }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           OUTPUT=$(az deployment group create \
             --name "$DEPLOYMENT_NAME" \
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
@@ -101,13 +114,11 @@ jobs:
               allowedOrigin="${{ vars.AMO_ALLOWED_ORIGIN }}" \
             --query properties.outputs \
             -o json)
-
           echo "acr_name=$(echo "$OUTPUT" | jq -r '.acrName.value')" >> "$GITHUB_OUTPUT"
           echo "acr_server=$(echo "$OUTPUT" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
           echo "container_app=$(echo "$OUTPUT" | jq -r '.containerAppName.value')" >> "$GITHUB_OUTPUT"
           echo "container_app_fqdn=$(echo "$OUTPUT" | jq -r '.containerAppFqdn.value')" >> "$GITHUB_OUTPUT"
           echo "repository_mode=$(echo "$OUTPUT" | jq -r '.repositoryMode.value')" >> "$GITHUB_OUTPUT"
-          echo "cosmos_account=$(echo "$OUTPUT" | jq -r '.cosmosAccountName.value')" >> "$GITHUB_OUTPUT"
 
       - name: Wait for Container App after infrastructure deployment
         shell: bash
@@ -119,10 +130,9 @@ jobs:
             state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
             echo "Container App provisioning state: ${state:-unknown}"
             if [ "$state" = "Succeeded" ]; then exit 0; fi
-            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed."; exit 1; fi
+            if [ "$state" = "Failed" ]; then exit 1; fi
             sleep 10
           done
-          echo "::error::Timed out waiting for Container App provisioning to settle after infrastructure deployment."
           exit 1
 
       - name: Login to Azure Container Registry
@@ -132,7 +142,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          IMAGE="${{ steps.infra.outputs.acr_server }}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${{ steps.infra.outputs.acr_server }}/${IMAGE_NAME}:${{ steps.release.outputs.sha }}"
           docker build -f server/Dockerfile -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
@@ -144,21 +154,9 @@ jobs:
           APP="${{ steps.infra.outputs.container_app }}"
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
           SERVER="${{ steps.infra.outputs.acr_server }}"
-
-          configured=$(az containerapp registry list \
-            --name "$APP" \
-            --resource-group "$RG" \
-            --query "[?server=='$SERVER'] | length(@)" \
-            -o tsv 2>/dev/null || echo 0)
-
+          configured=$(az containerapp registry list --name "$APP" --resource-group "$RG" --query "[?server=='$SERVER'] | length(@)" -o tsv 2>/dev/null || echo 0)
           if [ "$configured" = "0" ]; then
-            az containerapp registry set \
-              --name "$APP" \
-              --resource-group "$RG" \
-              --server "$SERVER" \
-              --identity system
-          else
-            echo "Registry $SERVER is already configured; skipping registry mutation."
+            az containerapp registry set --name "$APP" --resource-group "$RG" --server "$SERVER" --identity system
           fi
 
       - name: Wait for Container App after registry configuration
@@ -171,10 +169,9 @@ jobs:
             state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
             echo "Container App provisioning state: ${state:-unknown}"
             if [ "$state" = "Succeeded" ]; then exit 0; fi
-            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed after registry configuration."; exit 1; fi
+            if [ "$state" = "Failed" ]; then exit 1; fi
             sleep 10
           done
-          echo "::error::Timed out waiting for Container App provisioning after registry configuration."
           exit 1
 
       - name: Deploy AMO API image
@@ -194,10 +191,9 @@ jobs:
             state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
             echo "Container App provisioning state: ${state:-unknown}"
             if [ "$state" = "Succeeded" ]; then exit 0; fi
-            if [ "$state" = "Failed" ]; then echo "::error::Container App provisioning failed after image deployment."; exit 1; fi
+            if [ "$state" = "Failed" ]; then exit 1; fi
             sleep 10
           done
-          echo "::error::Timed out waiting for Container App provisioning after image deployment."
           exit 1
 
       - name: Ensure custom API hostname and managed certificate
@@ -206,19 +202,14 @@ jobs:
           set -euo pipefail
           APP="${{ steps.infra.outputs.container_app }}"
           RG="${{ vars.AZURE_RESOURCE_GROUP }}"
-
-          echo "Ensuring custom hostname $API_HOSTNAME on $APP"
-          az containerapp hostname add \
-            --hostname "$API_HOSTNAME" \
-            --resource-group "$RG" \
-            --name "$APP" || true
-
-          echo "Ensuring managed certificate and TLS binding for $API_HOSTNAME"
+          HOSTNAME="${{ vars.AMO_API_HOSTNAME }}"
+          ENVIRONMENT="${{ vars.AMO_AZURE_NAME_PREFIX }}-env"
+          az containerapp hostname add --hostname "$HOSTNAME" --resource-group "$RG" --name "$APP" || true
           az containerapp hostname bind \
-            --hostname "$API_HOSTNAME" \
+            --hostname "$HOSTNAME" \
             --resource-group "$RG" \
             --name "$APP" \
-            --environment "$CONTAINER_APP_ENVIRONMENT" \
+            --environment "$ENVIRONMENT" \
             --validation-method CNAME
 
       - name: Smoke test generated API hostname
@@ -226,32 +217,56 @@ jobs:
         run: |
           set -euo pipefail
           URL="https://${{ steps.infra.outputs.container_app_fqdn }}/api/info"
-          echo "Waiting for $URL"
           for attempt in {1..18}; do
             if BODY=$(curl --fail --silent --show-error "$URL"); then
-              echo "$BODY"
               echo "$BODY" | jq -e --arg mode "${{ steps.infra.outputs.repository_mode }}" '(.product == "AMO") and (($mode != "mongo") or (.storage == "mongodb" and .capabilities.recovery == true and .capabilities.databaseTransactions == true))' > /dev/null
-              echo "AMO API is responding with the expected repository capabilities."
               exit 0
             fi
             sleep 10
           done
-          echo "API did not become healthy in time." >&2
           exit 1
 
       - name: Smoke test custom API hostname
         shell: bash
         run: |
           set -euo pipefail
-          URL="https://${API_HOSTNAME}/api/info"
-          echo "Waiting for $URL"
+          URL="https://${{ vars.AMO_API_HOSTNAME }}/api/info"
           for attempt in {1..24}; do
-            if curl --fail --silent --show-error "$URL"; then
-              echo
-              echo "AMO API custom hostname is responding."
-              exit 0
-            fi
+            if curl --fail --silent --show-error "$URL"; then exit 0; fi
             sleep 10
           done
-          echo "Custom API hostname did not become healthy in time." >&2
+          exit 1
+
+  deploy-frontend:
+    name: Deploy frontend · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && 'prod-amo' || 'test-amo' }}
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+
+      - name: Resolve release SHA
+        shell: bash
+        run: echo "Deploying $(git rev-parse HEAD) to ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}"
+
+      - name: Deploy Cloudflare Worker
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --name "${{ vars.AMO_CLOUDFLARE_WORKER }}"
+
+      - name: Smoke test frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ vars.AMO_WEB_ORIGIN }}"
+          for attempt in {1..18}; do
+            if curl --fail --silent --show-error "$URL" > /dev/null; then exit 0; fi
+            sleep 10
+          done
           exit 1
