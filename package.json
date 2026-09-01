@@ -1,0 +1,11 @@
+{
+  "name": "amo",
+  "private": true,
+  "scripts": {
+    "test:e2e": "cucumber-js --config tests/e2e/cucumber.cjs"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^12.2.0",
+    "playwright": "^1.55.0"
+  }
+}
