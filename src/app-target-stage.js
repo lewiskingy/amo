@@ -134,5 +134,33 @@
     }
   }
 
+  /* Config V2 replaces the legacy renderConfig output after this module loads. Decorate the authoritative
+     System tab directly so Workspace Data Stage and version details remain visible and editable. */
+  async function saveTabbedDataStage(value){
+    const requested=normalizeStage(value);if(!requested)throw new Error('Choose Production or Test.');
+    if(window.amoAccess?.can?.('system.configure')!==true)throw new Error('System configuration access is required.');
+    if(targetStage==='test'&&requested==='production')throw new Error('A Production workspace cannot be configured from the Test AMO application. Open it in Production to classify it as Production.');
+    const repo=window.workspaceRepository;if(!repo)throw new Error('Open a workspace first.');
+    const latest=await repo.getSettings();latest.dataStage=requested;await repo.saveSettings(latest);
+    db.settings={...db.settings,...structuredClone(latest)};db.configFiles=db.configFiles||{};db.configFiles['settings.json']=structuredClone(latest);
+    log?.(`Workspace Data Stage set to ${requested}.`);renderStageIndicator();renderConfig?.()
+  }
+
+  function decorateTabbedConfig(){
+    const content=document.getElementById('configContent');if(!content)return;
+    const active=content.querySelector('[data-settings-tab="system"].active');if(!active)return;
+    const grid=content.querySelector('.settings-grid');if(!grid)return;
+    document.getElementById('amoWorkspaceDataStageCard')?.remove();document.getElementById('amoVersionCompatibilityCard')?.remove();
+    const value=normalizeStage(db?.settings?.dataStage),canEdit=window.amoAccess?.can?.('system.configure')===true;
+    const stage=document.createElement('div');stage.className='card';stage.id='amoWorkspaceDataStageCard';
+    stage.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Workspace Data Stage</h2><p class="muted config-description">Identifies whether this workspace contains Production or Test data. This is independent of the deployed application stage.</p></div></div><div class="settings-field"><label>Data Stage</label>${canEdit?`<div class="flex" style="gap:8px;align-items:center"><select class="cell-input" id="amoWorkspaceDataStageSelect"><option value="" ${!value?'selected':''} disabled>Not set</option><option value="production" ${value==='production'?'selected':''}>Production</option><option value="test" ${value==='test'?'selected':''}>Test</option></select><button class="btn success" id="amoWorkspaceDataStageSave">Save</button></div>`:`<strong>${value==='production'?'Production':value==='test'?'Test':'Not set'}</strong>`}<div class="settings-note" style="margin-top:6px">Legacy workspaces may remain unclassified temporarily, but should be set explicitly. Test AMO refuses workspaces explicitly classified as Production.</div></div>`;
+    stage.querySelector('#amoWorkspaceDataStageSave')?.addEventListener('click',async()=>{const button=stage.querySelector('#amoWorkspaceDataStageSave'),select=stage.querySelector('#amoWorkspaceDataStageSelect');try{button.disabled=true;await saveTabbedDataStage(select?.value||'')}catch(e){alert(`Could not save Workspace Data Stage: ${e.message}`)}finally{button.disabled=false}});
+    const version=document.createElement('div');version.className='card';version.id='amoVersionCompatibilityCard';version.innerHTML=versionCard().replace(/^<div class="card config-card amo-version-config">|<\/div>$/g,'');
+    grid.prepend(version);grid.prepend(stage)
+  }
+
+  const configContent=document.getElementById('configContent');
+  if(configContent){const observer=new MutationObserver(()=>decorateTabbedConfig());observer.observe(configContent,{childList:true,subtree:true});setTimeout(decorateTabbedConfig,0)}
+
   renderVersionIdentity();renderStageIndicator()
 })();
