@@ -90,23 +90,47 @@
   }
 
   function ensureMobileWorkspaceControl(){
-    const actions=document.querySelector('.top-actions');if(!actions)return;
     let shell=document.getElementById('amoMobileWorkspaceShell');
     if(!shell){
       shell=document.createElement('div');shell.id='amoMobileWorkspaceShell';shell.className='amo-mobile-workspace-shell';
-      shell.innerHTML='<button class="amo-mobile-workspace-toggle" id="amoMobileWorkspaceToggle" type="button" aria-expanded="false">Workspace <span aria-hidden="true">⌄</span></button><div class="amo-mobile-workspace-menu" id="amoMobileWorkspaceMenu"><button type="button" data-workspace-source="openWorkspaceBtn">Local workspace</button><button type="button" data-workspace-source="remoteWorkspaceBtn">Remote workspace</button></div>';
-      actions.prepend(shell);
+      shell.innerHTML='<button class="amo-mobile-workspace-toggle" id="amoMobileWorkspaceToggle" type="button" aria-expanded="false"><span>Workspace</span><span aria-hidden="true">⌄</span></button><div class="amo-mobile-workspace-menu" id="amoMobileWorkspaceMenu"><button type="button" data-workspace-source="openWorkspaceBtn">Local workspace</button><button type="button" data-workspace-source="remoteWorkspaceBtn">Remote workspace</button></div>';
       shell.querySelector('#amoMobileWorkspaceToggle').addEventListener('click',e=>{e.stopPropagation();const open=shell.classList.toggle('open');e.currentTarget.setAttribute('aria-expanded',String(open))});
-      shell.querySelectorAll('[data-workspace-source]').forEach(btn=>btn.addEventListener('click',()=>{const source=document.getElementById(btn.dataset.workspaceSource);shell.classList.remove('open');shell.querySelector('#amoMobileWorkspaceToggle')?.setAttribute('aria-expanded','false');if(source&&!source.disabled)source.click()}));
-      document.addEventListener('click',e=>{if(!shell.contains(e.target)){shell.classList.remove('open');shell.querySelector('#amoMobileWorkspaceToggle')?.setAttribute('aria-expanded','false')}})
+      shell.querySelectorAll('[data-workspace-source]').forEach(btn=>btn.addEventListener('click',()=>{const source=document.getElementById(btn.dataset.workspaceSource);shell.classList.remove('open');shell.querySelector('#amoMobileWorkspaceToggle')?.setAttribute('aria-expanded','false');if(source&&!source.disabled)source.click()}))
     }
     const local=shell.querySelector('[data-workspace-source="openWorkspaceBtn"]'),remote=shell.querySelector('[data-workspace-source="remoteWorkspaceBtn"]');
     if(local){const source=document.getElementById('openWorkspaceBtn');local.disabled=!source||source.disabled;local.textContent=source?.textContent?.replace(/\s+/g,' ').trim()||'Local workspace'}
     if(remote){const source=document.getElementById('remoteWorkspaceBtn');remote.disabled=!source||source.disabled;remote.textContent=source?.textContent?.replace(/\s+/g,' ').trim()||'Remote workspace'}
+    return shell
+  }
+
+  function ensureDrawerUtilities(){
+    const sidebar=document.querySelector('.sidebar');if(!sidebar)return null;
+    let host=document.getElementById('amoDrawerUtilities');
+    if(!host){
+      host=document.createElement('div');host.id='amoDrawerUtilities';host.className='amo-drawer-utilities';
+      host.innerHTML='<div class="amo-drawer-section-label">Workspace</div><div id="amoDrawerWorkspace"></div><div class="amo-drawer-section-label amo-drawer-account-label">Account & actions</div><div id="amoDrawerAccount"></div>';
+      sidebar.appendChild(host)
+    }
+    return host
+  }
+
+  function placeShellControls(){
+    const top=document.querySelector('.top-actions'),host=ensureDrawerUtilities(),workspace=ensureMobileWorkspaceControl(),command=document.getElementById('commandMenuShell');if(!top||!host)return;
+    const workspaceHost=host.querySelector('#amoDrawerWorkspace'),accountHost=host.querySelector('#amoDrawerAccount');
+    if(mobileQuery.matches){
+      if(workspace&&workspace.parentElement!==workspaceHost)workspaceHost.appendChild(workspace);
+      if(command&&command.parentElement!==accountHost)accountHost.appendChild(command);
+      command?.classList.add('amo-command-menu-in-drawer')
+    }else{
+      if(workspace&&workspace.parentElement!==top)top.prepend(workspace);
+      if(command&&command.parentElement!==top)top.appendChild(command);
+      command?.classList.remove('amo-command-menu-in-drawer')
+    }
   }
 
   function applyMobileMode(){
     if(!mobileQuery.matches){closeMobileNav();document.getElementById('amoPageContext')?.classList.remove('amo-scope-open');document.getElementById('amoMobileScopeToggle')?.setAttribute('aria-expanded','false')}
+    placeShellControls()
   }
 
   function applyPageHierarchy(){
