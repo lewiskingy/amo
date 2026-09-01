@@ -150,17 +150,27 @@
     const content=document.getElementById('configContent');if(!content)return;
     const active=content.querySelector('[data-settings-tab="system"].active');if(!active)return;
     const grid=content.querySelector('.settings-grid');if(!grid)return;
-    document.getElementById('amoWorkspaceDataStageCard')?.remove();document.getElementById('amoVersionCompatibilityCard')?.remove();
     const value=normalizeStage(db?.settings?.dataStage),canEdit=window.amoAccess?.can?.('system.configure')===true;
-    const stage=document.createElement('div');stage.className='card';stage.id='amoWorkspaceDataStageCard';
-    stage.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Workspace Data Stage</h2><p class="muted config-description">Identifies whether this workspace contains Production or Test data. This is independent of the deployed application stage.</p></div></div><div class="settings-field"><label>Data Stage</label>${canEdit?`<div class="flex" style="gap:8px;align-items:center"><select class="cell-input" id="amoWorkspaceDataStageSelect"><option value="" ${!value?'selected':''} disabled>Not set</option><option value="production" ${value==='production'?'selected':''}>Production</option><option value="test" ${value==='test'?'selected':''}>Test</option></select><button class="btn success" id="amoWorkspaceDataStageSave">Save</button></div>`:`<strong>${value==='production'?'Production':value==='test'?'Test':'Not set'}</strong>`}<div class="settings-note" style="margin-top:6px">Legacy workspaces may remain unclassified temporarily, but should be set explicitly. Test AMO refuses workspaces explicitly classified as Production.</div></div>`;
-    stage.querySelector('#amoWorkspaceDataStageSave')?.addEventListener('click',async()=>{const button=stage.querySelector('#amoWorkspaceDataStageSave'),select=stage.querySelector('#amoWorkspaceDataStageSelect');try{button.disabled=true;await saveTabbedDataStage(select?.value||'')}catch(e){alert(`Could not save Workspace Data Stage: ${e.message}`)}finally{button.disabled=false}});
-    const version=document.createElement('div');version.className='card';version.id='amoVersionCompatibilityCard';version.innerHTML=versionCard().replace(/^<div class="card config-card amo-version-config">|<\/div>$/g,'');
-    grid.prepend(version);grid.prepend(stage)
+
+    if(!document.getElementById('amoWorkspaceDataStageCard')){
+      const stage=document.createElement('div');stage.className='card';stage.id='amoWorkspaceDataStageCard';
+      stage.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Workspace Data Stage</h2><p class="muted config-description">Identifies whether this workspace contains Production or Test data. This is independent of the deployed application stage.</p></div></div><div class="settings-field"><label>Data Stage</label>${canEdit?`<div class="flex" style="gap:8px;align-items:center"><select class="cell-input" id="amoWorkspaceDataStageSelect"><option value="" ${!value?'selected':''} disabled>Not set</option><option value="production" ${value==='production'?'selected':''}>Production</option><option value="test" ${value==='test'?'selected':''}>Test</option></select><button class="btn success" id="amoWorkspaceDataStageSave">Save</button></div>`:`<strong>${value==='production'?'Production':value==='test'?'Test':'Not set'}</strong>`}<div class="settings-note" style="margin-top:6px">Legacy workspaces may remain unclassified temporarily, but should be set explicitly. Test AMO refuses workspaces explicitly classified as Production.</div></div>`;
+      stage.querySelector('#amoWorkspaceDataStageSave')?.addEventListener('click',async()=>{const button=stage.querySelector('#amoWorkspaceDataStageSave'),select=stage.querySelector('#amoWorkspaceDataStageSelect');try{button.disabled=true;await saveTabbedDataStage(select?.value||'')}catch(e){alert(`Could not save Workspace Data Stage: ${e.message}`)}finally{button.disabled=false}});
+      grid.prepend(stage)
+    }
+
+    if(!document.getElementById('amoVersionCompatibilityCard')){
+      const version=document.createElement('div');version.className='card';version.id='amoVersionCompatibilityCard';version.innerHTML=versionCard().replace(/^<div class="card config-card amo-version-config">|<\/div>$/g,'');
+      const stage=document.getElementById('amoWorkspaceDataStageCard');if(stage?.parentElement===grid)stage.insertAdjacentElement('afterend',version);else grid.prepend(version)
+    }
   }
 
   const configContent=document.getElementById('configContent');
-  if(configContent){const observer=new MutationObserver(()=>decorateTabbedConfig());observer.observe(configContent,{childList:true,subtree:true});setTimeout(decorateTabbedConfig,0)}
+  if(configContent){
+    const observer=new MutationObserver(()=>decorateTabbedConfig());
+    observer.observe(configContent,{childList:true,subtree:true});
+    setTimeout(decorateTabbedConfig,0)
+  }
 
   renderVersionIdentity();renderStageIndicator()
 })();
