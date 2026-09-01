@@ -119,8 +119,8 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
   }
   const recovery=document.createElement('script');recovery.src=amoAsset('app-remote-recovery.js');recovery.dataset.amoRemoteRecovery='true';
   recovery.onload=()=>{
-    if(document.querySelector('script[data-amo-restore-rbac-fix]'))return;
-    const fix=document.createElement('script');fix.src=amoAsset('app-restore-rbac-fix.js');fix.dataset.amoRestoreRbacFix='true';document.head.appendChild(fix)
+    if(!document.querySelector('script[data-amo-restore-rbac-fix]')){const fix=document.createElement('script');fix.src=amoAsset('app-restore-rbac-fix.js');fix.dataset.amoRestoreRbacFix='true';document.head.appendChild(fix)}
+    window.refreshAmoInformationArchitecture?.()
   };
   recovery.onerror=()=>console.error('Could not load AMO Remote recovery module.');
   document.head.appendChild(recovery)
@@ -159,3 +159,10 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
 (function loadPageScrollListHeaders(){if(document.querySelector('script[data-amo-page-scroll-list]'))return;const s=document.createElement('script');s.src=amoAsset('app-list-page-sticky.js');s.dataset.amoPageScrollList='true';document.head.appendChild(s)})();
 
 (function loadModalUx(){if(document.querySelector('script[data-amo-modal-ux]'))return;const s=document.createElement('script');s.src=amoAsset('app-modal-ux.js');s.dataset.amoModalUx='true';document.head.appendChild(s)})();
+
+/* Information architecture is a first-class shell concern. Load it explicitly rather than relying
+   on another feature module to happen to pull in the UI-polish layer. */
+(function loadUiPolish(){
+  if(document.querySelector('script[data-amo-ui-polish]'))return;
+  const s=document.createElement('script');s.src=amoAsset('app-ui-polish.js');s.dataset.amoUiPolish='true';document.head.appendChild(s)
+})();
