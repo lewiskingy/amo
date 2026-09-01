@@ -1,5 +1,6 @@
 /* HTTP implementation of the WorkspaceRepository contract. */
 (function initRemoteWorkspaceRepository(){
+  const REQUIRED_API_VERSION='2';
   let authLoadPromise=null;
   function ensureAmoAuth(){
     if(window.amoAuth)return Promise.resolve(window.amoAuth);
@@ -34,12 +35,21 @@
       const text=await response.text();let data=null;try{data=text?JSON.parse(text):null}catch{data=text}
       if(!response.ok){
         const message=response.status===401&&!auth?.isSignedIn?.()
-          ?'AMO API requires authentication. Sign in with Google from the menu and try again.'
+          ?'AMO API requires authentication. Sign in with Google from the navigation panel and try again.'
           :(data?.error||`Remote workspace request failed (${response.status}).`);
         const e=new Error(message);e.status=response.status;e.details=data?.details;throw e
       }return data
     }
-    async connect(){this.info=await this.request('/api/info');if(this.info?.product!=='AMO')throw new Error('The remote URL is not an AMO API.');this.name=this.info.workspaceName||'Remote Workspace';return this.info}
+    async connect(){
+      this.info=await this.request('/api/info');
+      if(this.info?.product!=='AMO')throw new Error('The remote URL is not an AMO API.');
+      const apiVersion=String(this.info?.apiVersion||'');
+      if(apiVersion&&apiVersion!==REQUIRED_API_VERSION)throw new Error(`This AMO client requires API contract ${REQUIRED_API_VERSION}, but the remote backend reports API contract ${apiVersion}.`);
+      this.name=this.info.workspaceName||'Remote Workspace';
+      window.AMO_BACKEND_INFO={...this.info,mode:'remote'};
+      try{window.dispatchEvent(new CustomEvent('amo-backend-info',{detail:window.AMO_BACKEND_INFO}))}catch{}
+      return this.info
+    }
     async loadWorkspace(){const bundle=await this.request('/api/workspace');this.versions={...(bundle?.versions||{})};if(bundle&&Object.prototype.hasOwnProperty.call(bundle,'versions'))delete bundle.versions;return bundle}
     async ensureWritePermission(){return true}
     async saveChanges(payload){const result=await this.request('/api/workspace/save',{method:'POST',body:JSON.stringify({workspace:payload.workspace,settings:payload.settings,collections:payload.collections,dirty:Object.fromEntries(Object.entries(payload.dirty||{}).map(([k,v])=>[k,[...v]])),deleted:Object.fromEntries(Object.entries(payload.deleted||{}).map(([k,v])=>[k,[...v]])),configDirty:!!payload.configDirty,expectedVersions:this.versions})});return this.rememberVersions(result)}
@@ -63,5 +73,10 @@
     async pruneBackups(){return null}
     async listBackups(){return[]}
   }
+  window.AMO_REQUIRED_API_VERSION=REQUIRED_API_VERSION;
   window.RemoteWorkspaceRepository=RemoteWorkspaceRepository;
+
+  if(!document.querySelector('script[data-amo-version-compatibility]')){
+    const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset('app-version-compatibility.js'):'app-version-compatibility.js';s.dataset.amoVersionCompatibility='true';document.head.appendChild(s)
+  }
 })();
