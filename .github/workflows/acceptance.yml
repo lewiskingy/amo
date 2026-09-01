@@ -11,6 +11,7 @@ on:
       - Validate and release AMO
     types:
       - completed
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -41,7 +42,7 @@ jobs:
 
   acceptance:
     name: Acceptance · Test · ${{ matrix.profile }}
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     environment: test-amo
     strategy:
@@ -52,10 +53,10 @@ jobs:
           - mobile
 
     steps:
-      - name: Checkout deployed release
+      - name: Checkout acceptance definition
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -94,7 +95,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-${{ matrix.profile }}-${{ github.event.workflow_run.head_sha }}
+          name: acceptance-${{ matrix.profile }}-${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
           path: artifacts/
           if-no-files-found: ignore
           retention-days: 14
