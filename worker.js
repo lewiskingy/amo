@@ -9,6 +9,7 @@ function environmentConfig(env,url){
   const targetStage=normalizeTargetStage(env.AMO_TARGET_STAGE,url);
   return {
     targetStage,
+    buildId:env.CF_VERSION_METADATA?.id||'local',
     defaultRemoteUrl:targetStage==='test'?'https://api.amo-test.theflat.me.uk':'https://api.amo.theflat.me.uk'
   }
 }
@@ -33,7 +34,7 @@ export default {
 
     // Static Assets html_handling is deliberately disabled so deep report routes are not
     // canonicalised to /reports/. Resolve application shells explicitly and inject the
-    // deployment target stage and matching Remote Workspace API default before browser scripts initialise.
+    // deployment target stage, build identity and matching Remote Workspace API default.
     if(url.pathname==='/'||url.pathname==='/index.html'){
       return applicationShell(request,env,url,'/index.html')
     }
