@@ -1,6 +1,7 @@
 /* Signed-in identity surface for the compact command menu. */
 (function initAuthProfile(){
   let authPromise=null;
+  let profilePromise=null;
   function ensureAuth(){
     if(window.amoAuth)return Promise.resolve(window.amoAuth);
     if(authPromise)return authPromise;
@@ -16,22 +17,27 @@
 
   async function ensureProfile(){
     const menu=document.getElementById('commandMenu');if(!menu||menu.querySelector('[data-amo-auth-profile]'))return;
-    const auth=await ensureAuth();if(!auth)return;
-    const identity=auth.currentIdentity?.();
-    const block=document.createElement('div');block.dataset.amoAuthProfile='true';block.className='amo-auth-profile';
-    if(identity){
-      const initial=(identity.name||identity.email||'?').trim().charAt(0).toUpperCase();
-      block.innerHTML=`<div class="amo-auth-profile-card"><div class="amo-auth-avatar" aria-hidden="true">${esc(initial)}</div><div class="amo-auth-copy"><strong>${esc(identity.name||'Google user')}</strong><span>${esc(identity.email||'Signed in with Google')}</span></div></div><button type="button" class="command-menu-item amo-auth-signout"><span class="command-menu-icon">↪</span><span>Sign out</span></button>`;
-      block.querySelector('.amo-auth-signout')?.addEventListener('click',async()=>{closeMenu();try{await auth.signOut()}catch(e){alert(`Could not sign out: ${e.message}`)}})
-    }else{
-      block.innerHTML='<div class="amo-auth-signin-wrap"><div class="amo-auth-signin-label">Sign in with Google</div><div class="amo-google-signin"></div></div>';
-      const target=block.querySelector('.amo-google-signin');
-      try{await auth.renderSignInButton?.(target,{width:220})}catch(err){target.innerHTML=`<div class="muted" style="padding:6px 9px">${esc(err.message||'Google sign-in unavailable')}</div>`}
-    }
-    menu.prepend(block)
+    if(profilePromise)return profilePromise;
+    profilePromise=(async()=>{
+      const auth=await ensureAuth();if(!auth)return;
+      const currentMenu=document.getElementById('commandMenu');if(!currentMenu||currentMenu.querySelector('[data-amo-auth-profile]'))return;
+      const identity=auth.currentIdentity?.();
+      const block=document.createElement('div');block.dataset.amoAuthProfile='true';block.className='amo-auth-profile';
+      if(identity){
+        const initial=(identity.name||identity.email||'?').trim().charAt(0).toUpperCase();
+        block.innerHTML=`<div class="amo-auth-profile-card"><div class="amo-auth-avatar" aria-hidden="true">${esc(initial)}</div><div class="amo-auth-copy"><strong>${esc(identity.name||'Google user')}</strong><span>${esc(identity.email||'Signed in with Google')}</span></div></div><button type="button" class="command-menu-item amo-auth-signout"><span class="command-menu-icon">↪</span><span>Sign out</span></button>`;
+        block.querySelector('.amo-auth-signout')?.addEventListener('click',async()=>{closeMenu();try{await auth.signOut()}catch(e){alert(`Could not sign out: ${e.message}`)}})
+      }else{
+        block.innerHTML='<div class="amo-auth-signin-wrap"><div class="amo-auth-signin-label">Sign in with Google</div><div class="amo-google-signin"></div></div>';
+        const target=block.querySelector('.amo-google-signin');
+        try{await auth.renderSignInButton?.(target,{width:220})}catch(err){target.innerHTML=`<div class="muted" style="padding:6px 9px">${esc(err.message||'Google sign-in unavailable')}</div>`}
+      }
+      if(!currentMenu.querySelector('[data-amo-auth-profile]'))currentMenu.prepend(block)
+    })();
+    try{return await profilePromise}finally{profilePromise=null}
   }
 
-  function refreshProfile(){document.querySelector('[data-amo-auth-profile]')?.remove();ensureProfile()}
+  function refreshProfile(){document.querySelectorAll('[data-amo-auth-profile]').forEach(el=>el.remove());ensureProfile()}
   const observer=new MutationObserver(()=>ensureProfile());
   function observe(){const menu=document.getElementById('commandMenu');if(!menu){setTimeout(observe,50);return}observer.observe(menu,{childList:true});ensureProfile()}
   ensureAuth().then(auth=>auth?.onChange?.(()=>refreshProfile()));
