@@ -1,0 +1,72 @@
+name: Deployed AMO acceptance
+
+on:
+  workflow_run:
+    workflows:
+      - Validate and release AMO
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: Acceptance · Test · ${{ matrix.profile }}
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: test-amo
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - desktop
+          - mobile
+
+    steps:
+      - name: Checkout deployed release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install acceptance dependencies
+        run: npm install
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Resolve expected release versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_VERSION=$(sed -n "s/.*const APP_VERSION='\([^']*\)'.*/\1/p" src/app-target-stage.js | head -1)
+          BACKEND_VERSION=$(node -p "require('./server/package.json').version")
+          API_VERSION=$(sed -n "s/.*apiVersion:'\([^']*\)'.*/\1/p" server/server.js | head -1)
+          [ -n "$CLIENT_VERSION" ] || { echo '::error::Could not resolve client version.'; exit 1; }
+          [ -n "$BACKEND_VERSION" ] || { echo '::error::Could not resolve backend version.'; exit 1; }
+          [ -n "$API_VERSION" ] || { echo '::error::Could not resolve API contract version.'; exit 1; }
+          echo "E2E_EXPECTED_CLIENT_VERSION=$CLIENT_VERSION" >> "$GITHUB_ENV"
+          echo "E2E_EXPECTED_BACKEND_VERSION=$BACKEND_VERSION" >> "$GITHUB_ENV"
+          echo "E2E_EXPECTED_API_VERSION=$API_VERSION" >> "$GITHUB_ENV"
+          echo "Acceptance expects Client $CLIENT_VERSION · Backend $BACKEND_VERSION · API $API_VERSION"
+
+      - name: Run deployed Gherkin acceptance tests
+        env:
+          E2E_BASE_URL: ${{ vars.AMO_WEB_ORIGIN }}
+          E2E_API_BASE_URL: https://${{ vars.AMO_API_HOSTNAME }}
+          E2E_PROFILE: ${{ matrix.profile }}
+        run: npm run test:e2e
+
+      - name: Upload acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-${{ matrix.profile }}-${{ github.event.workflow_run.head_sha }}
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
