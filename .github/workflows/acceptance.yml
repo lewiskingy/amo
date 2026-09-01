@@ -75,7 +75,7 @@ jobs:
           set -euo pipefail
           CLIENT_VERSION=$(sed -n "s/.*const APP_VERSION='\([^']*\)'.*/\1/p" src/app-target-stage.js | head -1)
           BACKEND_VERSION=$(node -p "require('./server/package.json').version")
-          API_VERSION=$(sed -n "s/.*apiVersion:'\([^']*\)'.*/\1/p" server/server.js | head -1)
+          API_VERSION=$(sed -n "s/^const API_VERSION='\([^']*\)';.*/\1/p" server/server.js | head -1)
           [ -n "$CLIENT_VERSION" ] || { echo '::error::Could not resolve client version.'; exit 1; }
           [ -n "$BACKEND_VERSION" ] || { echo '::error::Could not resolve backend version.'; exit 1; }
           [ -n "$API_VERSION" ] || { echo '::error::Could not resolve API contract version.'; exit 1; }
