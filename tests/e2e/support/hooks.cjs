@@ -1,0 +1,50 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const { chromium } = require('playwright');
+const { BeforeAll, AfterAll, Before, After, Status } = require('@cucumber/cucumber');
+
+let browser;
+
+function viewportOptions(){
+  return process.env.E2E_PROFILE === 'mobile'
+    ? { viewport:{width:390,height:844}, isMobile:true, hasTouch:true }
+    : { viewport:{width:1440,height:1000} };
+}
+
+function artifactName(name){
+  return String(name||'scenario').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+
+BeforeAll(async()=>{
+  browser=await chromium.launch({headless:true});
+  fs.mkdirSync(path.resolve('artifacts'),{recursive:true});
+});
+
+Before(async function(){
+  this.browser=browser;
+  this.browserErrors=[];
+  this.context=await browser.newContext(viewportOptions());
+  this.page=await this.context.newPage();
+  this.page.on('pageerror',error=>this.browserErrors.push(`pageerror: ${error.message}`));
+  this.page.on('console',message=>{
+    if(message.type()==='error')this.browserErrors.push(`console: ${message.text()}`);
+  });
+});
+
+After(async function(scenario){
+  try{
+    if(scenario.result?.status===Status.FAILED){
+      const filename=path.resolve('artifacts',`${process.env.E2E_PROFILE||'desktop'}-${artifactName(scenario.pickle.name)}.png`);
+      await this.page?.screenshot({path:filename,fullPage:true}).catch(()=>{});
+    }
+    if(this.browserErrors.length){
+      throw new Error(`Browser errors detected:\n${this.browserErrors.join('\n')}`);
+    }
+  }finally{
+    await this.context?.close();
+  }
+});
+
+AfterAll(async()=>{
+  await browser?.close();
+});
