@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
 import { ServerJsonWorkspaceRepository } from './repository.js';
 import { MongoWorkspaceRepository } from './mongo-repository.js';
@@ -7,6 +8,10 @@ import { openApiDocument, swaggerHtml } from './openapi.js';
 const PORT=Number(process.env.PORT||8080);
 const WORKSPACE_ROOT=process.env.AMO_WORKSPACE_ROOT||'/data/workspace';
 const REPOSITORY_MODE=String(process.env.AMO_REPOSITORY||'json').toLowerCase();
+const API_VERSION='2';
+const packageInfo=JSON.parse(readFileSync(new URL('./package.json',import.meta.url),'utf8'));
+const BACKEND_VERSION=String(packageInfo.version||'unknown');
+const BACKEND_BUILD=String(process.env.AMO_BUILD_ID||'').trim()||null;
 const allowedOrigins=(process.env.AMO_ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
 const repo=REPOSITORY_MODE==='mongo'
   ?new MongoWorkspaceRepository({connectionString:process.env.AMO_MONGO_CONNECTION_STRING,databaseName:process.env.AMO_MONGO_DATABASE||'amo'})
@@ -33,7 +38,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET'&&(url.pathname==='/swagger'||url.pathname==='/swagger/'))return sendHtml(res,200,swaggerHtml());
     if(req.method==='GET'&&url.pathname==='/api/info'){
       let workspace=null;try{workspace=await repo.connect()}catch{}
-      const mongo=repo.storage==='mongodb';return send(res,200,{product:'AMO',apiVersion:'2',storage:repo.storage,workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:!mongo,commitLocking:true,archive:true,bulkSave:true,optimisticConcurrency:mongo,databaseTransactions:mongo,recovery:mongo,auditRetentionDays:mongo?28:null,managedBackup:mongo?'cosmos-continuous':null}})
+      const mongo=repo.storage==='mongodb';return send(res,200,{product:'AMO',backendVersion:BACKEND_VERSION,backendBuild:BACKEND_BUILD,apiVersion:API_VERSION,storage:repo.storage,workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:!mongo,commitLocking:true,archive:true,bulkSave:true,optimisticConcurrency:mongo,databaseTransactions:mongo,recovery:mongo,auditRetentionDays:mongo?28:null,managedBackup:mongo?'cosmos-continuous':null}})
     }
     if(req.method==='GET'&&url.pathname==='/api/workspace')return send(res,200,await repo.loadWorkspace());
     if(req.method==='POST'&&url.pathname==='/api/workspace/save'){const result=await repo.saveChanges(await body(req),{actor:actor(req)});return send(res,200,{ok:true,...(result||{})})}
@@ -70,6 +75,6 @@ const server=http.createServer(async(req,res)=>{
     send(res,404,{error:'Not found'})
   }catch(e){console.error(e);const status=e.code==='ENOENT'?404:e.code==='AMO_CONFLICT'?409:500;send(res,status,{error:e.message||'Server error',details:e.details||undefined})}
 });
-server.listen(PORT,'0.0.0.0',()=>console.log(`AMO API listening on :${PORT}; repository=${repo.storage}`));
+server.listen(PORT,'0.0.0.0',()=>console.log(`AMO API ${BACKEND_VERSION} listening on :${PORT}; API contract=${API_VERSION}; repository=${repo.storage}`));
 
 for(const signal of ['SIGTERM','SIGINT'])process.on(signal,async()=>{try{await repo.close?.()}finally{process.exit(0)}});
