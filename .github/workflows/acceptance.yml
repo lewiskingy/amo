@@ -1,6 +1,11 @@
 name: Deployed AMO acceptance
 
 on:
+  pull_request:
+    paths:
+      - 'tests/e2e/**'
+      - 'package.json'
+      - '.github/workflows/acceptance.yml'
   workflow_run:
     workflows:
       - Validate and release AMO
@@ -11,9 +16,32 @@ permissions:
   contents: read
 
 jobs:
+  validate-e2e:
+    name: Validate acceptance tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install acceptance dependencies
+        run: npm install
+
+      - name: Validate test scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          find tests/e2e -name '*.cjs' -print0 | xargs -0 -n1 node --check
+          npm run test:e2e -- --dry-run
+
   acceptance:
     name: Acceptance · Test · ${{ matrix.profile }}
-    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: test-amo
     strategy:
