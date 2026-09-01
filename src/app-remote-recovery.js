@@ -9,7 +9,7 @@
 
   function ensureNav(){
     const nav=[...document.querySelectorAll('details.nav-group')].find(d=>/Admin/i.test(d.querySelector('summary')?.textContent||''))?.querySelector('.nav-group-items');
-    if(nav&&!nav.querySelector('[data-view="restore"]')){const b=document.createElement('button');b.className='nav-btn';b.dataset.view='restore';b.innerHTML='<span class="nav-dot"></span>Restore';b.addEventListener('click',()=>switchView('restore'));const workspace=nav.querySelector('[data-view="data"]');nav.insertBefore(b,workspace||null)}
+    if(nav&&!nav.querySelector('[data-view="restore"]')){const b=document.createElement('button');b.className='nav-btn';b.dataset.view='restore';b.innerHTML='<span class="nav-dot"></span>Restore';const workspace=nav.querySelector('[data-view="data"]');nav.insertBefore(b,workspace||null)}
     const content=document.querySelector('.content');if(content&&!document.getElementById('restore')){const s=document.createElement('section');s.id='restore';s.className='view';s.innerHTML='<div class="hero"><div><h1>Restore</h1><p>Point-in-time recovery from retained AMO audit transactions.</p></div></div><div id="restoreContent"></div>';content.appendChild(s)}
   }
 
@@ -69,6 +69,8 @@
     }
   `;document.head.appendChild(style);
 
-  ensureNav();const previousSwitch=window.switchView;if(typeof previousSwitch==='function')window.switchView=function(id){const result=previousSwitch.apply(this,arguments);if(id==='restore'&&activeRepo()?.mode==='remote')renderRemoteRestore();return result};
+  /* app-restore-rbac-fix.js owns Restore activation. This module only exposes the rendering API
+     and ensures the Restore surface exists, avoiding stacked switchView wrappers and double renders. */
+  ensureNav();
   window.AmoRemoteRecovery={render:renderRemoteRestore};
 })();

@@ -110,6 +110,22 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
 
 (function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src=amoAsset('app-estimates-funding.js');s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src=amoAsset('app-estimates-funding-guard.js');g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
 
+/* Recovery is an application capability, not an incidental side effect of another module.
+   Load the implementation first, then the activation/RBAC adapter that owns Restore rendering. */
+(function loadRecoveryModules(){
+  if(document.querySelector('script[data-amo-remote-recovery]')||window.AmoRemoteRecovery){
+    if(!document.querySelector('script[data-amo-restore-rbac-fix]')){const fix=document.createElement('script');fix.src=amoAsset('app-restore-rbac-fix.js');fix.dataset.amoRestoreRbacFix='true';document.head.appendChild(fix)}
+    return
+  }
+  const recovery=document.createElement('script');recovery.src=amoAsset('app-remote-recovery.js');recovery.dataset.amoRemoteRecovery='true';
+  recovery.onload=()=>{
+    if(document.querySelector('script[data-amo-restore-rbac-fix]'))return;
+    const fix=document.createElement('script');fix.src=amoAsset('app-restore-rbac-fix.js');fix.dataset.amoRestoreRbacFix='true';document.head.appendChild(fix)
+  };
+  recovery.onerror=()=>console.error('Could not load AMO Remote recovery module.');
+  document.head.appendChild(recovery)
+})();
+
 /* Remote mode is layered on after the local implementation. The HTTP repository implements
    the same WorkspaceRepository contract and the UX then exposes Local/Remote connection choices.
    Auto-connect is deliberately gated on the target-stage safety module. */
