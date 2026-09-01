@@ -56,11 +56,27 @@
 
   window.renderAmoStageIndicator=renderStageIndicator;
 
-  function assertCompatible(settings){
-    const dataStage=normalizeStage(settings?.dataStage,'production');
-    if(targetStage==='test'&&dataStage==='production'){
-      throw new Error('Loading production data in a Test AMO application instance is not supported. This application version may contain schema or write-behaviour changes. Set the workspace Data Stage to test before opening it in Test.')
+  function incompatibleProductionData(){
+    return new Error('Loading production data in a Test AMO application instance is not supported. This application version may contain schema or write-behaviour changes. Set the workspace Data Stage to test before opening it in Test.')
+  }
+
+  function classifyWorkspaceStage(settings){
+    const raw=String(settings?.dataStage||'').trim();
+    if(raw){
+      const dataStage=normalizeStage(raw,'production');
+      if(targetStage==='test'&&dataStage==='production')throw incompatibleProductionData();
+      return {dataStage,classified:false}
     }
+    if(targetStage==='test'){
+      const answer=prompt('This workspace predates the Data Stage control and is therefore treated as Production by default.\n\nIf this is definitely Test data, type TEST to classify it as Test and continue. Otherwise cancel or leave blank.','');
+      if(String(answer||'').trim().toLowerCase()==='test')return{dataStage:'test',classified:true};
+      throw incompatibleProductionData()
+    }
+    return {dataStage:'production',classified:true}
+  }
+
+  function assertCompatible(settings){
+    const {dataStage}=classifyWorkspaceStage(settings);
     return dataStage
   }
   window.assertAmoWorkspaceStage=assertCompatible;
@@ -69,16 +85,23 @@
   if(typeof prepareLoadedWorkspace==='function'){
     const basePrepareLoadedWorkspace=prepareLoadedWorkspace;
     prepareLoadedWorkspace=function(rawBundle){
-      const prepared=basePrepareLoadedWorkspace(rawBundle);
-      const explicit=prepared.loadedSettings?.dataStage;
-      const dataStage=assertCompatible(prepared.loadedSettings);
-      prepared.loadedSettings.dataStage=dataStage;
-      if(prepared.configFiles?.['settings.json'])prepared.configFiles['settings.json'].dataStage=dataStage;
-      if(explicit==null&&targetStage==='production'){
-        /* Existing workspaces predate Data Stage; treat them conservatively as Production. */
-        prepared.loadedSettings.dataStage='production'
-      }
+      const prepared=basePrepareLoadedWorkspace(rawBundle),classification=classifyWorkspaceStage(prepared.loadedSettings);
+      prepared.loadedSettings.dataStage=classification.dataStage;
+      if(prepared.configFiles?.['settings.json'])prepared.configFiles['settings.json'].dataStage=classification.dataStage;
+      prepared.dataStageClassified=classification.classified;
       return prepared
+    }
+  }
+
+  /* Persist a one-time classification of a legacy/unlabelled workspace after it has safely loaded. */
+  if(typeof applyMigrationDirtyState==='function'){
+    const baseApplyMigrationDirtyState=applyMigrationDirtyState;
+    applyMigrationDirtyState=function(prepared){
+      const result=baseApplyMigrationDirtyState(prepared);
+      if(prepared?.dataStageClassified){
+        configDirty=true;updateBanner();log?.(`Workspace Data Stage classified as ${prepared.loadedSettings.dataStage}.`);if(typeof requestAutosave==='function')requestAutosave()
+      }
+      return result
     }
   }
 
