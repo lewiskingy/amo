@@ -85,6 +85,12 @@ function amoAsset(path){
   return v?`${path}${path.includes('?')?'&':'?'}v=${encodeURIComponent(v)}`:path
 }
 
+/* Load the stage/data safety layer before anything can auto-connect to a remote workspace. */
+window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reject)=>{
+  if(window.assertAmoWorkspaceStage){resolve();return}
+  const s=document.createElement('script');s.src=amoAsset('app-target-stage.js');s.dataset.amoTargetStage='true';s.onload=resolve;s.onerror=()=>reject(new Error('Could not load AMO target-stage safety controls.'));document.head.appendChild(s)
+});
+
 /* Hosted AMO can run in browsers or managed environments where a showDirectoryPicker
    property exists but is not callable. Older core code tests for property presence, so
    normalise that case to a callable compatibility function which produces a useful error
@@ -105,13 +111,16 @@ function amoAsset(path){
 (function loadEstimateFunding(){if(document.querySelector('script[data-amo-estimates-funding]'))return;const s=document.createElement('script');s.src=amoAsset('app-estimates-funding.js');s.dataset.amoEstimatesFunding='true';s.onload=()=>{if(document.querySelector('script[data-amo-estimates-guard]'))return;const g=document.createElement('script');g.src=amoAsset('app-estimates-funding-guard.js');g.dataset.amoEstimatesGuard='true';document.head.appendChild(g)};document.head.appendChild(s)})();
 
 /* Remote mode is layered on after the local implementation. The HTTP repository implements
-   the same WorkspaceRepository contract and the UX then exposes Local/Remote connection choices. */
+   the same WorkspaceRepository contract and the UX then exposes Local/Remote connection choices.
+   Auto-connect is deliberately gated on the target-stage safety module. */
 (function loadRemoteWorkspace(){
-  if(document.querySelector('script[data-amo-remote-repository]'))return;
-  const repo=document.createElement('script');repo.src=amoAsset('app-workspace-remote-repository.js');repo.dataset.amoRemoteRepository='true';repo.onload=()=>{
-    if(document.querySelector('script[data-amo-remote-workspace]'))return;
-    const ux=document.createElement('script');ux.src=amoAsset('app-remote-workspace.js');ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
-  };document.head.appendChild(repo)
+  window.amoTargetStageReady.then(()=>{
+    if(document.querySelector('script[data-amo-remote-repository]'))return;
+    const repo=document.createElement('script');repo.src=amoAsset('app-workspace-remote-repository.js');repo.dataset.amoRemoteRepository='true';repo.onload=()=>{
+      if(document.querySelector('script[data-amo-remote-workspace]'))return;
+      const ux=document.createElement('script');ux.src=amoAsset('app-remote-workspace.js');ux.dataset.amoRemoteWorkspace='true';document.head.appendChild(ux)
+    };document.head.appendChild(repo)
+  }).catch(e=>{console.error(e);alert(e.message)})
 })();
 
 (function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src=amoAsset('app-ux-fixes.js');s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
