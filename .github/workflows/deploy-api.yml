@@ -19,6 +19,9 @@ on:
       - 'worker.js'
       - 'wrangler.jsonc'
       - '.github/workflows/deploy-api.yml'
+      - 'tests/e2e/**'
+      - 'package.json'
+      - '.github/workflows/acceptance.yml'
   workflow_dispatch:
     inputs:
       ref:
