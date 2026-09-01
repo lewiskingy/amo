@@ -17,7 +17,7 @@
   if(typeof db==='object'&&db?.settings&&!db.settings.dataStage)db.settings.dataStage='production';
 
   function workspaceDataStage(){
-    if(!window.workspaceHandle||!db?.settings)return null;
+    if(typeof workspaceHandle==='undefined'||!workspaceHandle||!db?.settings)return null;
     return normalizeStage(db.settings.dataStage,'production')
   }
 
@@ -98,7 +98,7 @@
     renderConfig=function(...args){
       if(configState.editing&&configState.draft&&!configState.draft.dataStage)configState.draft.dataStage=normalizeStage(db.settings?.dataStage,'production');
       const result=baseRenderConfigStage.apply(this,args),grid=document.querySelector('#configContent .config-grid');
-      if(grid&&workspaceHandle){grid.querySelector('.amo-data-stage-config')?.remove();grid.insertAdjacentHTML('afterbegin',dataStageCard());document.getElementById('workspaceDataStage')?.addEventListener('change',e=>{configState.draft.dataStage=normalizeStage(e.target.value,'production')})}
+      if(grid&&typeof workspaceHandle!=='undefined'&&workspaceHandle){grid.querySelector('.amo-data-stage-config')?.remove();grid.insertAdjacentHTML('afterbegin',dataStageCard());document.getElementById('workspaceDataStage')?.addEventListener('change',e=>{configState.draft.dataStage=normalizeStage(e.target.value,'production')})}
       return result
     }
   }
@@ -109,6 +109,9 @@
       const wasEditing=!!configState.editing;
       const requested=normalizeStage(configState.draft?.dataStage||db.settings?.dataStage,'production');
       const previous=normalizeStage(db.settings?.dataStage,'production');
+      if(wasEditing&&targetStage==='test'&&requested==='production'){
+        alert('A Production workspace cannot be configured while running the Test AMO application. Set Data Stage to Test, or make the change from Production.');return
+      }
       const result=baseSaveConfigStage.apply(this,args);
       if(wasEditing&&!configState.editing){
         db.settings.dataStage=requested;db.configFiles=db.configFiles||{};db.configFiles['settings.json']=clone(db.settings);configDirty=true;
