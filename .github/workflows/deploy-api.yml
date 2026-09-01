@@ -22,9 +22,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tested commit SHA or tag to promote to Production'
-        required: true
-        default: 'main'
+        description: 'Optional commit SHA or tag override; leave blank to promote current Test release'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
       - name: Checkout candidate revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
 
       - name: Validate Bicep syntax
         run: az bicep build --file infra/main.bicep --stdout > /dev/null
@@ -67,12 +67,15 @@ jobs:
       - name: Checkout release revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
 
       - name: Resolve release SHA
         id: release
         shell: bash
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Deploying $SHA to ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}"
 
       - name: Azure login using OIDC
         uses: azure/login@v2
@@ -247,7 +250,7 @@ jobs:
       - name: Checkout release revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
 
       - name: Resolve release SHA
         shell: bash
@@ -270,3 +273,27 @@ jobs:
             sleep 10
           done
           exit 1
+
+  mark-test-release:
+    name: Record current Test release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - deploy-api
+      - deploy-frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Move durable Test marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -f test-current "${{ github.sha }}"
+          git push origin refs/tags/test-current --force
+          echo "Test release recorded at ${{ github.sha }}"
