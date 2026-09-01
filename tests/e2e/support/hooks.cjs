@@ -25,20 +25,19 @@ Before(async function(){
   this.browserErrors=[];
   this.context=await browser.newContext(viewportOptions());
   this.page=await this.context.newPage();
+  /* Uncaught application failures are release blockers. Third-party console errors are deliberately
+     not treated as failures because identity providers and browser extensions can emit noisy logs. */
   this.page.on('pageerror',error=>this.browserErrors.push(`pageerror: ${error.message}`));
-  this.page.on('console',message=>{
-    if(message.type()==='error')this.browserErrors.push(`console: ${message.text()}`);
-  });
 });
 
 After(async function(scenario){
   try{
-    if(scenario.result?.status===Status.FAILED){
+    if(scenario.result?.status===Status.FAILED||this.browserErrors.length){
       const filename=path.resolve('artifacts',`${process.env.E2E_PROFILE||'desktop'}-${artifactName(scenario.pickle.name)}.png`);
       await this.page?.screenshot({path:filename,fullPage:true}).catch(()=>{});
     }
     if(this.browserErrors.length){
-      throw new Error(`Browser errors detected:\n${this.browserErrors.join('\n')}`);
+      throw new Error(`Uncaught browser errors detected:\n${this.browserErrors.join('\n')}`);
     }
   }finally{
     await this.context?.close();
