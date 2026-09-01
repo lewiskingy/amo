@@ -1,6 +1,5 @@
 /* Client/backend/schema version presentation and compatibility diagnostics. */
 (function initVersionCompatibility(){
-  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const short=value=>{const v=String(value||'').trim();return !v?'—':v.length>12?v.slice(0,12):v};
 
   function backendState(){
@@ -21,8 +20,10 @@
     const sub=document.querySelector('.brand-sub');if(!sub)return;
     const client=window.AMO_APP_VERSION||'—';
     const schema=Number(typeof CURRENT_SCHEMA_VERSION!=='undefined'?CURRENT_SCHEMA_VERSION:0)||'—';
-    sub.textContent=`Client ${client} · Schema ${schema}`;
     const backend=backendState();
+    sub.textContent=backend.mode==='remote'
+      ?`Client ${client} · Backend ${backend.version} · Schema ${schema}`
+      :`Client ${client} · Schema ${schema}`;
     sub.title=backend.mode==='remote'
       ?`AMO Client ${client} · Backend ${backend.version} · API contract ${backend.apiVersion} · Schema ${schema}`
       :`AMO Client ${client} · Local browser workspace · Schema ${schema}`
@@ -40,7 +41,7 @@
     const list=card?.querySelector('.config-list');if(!card||!list)return;
     const backend=backendState(),client=window.AMO_APP_VERSION||'—',clientBuild=String(window.AMO_BUILD_ID||'').trim();
     const appSchema=Number(typeof CURRENT_SCHEMA_VERSION!=='undefined'?CURRENT_SCHEMA_VERSION:0)||'—';
-    const workspaceSchema=(()=>{const v=Number(window.db?.workspace?.schemaVersion||window.db?.settings?.schemaVersion||0);return Number.isFinite(v)&&v>0?v:'—'})();
+    const workspaceSchema=(()=>{let source=null;try{source=typeof db!=='undefined'?db:null}catch{}const v=Number(source?.workspace?.schemaVersion||source?.settings?.schemaVersion||0);return Number.isFinite(v)&&v>0?v:'—'})();
     const signature=[client,clientBuild,backend.mode,backend.version,backend.build,backend.apiVersion,appSchema,workspaceSchema].join('|');
     if(card.dataset.amoVersionSignature===signature)return;
 
@@ -50,7 +51,7 @@
     const rows=[
       stat('Client version',client),
       stat('Client build',short(clientBuild),clientBuild),
-      stat('Backend',backend.version),
+      stat('Backend',backend.version)
     ];
     if(backend.mode==='remote'&&backend.build)rows.push(stat('Backend build',short(backend.build),backend.build));
     rows.push(stat('API contract',backend.apiVersion));
