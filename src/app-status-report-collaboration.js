@@ -1,6 +1,7 @@
-/* Status Reporting lifecycle, collaborative draft merge, previous-report context and accessible Health presentation.
+/* Status Reporting lifecycle, collaborative draft merge and previous-report context.
    Active cycle: Draft <-> Published; New Draft finalises Published and starts the next cycle.
-   Draft saves use baseline/local/latest three-way merge at entry-field granularity. */
+   Draft saves use baseline/local/latest three-way merge at entry-field granularity.
+   Report presentation itself is owned by app-report-renderer.js. */
 (function initStatusReportCollaboration(){
   if(window.__amoStatusReportCollaborationLoaded)return;window.__amoStatusReportCollaborationLoaded=true;
 
@@ -77,9 +78,16 @@
   }
   saveStatusDraft=saveDraftCollaboratively;
 
+  /* Publish must persist the exact same composed report model used by Preview. Temporarily point
+     Preview composition at the latest locked draft, then restore the in-memory editing state. This
+     preserves every existing snapshot/hierarchy decorator without maintaining a second composer. */
   function buildReportFromDraft(draft,id,status='Published'){
-    const entries=reportingRows(draft).filter(x=>reportHasContent(x.entry)).map(({demand:d,entry:e})=>snapshotStatusEntry(d,normalizeEntry(e)));
-    const previous=statusReports.find(r=>r.id===draft.previousReportId)||null;return{id,status,reportingDate:draft.reportingDate||todayIso(),previousReportId:draft.previousReportId||null,entries,revision:1,previousPublishedAt:previous?.publishedAt||null}
+    const priorDraft=statusReportDraft,priorEditing=statusReportState.editing,priorBuffer=statusReportState.draftBuffer;
+    try{
+      statusReportDraft=normalizeDraft(draft);statusReportState.editing=false;statusReportState.draftBuffer=null;
+      const composed=buildPreviewReport(),previous=statusReports.find(r=>r.id===draft.previousReportId)||null;
+      return{...composed,id,status,reportingDate:draft.reportingDate||todayIso(),previousReportId:draft.previousReportId||null,revision:1,previousPublishedAt:previous?.publishedAt||null}
+    }finally{statusReportDraft=priorDraft;statusReportState.editing=priorEditing;statusReportState.draftBuffer=priorBuffer}
   }
   function applyPublishedHealth(draft){
     for(const e of draft.entries||[]){const d=db.demand.find(x=>x.id===e.demandId),health=normalizedHealth(e.health||e.rag);if(!d||!health||health===normalizedHealth(d.health))continue;d.health=health;d.version=(Number(d.version)||0)+1;d.modifiedAt=nowIso();markDirty?.('demand',d.id,`Updated ${d.id} Health to ${health} from published Status Report.`)}
@@ -130,26 +138,21 @@
   function copyPreviousAll(id){const prev=previousEntry(id);if(!prev)return;const e=ensureDraftEntry(id);for(const f of ENTRY_FIELDS)e[f]=f==='health'?normalizedHealth(prev.health||prev.rag):(prev[f]||'');renderStatusReporting()}
 
   function healthTone(v){const h=normalizedHealth(v);return h==='On Track'?'green':h==='At Risk'?'amber':h==='Off Track'?'red':'unset'}
-  function decorateHealth(){
-    document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{const cell=tr.children?.[4];if(!cell)return;const select=cell.querySelector('[data-status-field="rag"]'),text=select?.value||cell.textContent,tone=healthTone(text);cell.classList.remove('health-cell-green','health-cell-amber','health-cell-red','health-cell-unset');cell.classList.add(`health-cell-${tone}`);if(select&&!select.dataset.healthToneBound){select.dataset.healthToneBound='true';select.addEventListener('change',()=>decorateHealth())}});
-    document.querySelectorAll('#recordModalBody .report-entry').forEach(entry=>{const dot=entry.querySelector('.rag-dot,.health-green,.health-amber,.health-red,.health-unset');let tone='unset';for(const t of ['green','amber','red'])if(dot?.classList.contains(`health-${t}`)||dot?.classList.contains(`rag-${t[0].toUpperCase()+t.slice(1)}`))tone=t;entry.classList.remove('report-health-green','report-health-amber','report-health-red','report-health-unset');entry.classList.add(`report-health-${tone}`);entry.querySelector('.report-entry-head > div:last-child')?.classList.add('report-health-label')})
+  function decorateAuthoringHealth(){
+    document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{const cell=tr.children?.[4];if(!cell)return;const select=cell.querySelector('[data-status-field="rag"]'),text=select?.value||cell.textContent,tone=healthTone(text);cell.classList.remove('health-cell-green','health-cell-amber','health-cell-red','health-cell-unset');cell.classList.add(`health-cell-${tone}`);if(select&&!select.dataset.healthToneBound){select.dataset.healthToneBound='true';select.addEventListener('change',()=>decorateAuthoringHealth())}})
   }
 
   const baseRenderStatusCollab=renderStatusReporting;
-  renderStatusReporting=function(){const r=baseRenderStatusCollab();renderStatusToolbar();decoratePreviousContext();decorateHealth();return r};
+  renderStatusReporting=function(){const r=baseRenderStatusCollab();renderStatusToolbar();decoratePreviousContext();decorateAuthoringHealth();return r};
 
   latestReport=function(){return statusReports.filter(r=>r.status==='Published'||r.status==='Final').sort((a,b)=>clean(b.publishedAt||b.finalizedAt).localeCompare(clean(a.publishedAt||a.finalizedAt)))[0]||null};
   renderLatestReportCard=function(){const el=$('latestStatusReport');if(!el)return;const current=activePublishedReport(),r=current||latestReport();if(!r){el.innerHTML='<div class="notice">No status reports have been published yet.</div>';return}const label=current?'Current published report':'Latest final report';el.innerHTML=`<div class="report-card"><div class="flex" style="justify-content:space-between"><div><strong>${label}</strong><div class="muted">${escHtml(r.reportingDate||'')} · ${r.entries?.length||0} reported items · ${escHtml(r.status)}</div></div><button class="btn" id="viewLatestStatus">View</button></div></div>`;$('viewLatestStatus')?.addEventListener('click',()=>openStatusReportModal(r))};
   renderStatusHistory=function(){const table=$('statusHistoryTable');if(!table)return;const rows=statusReports.filter(r=>r.status!=='Unpublished').slice().sort((a,b)=>clean(b.publishedAt||b.finalizedAt).localeCompare(clean(a.publishedAt||a.finalizedAt)));table.innerHTML=`<thead><tr><th>Report ID</th><th>State</th><th>Reporting Date</th><th>Published</th><th>Published By</th><th>Items</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr data-report-id="${r.id}"><td><strong>${escHtml(r.id)}</strong></td><td>${statusBadge(r.status||'Final')}</td><td>${escHtml(r.reportingDate||'—')}</td><td>${r.publishedAt?new Date(r.publishedAt).toLocaleString():'—'}</td><td>${escHtml(r.publishedBy||'—')}</td><td>${r.entries?.length||0}</td><td><button class="btn" data-view-report="${r.id}">View</button></td></tr>`).join('')}</tbody>`;table.querySelectorAll('[data-view-report]').forEach(b=>b.onclick=()=>openStatusReportModal(statusReports.find(r=>r.id===b.dataset.viewReport)));$('statusHistoryCount').textContent=`${rows.length} published/final report${rows.length===1?'':'s'}.`};
 
-  const baseNarrativeLifecycle=reportNarrativeHtml;
-  reportNarrativeHtml=function(report){let html=baseNarrativeLifecycle(report);if(report?.status==='Final')html=html.replace('<span class="pill amber">Final</span>','<span class="pill blue">Final</span>');return html};
-
   document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;const backdrop=$('recordModalBackdrop');if(!backdrop?.classList.contains('open'))return;if(typeof recordModalState!=='undefined'&&recordModalState.type==='status-report'){e.preventDefault();const close=$('closeStatusReport');if(close)close.click();else if(typeof closeRecordModal==='function')closeRecordModal()}});
-  const modalObserver=new MutationObserver(()=>decorateHealth());const modalBody=$('recordModalBody');if(modalBody)modalObserver.observe(modalBody,{childList:true,subtree:true});
 
   const style=document.createElement('style');style.id='status-report-collaboration-styles';style.textContent=`
-    .status-cycle-summary{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}.previous-report-detail{margin-top:7px;border-top:1px solid var(--line);padding-top:6px;font-size:.73rem}.previous-report-detail summary{cursor:pointer;font-weight:700;color:var(--muted)}.previous-report-content{display:grid;gap:7px;margin-top:6px;padding:8px;border-radius:8px;background:var(--soft);white-space:pre-wrap}.previous-copy{justify-self:start;padding:4px 7px;font-size:.7rem}.previous-copy-all{margin-top:7px;padding:4px 7px;font-size:.7rem}.health-cell-green{box-shadow:inset 5px 0 0 #1b7f5a;background:rgba(27,127,90,.08)}.health-cell-amber{box-shadow:inset 5px 0 0 #d88a00;background:rgba(216,138,0,.09)}.health-cell-red{box-shadow:inset 5px 0 0 #b42318;background:rgba(180,35,24,.08)}.health-cell-unset{box-shadow:inset 5px 0 0 #98a2b3}.report-entry{border-left-width:6px}.report-health-green{border-left-color:#1b7f5a}.report-health-amber{border-left-color:#d88a00}.report-health-red{border-left-color:#b42318}.report-health-unset{border-left-color:#98a2b3}.report-health-green .report-entry-head{background:rgba(27,127,90,.08)}.report-health-amber .report-entry-head{background:rgba(216,138,0,.09)}.report-health-red .report-entry-head{background:rgba(180,35,24,.08)}.report-health-label{font-weight:800}.status-modal{width:min(1500px,96vw)!important;max-width:none!important;max-height:92vh}.status-modal #recordModalBody{overflow:auto;min-height:0}.status-modal .report-card{max-width:none}.status-modal .report-narrative p{max-width:70ch}.status-modal-maximized .report-narrative p{max-width:78ch}@media(max-width:800px){.status-modal{width:97vw!important;max-height:96vh}.previous-report-content{font-size:.78rem}}
+    .status-cycle-summary{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}.previous-report-detail{margin-top:7px;border-top:1px solid var(--line);padding-top:6px;font-size:.73rem}.previous-report-detail summary{cursor:pointer;font-weight:700;color:var(--muted)}.previous-report-content{display:grid;gap:7px;margin-top:6px;padding:8px;border-radius:8px;background:var(--soft);white-space:pre-wrap}.previous-copy{justify-self:start;padding:4px 7px;font-size:.7rem}.previous-copy-all{margin-top:7px;padding:4px 7px;font-size:.7rem}.health-cell-green{box-shadow:inset 5px 0 0 #1b7f5a;background:rgba(27,127,90,.08)}.health-cell-amber{box-shadow:inset 5px 0 0 #d88a00;background:rgba(216,138,0,.09)}.health-cell-red{box-shadow:inset 5px 0 0 #b42318;background:rgba(180,35,24,.08)}.health-cell-unset{box-shadow:inset 5px 0 0 #98a2b3}@media(max-width:800px){.previous-report-content{font-size:.78rem}}
   `;document.head.appendChild(style);
 
   renderStatusReporting();renderStatusHistory();
