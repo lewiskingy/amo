@@ -17,23 +17,31 @@ async function waitFor(fn,{timeout=5000,interval=100}={}){
   throw new Error(`Condition was not met within ${timeout}ms.`);
 }
 
+async function ensureMobileNavOpen(page){
+  const toggle=page.locator('#amoMobileNavToggle');
+  await waitFor(async()=>await toggle.isVisible());
+  const expanded=await toggle.getAttribute('aria-expanded');
+  if(expanded!=='true')await toggle.click();
+  await waitFor(async()=>await toggle.getAttribute('aria-expanded')==='true');
+  await waitFor(async()=>await page.locator('body').evaluate(node=>node.classList.contains('amo-mobile-nav-open')));
+}
+
+async function clickControl(locator){
+  await waitFor(async()=>await locator.count()===1);
+  await locator.evaluate(element=>element.click());
+}
+
 async function openNavView(world,view){
   const page=world.page;
   const profile=process.env.E2E_PROFILE||'desktop';
-  const sidebar=page.locator('.sidebar');
-  if(profile==='mobile'&&!await sidebar.isVisible()){
-    const toggle=page.locator('#amoMobileNavToggle');
-    await waitFor(async()=>await toggle.isVisible());
-    await toggle.click();
-    await waitFor(async()=>await sidebar.isVisible());
-  }
+  if(profile==='mobile')await ensureMobileNavOpen(page);
   const button=page.locator(`.sidebar .nav-btn[data-view="${view}"]`);
   await waitFor(async()=>await button.count()===1);
   const group=button.locator('xpath=ancestor::details[1]');
   if(await group.count()===1&&!await group.evaluate(node=>node.open)){
-    await group.locator(':scope > summary').click();
+    await group.evaluate(node=>{node.open=true});
   }
-  await button.click();
+  await clickControl(button);
   await waitFor(async()=>await page.locator(`#${view}.view.active`).count()===1);
 }
 
@@ -80,10 +88,7 @@ Then('the navigation shell should be usable at the selected viewport', async fun
   const profile=process.env.E2E_PROFILE||'desktop';
   const sidebar=this.page.locator('.sidebar');
   if(profile==='mobile'){
-    const toggle=this.page.locator('#amoMobileNavToggle');
-    await waitFor(async()=>await toggle.isVisible());
-    await toggle.click();
-    await waitFor(async()=>await sidebar.isVisible());
+    await ensureMobileNavOpen(this.page);
   }else{
     assert.equal(await sidebar.isVisible(),true,'Desktop sidebar is not visible.');
   }
@@ -161,6 +166,6 @@ Then('People should provide a Manage Users & Access action', async function(){
 
 When('I choose Manage Users & Access', async function(){
   const action=this.page.locator('#teamToolbar [data-manage-amo-access]');
-  await action.click();
+  await clickControl(action);
   await waitFor(async()=>await this.page.locator('#users.view.active').count()===1);
 });
