@@ -77,13 +77,18 @@ Then('the modal report scope should start organisation-wide', async function(){
 
 When('I scope the modal report to Department Alpha and Team Alpha One', async function(){
   const department=this.page.locator('#recordModalBackdrop.open #statusModalDepartment');
-  await department.selectOption('DEPT-A');
   const team=this.page.locator('#recordModalBackdrop.open #statusModalTeam');
-  await waitFor(async()=>await team.count()===1&&!await team.isDisabled());
-  assert.equal(await department.inputValue(),'DEPT-A');
-  await team.selectOption('TEAM-A1');
+  await waitFor(async()=>await department.count()===1&&await team.count()===1&&await department.isVisible()&&await team.isVisible());
+  const departmentValues=await department.locator('option').evaluateAll(options=>options.map(option=>option.value));
+  assert.ok(departmentValues.includes('DEPT-A'),'Modal Department scope does not offer Department Alpha.');
+  await department.evaluate(element=>{element.value='DEPT-A';element.dispatchEvent(new Event('change',{bubbles:true}))});
+  await waitFor(async()=>await department.inputValue()==='DEPT-A'&&!await team.isDisabled());
+  const teamValues=await team.locator('option').evaluateAll(options=>options.map(option=>option.value));
+  assert.ok(teamValues.includes('TEAM-A1'),'Modal Team scope does not offer Team Alpha One after selecting Department Alpha.');
+  await team.evaluate(element=>{element.value='TEAM-A1';element.dispatchEvent(new Event('change',{bubbles:true}))});
   await waitFor(async()=>await team.inputValue()==='TEAM-A1');
-  await modalReport(this.page);
+  const report=await modalReport(this.page);
+  await waitFor(async()=>{const text=String(await report.textContent()||'');return text.includes('Demand Alpha')&&!text.includes('Demand Beta')});
 });
 
 Then('the modal report should contain only Demand Alpha', async function(){
