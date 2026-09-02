@@ -28,7 +28,6 @@
     const dep=modalScope.departmentId,team=modalScope.teamId,depRow=catalog.departments.find(d=>d.id===dep),teamRow=catalog.teams.find(t=>t.id===team);
     return{departmentId:dep,teamId:team,departmentName:depRow?.name||'',teamName:teamRow?.name||'',label:dep===ORG?'Whole organisation':team===ALL?(depRow?.name||'Whole department'):[depRow?.name,teamRow?.name].filter(Boolean).join(' · ')}
   }
-  function persisted(report){return !!report?.id&&/^SR-/.test(report.id)&&['Published','Final'].includes(report.status||'Published')}
   function draftPreview(report){return report?.status==='Draft Preview'}
   function reportSourceMode(){return window.workspaceRepository?.mode||(typeof getLastConnectionPreference==='function'?getLastConnectionPreference()?.mode:null)||'remote'}
   function reportUrl(report,scope=modalScope){
@@ -71,13 +70,13 @@
     modalReport=clone(resolved);modalScope={departmentId:ORG,teamId:ALL};const backdrop=$('recordModalBackdrop');backdrop?.classList.add('open');if(typeof recordModalState!=='undefined'){recordModalState.open=true;recordModalState.mode='view';recordModalState.type='status-report';recordModalState.id=resolved.id}await renderModal()
   };
 
-  function latestPublishedReport(){return(statusReports||[]).filter(r=>['Published','Final'].includes(r?.status||'')).slice().sort((a,b)=>String(b.publishedAt||b.finalizedAt||'').localeCompare(String(a.publishedAt||a.finalizedAt||'')))[0]||null}
-  function friendlyDate(value){if(!value)return'Publication date unavailable';try{return new Date(value).toLocaleString()}catch{return String(value)}}
+  function latestPublishedReport(){return(statusReports||[]).filter(r=>['Published','Final'].includes(r?.status||'')).slice().sort((a,b)=>String(b.publishedAt||b.finalizedAt||b.id||'').localeCompare(String(a.publishedAt||a.finalizedAt||a.id||'')))[0]||null}
+  function friendlyDate(value){if(!value)return'Publication date unavailable';const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString()}
   renderLatestReportCard=function(){
     const el=$('latestStatusReport');if(!el)return;const r=latestPublishedReport();
     if(!r){el.innerHTML='<div class="notice">No published Status Report is available yet.</div>';return}
-    const revision=Number(r.revision)||1,items=r.entries?.length??r.itemCount??0;
-    el.innerHTML=`<div class="report-card latest-status-report-card"><div class="flex" style="justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap"><div><strong>Latest published report</strong><div class="muted">Published ${escHtml(friendlyDate(r.publishedAt))} · Reporting date ${escHtml(r.reportingDate||'—')} · Revision ${revision} · ${items} reported item${items===1?'':'s'}</div></div><div class="toolbar"><button class="btn" id="viewLatestStatus">View</button><button class="btn" id="openLatestStatus">Open Report ↗</button></div></div></div>`;
+    const details=r._lazy?'Details load on View':`Revision ${Number(r.revision)||1} · ${r.entries?.length||0} reported item${r.entries?.length===1?'':'s'}`;
+    el.innerHTML=`<div class="report-card latest-status-report-card"><div class="flex" style="justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap"><div><strong>Latest published report</strong><div class="muted">Published ${escHtml(friendlyDate(r.publishedAt))} · Reporting date ${escHtml(r.reportingDate||'—')} · ${escHtml(details)}</div></div><div class="toolbar"><button class="btn" id="viewLatestStatus">View</button><button class="btn" id="openLatestStatus">Open Report ↗</button></div></div></div>`;
     $('viewLatestStatus')?.addEventListener('click',()=>openStatusReportModal(r));$('openLatestStatus')?.addEventListener('click',()=>openReportWindow(r,{departmentId:ORG,teamId:ALL}))
   };
 
