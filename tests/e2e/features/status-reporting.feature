@@ -9,7 +9,15 @@ Feature: Status Report authoring and viewing
     Then the Status Report authoring page should be displayed
     And the Status Report authoring page should not contain dashboard portfolio metrics
 
-  Scenario: Draft Preview uses the shared report presentation without persisted actions
+  Scenario: The Status Report page provides direct access to the latest published report
+    Given the deployed AMO Test application
+    When I open the application
+    And I open Status Report
+    And I prepare the Status Report acceptance fixture
+    And I present the acceptance fixture as the latest published report
+    Then the Latest Report card should show its published date and direct report actions
+
+  Scenario: Draft Preview uses the shared report presentation and can open standalone
     Given the deployed AMO Test application
     When I open the application
     And I prepare the Status Report acceptance fixture
@@ -17,7 +25,8 @@ Feature: Status Report authoring and viewing
     Then the Status Report modal should use the shared report renderer
     And the report should show portfolio sections and strong Health semantics
     And the report viewer should not expose removed report actions
-    And Draft Preview should not expose Open Report
+    And Draft Preview should expose one Open Report action
+    And Draft Open Report should target a temporary standalone preview
 
   Scenario: Published View uses the shared report presentation with one Open Report action
     Given the deployed AMO Test application
@@ -29,6 +38,17 @@ Feature: Status Report authoring and viewing
     And the report viewer should not expose removed report actions
     And Published View should expose one Open Report action
     And Open Report should target the canonical report route
+
+  Scenario: Preview and View modal scope is independent from the page scope
+    Given the deployed AMO Test application
+    When I open the application
+    And I prepare the Status Report acceptance fixture
+    And the application page scope is Department Beta
+    And I view the acceptance Status Report as Published
+    Then the modal report scope should start organisation-wide
+    When I scope the modal report to Department Alpha and Team Alpha One
+    Then the modal report should contain only Demand Alpha
+    And the application page scope should remain Department Beta
 
   Scenario: Historical report scope is projected from the persisted report snapshot
     Given the deployed AMO Test application
