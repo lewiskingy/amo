@@ -76,7 +76,7 @@ When('I prepare the Status Report acceptance fixture', async function(){
         financialOutlook:{rows:[{label:'Sep 2026',capacity:100000,funded:60000,unfunded:20000,remaining:20000}],totals:{capacity:100000,funded:60000,unfunded:20000,remaining:20000}}
       },
       dashboardSnapshots:{
-        organization:{activeDemand:2,capacityOutlook:[{label:'Sep 2026',allocatedFte:4,capacityFte:5,utilisationPct:80}]},
+        organization:null,
         departments:{
           'DEPT-A':{activeDemand:1,capacityOutlook:[{label:'Sep 2026',allocatedFte:2,capacityFte:3,utilisationPct:67}]},
           'DEPT-B':{activeDemand:1,capacityOutlook:[{label:'Sep 2026',allocatedFte:2,capacityFte:2,utilisationPct:100}]}
@@ -91,8 +91,7 @@ When('I prepare the Status Report acceptance fixture', async function(){
         {demandId:'DEM-B',title:'Demand Beta',departmentId:'DEPT-B',departmentName:'Department Beta',teamId:'TEAM-B1',teamName:'Team Beta One',owner:'Bob Architect',health:'Red',statusUpdate:'Beta status',achievements:'Beta achievement',issues:'Beta issue'}
       ]
     };
-    window.__amoStatusAcceptanceOriginalHierarchy=window.amoOrganizationHierarchy;
-    window.__amoStatusAcceptanceOriginalConfiguredTeams=window.configuredTeams;
+    window.__amoStatusAcceptanceFixture.dashboardSnapshots.organization=structuredClone(window.__amoStatusAcceptanceFixture.dashboardSnapshot);
     window.amoOrganizationHierarchy={
       configuredDepartments:()=>[
         {id:'DEPT-A',name:'Department Alpha'},
@@ -235,13 +234,13 @@ Then('the scoped report should contain only Demand Alpha', async function(){
 
 Then('the scoped report should use the persisted Team Alpha One dashboard snapshot', async function(){
   const report=await sharedRenderer(this.page);
-  const text=String(await report.textContent()||'');
-  assert.ok(/Active demand\s*17/.test(text.replace(/\s+/g,' ')),'Team scope did not use the persisted Team Alpha One dashboard snapshot.');
+  const text=String(await report.textContent()||'').replace(/\s+/g,' ');
+  assert.ok(/Active demand\s*17/.test(text),'Team scope did not use the persisted Team Alpha One dashboard snapshot.');
 });
 
 Then('I remember the acceptance report content', async function(){
   const report=await sharedRenderer(this.page);
-  this.statusAcceptanceContent=await report.locator('.report-card, :scope').first().evaluate(node=>{
+  this.statusAcceptanceContent=await report.evaluate(node=>{
     const clone=node.cloneNode(true);
     clone.querySelector('.report-hero')?.remove();
     return clone.textContent.replace(/\s+/g,' ').trim();
@@ -250,7 +249,7 @@ Then('I remember the acceptance report content', async function(){
 
 Then('the acceptance report content should match the Draft Preview', async function(){
   const report=await sharedRenderer(this.page);
-  const published=await report.locator('.report-card, :scope').first().evaluate(node=>{
+  const published=await report.evaluate(node=>{
     const clone=node.cloneNode(true);
     clone.querySelector('.report-hero')?.remove();
     return clone.textContent.replace(/\s+/g,' ').trim();
@@ -259,9 +258,9 @@ Then('the acceptance report content should match the Draft Preview', async funct
 });
 
 Then('the standalone report viewer shell should be displayed', async function(){
-  await waitFor(async()=>await this.page.locator('#reportViewer, #reportContent, main').count()>0);
+  await waitFor(async()=>await this.page.locator('.report-viewer-shell').count()===1);
   const body=String(await this.page.locator('body').textContent()||'');
-  assert.ok(body.includes('Architecture Status Report')||body.includes('Status Report')||body.includes('Report'),'Standalone /reports route did not render the report viewer shell.');
+  assert.ok(body.includes('Status Report'),'Standalone /reports route did not render the report viewer shell.');
   assert.equal(await this.page.locator('.sidebar').count(),0,'Standalone /reports route loaded the full workspace navigation shell.');
 });
 
