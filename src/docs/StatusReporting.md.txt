@@ -39,12 +39,14 @@ Published is intentionally reversible. **Unpublish** reopens the active cycle as
 
 ## Status Report authoring page
 
-The live **Status Report** page is deliberately focused on producing the report rather than duplicating the Dashboard. It contains:
+The live **Status Report** page is deliberately focused on producing and managing the report rather than duplicating the Dashboard. It contains:
 
 - report lifecycle actions such as Edit Draft, Save Draft, Preview, Publish, Unpublish and New Draft;
 - reporting progress and current-cycle state;
 - the active-Demand authoring table with prominent Health semantics;
-- a compact Latest Report entry point.
+- a compact **Latest Report** card showing the latest Published/Final report, its publication date, reporting date, revision and reported-item count, with **View** and **Open Report ↗** actions.
+
+The Latest Report card is intentionally separate from Draft Preview. Preview answers “what would be published now?” while Latest Report answers “what was most recently published?”. Full history remains available under Status Report History.
 
 Dashboard-style Demand highlights, Capacity outlook, Portfolio forecast and Allocation outlook are **not rendered above the authoring table**. They are still captured into the report snapshot and appear when Previewing or viewing the report artefact.
 
@@ -64,15 +66,7 @@ Historical reports use the values persisted at publication time. Viewing or chan
 
 ## One report renderer
 
-`app-report-renderer.js` is the authoritative report presentation implementation. It owns:
-
-- report structure;
-- report-level presentation;
-- Health semantics;
-- report Health overview;
-- scope projection;
-- Dashboard snapshot sections;
-- Demand narrative rendering.
+`app-report-renderer.js` is the authoritative report presentation implementation. It owns report structure, report-level presentation, Health semantics, report Health overview, scope projection, Dashboard snapshot sections and Demand narrative rendering.
 
 Both in-application Preview/View and the lightweight `/reports` reader delegate to this renderer. The modal and standalone page are hosts only; they do not maintain competing report HTML implementations.
 
@@ -106,6 +100,10 @@ Team
 
 Organisation-wide view always means all Teams. Selecting a specific Department enables the Team selector.
 
+The Preview/View modal owns its **own report scope state**. It always opens Organisation-wide / All teams, regardless of the page-level Department/Team filter. Changing modal Department or Team scope rerenders only the report in the modal and does not change the surrounding AMO page scope.
+
+**Open Report ↗** carries the currently selected report scope to the standalone viewer. Persisted report URLs use `department` and `team` query parameters only when a narrower scope is selected.
+
 New report snapshots persist `departmentId`, `departmentName`, `teamId` and `teamName` on report entries so the lightweight viewer can scope an immutable report without loading current organisation configuration. Historical reports without all hierarchy metadata remain viewable; available filtering is limited to metadata that was persisted at the time.
 
 Dashboard snapshots are persisted for organisation, Department and Team scopes where available. Scope projection chooses the matching persisted snapshot and filters report entries; it never reads the live Demand register.
@@ -116,17 +114,17 @@ AMO intentionally uses three user concepts:
 
 - **Preview** — view the current Draft as a report inside AMO;
 - **View** — view a Published or Final report inside AMO;
-- **Open Report** — open a persisted report in the canonical lightweight report reader.
+- **Open Report** — open the same report presentation in the canonical lightweight reader.
 
-Preview and View use the same in-application modal host and the same `AmoReportRenderer` output. A persisted Published/Final report modal contains **Open Report ↗**.
+Preview and View use the same in-application modal host and the same `AmoReportRenderer` output. Both expose **Open Report ↗**.
 
-Draft Preview has no persisted report identity, so it does not expose Open Report.
+For Published/Final reports, Open Report navigates to the persisted report route. A Draft has no persisted report identity, so Draft Open Report creates a **temporary one-time browser preview snapshot** of the exact composed Draft Preview and opens `/reports/preview`. The snapshot is held only in same-origin browser storage, expires after a short period and is removed when the standalone viewer consumes it. It is never written to Status Report History or the workspace repository.
 
-The application no longer provides dedicated **Copy Link**, **Copy Local Link**, **Print / Save PDF**, **Maximize** or generated standalone-window actions for reports. Browser-native address copying and printing remain available where appropriate.
+The application does not provide dedicated **Copy Link**, **Copy Local Link**, **Print / Save PDF** or **Maximize** report actions. Browser-native address copying and printing remain available where appropriate.
 
-## Canonical report route
+## Canonical report routes
 
-Published and Final reports have the canonical route:
+Published and Final reports use:
 
 ```text
 /reports/{reportId}
@@ -138,7 +136,19 @@ For example:
 /reports/SR-20260828-153012
 ```
 
-The route opens a lightweight report-only page. It does **not** call the AMO workspace `loadWorkspace()` path and therefore does not run workspace migrations, safety backups, archive maintenance, autosave or normal workspace startup. It resolves exactly one report through `WorkspaceRepository.getStatusReport(id)` and renders it with `AmoReportRenderer`.
+A scoped persisted view can carry the report-only projection:
+
+```text
+/reports/SR-20260828-153012?department=DEPT-ARCH&team=TEAM-DATA
+```
+
+Draft Preview opens through:
+
+```text
+/reports/preview?preview={temporary-token}
+```
+
+The lightweight route does **not** call the AMO workspace `loadWorkspace()` path and therefore does not run workspace migrations, safety backups, archive maintenance, autosave or normal workspace startup. Persisted routes resolve exactly one report through `WorkspaceRepository.getStatusReport(id)`; temporary Draft routes consume the staged preview snapshot. Both render with `AmoReportRenderer`.
 
 ### Remote workspace
 
@@ -158,7 +168,7 @@ The URL does not encode a filesystem path. The report viewer reuses the remember
 
 History exposes one primary action per report: **View**. This opens the shared in-application viewer. From there the reader can choose **Open Report ↗** when a standalone report page is needed.
 
-Latest Report follows the same interaction model.
+Latest Report provides the direct shortcut to the most recent Published/Final report from the authoring page; History remains the catalogue for earlier reports.
 
 ## Collaborative draft saves
 
