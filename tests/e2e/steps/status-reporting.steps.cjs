@@ -152,7 +152,7 @@ When('I open the standalone acceptance report route', async function(){
 Then('the Status Report authoring page should be displayed', async function(){
   const view=this.page.locator('#status-report.view.active');
   await waitFor(async()=>await view.count()===1);
-  assert.equal(String(await view.locator(':scope > .hero h1').textContent()||'').trim(),'Status Report');
+  assert.equal(String(await view.locator(':scope > .hero h1').textContent()||'').trim(),'Status report');
   const headingTexts=(await view.locator(':scope > .section-title h2').allTextContents()).map(x=>x.trim());
   assert.ok(headingTexts.includes('Architecture Status Report'),'The authoring table is not presented as the Architecture Status Report.');
   assert.equal(await view.locator('#statusReportTable').count(),1,'The Status Report authoring table is missing.');
