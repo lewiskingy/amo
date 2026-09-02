@@ -21,6 +21,10 @@
     async listStatusReports(){throw new Error('listStatusReports() not implemented')}
     async getStatusReport(){throw new Error('getStatusReport() not implemented')}
     async saveStatusReport(){throw new Error('saveStatusReport() not implemented')}
+    async readActuals(){throw new Error('readActuals() not implemented')}
+    async readActualsManifest(){throw new Error('readActualsManifest() not implemented')}
+    async saveActualsSnapshot(){throw new Error('saveActualsSnapshot() not implemented')}
+    async clearActuals(){throw new Error('clearActuals() not implemented')}
     async readLock(){throw new Error('readLock() not implemented')}
     async writeLock(){throw new Error('writeLock() not implemented')}
     async deleteLock(){throw new Error('deleteLock() not implemented')}
@@ -91,6 +95,14 @@
     async getStatusReport(idOrFile){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.readJson(`status-reports/${name}`,{required:true})}
     async saveStatusReport(idOrFile,record){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.writeJson(`status-reports/${name}`,record)}
 
+    async readActuals(){return this.readJson('actuals/facts.json')}
+    async readActualsManifest(){return this.readJson('actuals/manifest.json')}
+    async saveActualsSnapshot(factsDocument,manifest){
+      if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to save Actuals.');
+      await this.writeJson('actuals/facts.json',factsDocument);await this.writeJson('actuals/manifest.json',manifest)
+    }
+    async clearActuals(){if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to clear Actuals.');await this.deletePath('actuals/facts.json');await this.deletePath('actuals/manifest.json')}
+
     async readLock(fileName='.lock.json'){return this.readJson(fileName)}
     async writeLock(record,fileName='.lock.json'){return this.writeJson(fileName,record)}
     async deleteLock(fileName='.lock.json'){return this.deletePath(fileName)}
@@ -106,7 +118,7 @@
     }
     async createSafetyBackup({name,manifest}){
       if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to create the workspace safety backup.');const backups=await this.rootHandle.getDirectoryHandle('backups',{create:true}),snapshot=await backups.getDirectoryHandle(name,{create:true});
-      await this.copyFile(await this.rootHandle.getFileHandle('workspace.json'),snapshot,'workspace.json');for(const folder of ['demand','team','allocations','ideas','config'])await this.copyJsonDirectory(snapshot,folder);
+      await this.copyFile(await this.rootHandle.getFileHandle('workspace.json'),snapshot,'workspace.json');for(const folder of ['demand','team','allocations','ideas','config','actuals'])await this.copyJsonDirectory(snapshot,folder);
       try{const reports=await this.rootHandle.getDirectoryHandle('status-reports'),draft=await reports.getFileHandle('draft.json'),dest=await snapshot.getDirectoryHandle('status-reports',{create:true});await this.copyFile(draft,dest,'draft.json')}catch(e){if(e.name!=='NotFoundError')throw e}
       const manifestHandle=await snapshot.getFileHandle('backup-manifest.json',{create:true}),w=await manifestHandle.createWritable();await w.write(jsonText(manifest));await w.close();return name
     }
