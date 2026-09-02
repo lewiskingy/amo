@@ -61,13 +61,15 @@
   function refresh(){ensureUsersNavigation();decoratePeople();decorateUsers();window.refreshAmoInformationArchitecture?.()}
   const usersContentObserver=new MutationObserver(()=>{const table=document.querySelector('#usersContent table.users-table');if(table&&!table.querySelector('[data-amo-person-link-head]'))queueMicrotask(decorateUsers)});
   function observeUsers(){const root=document.getElementById('usersContent');if(!root){setTimeout(observeUsers,100);return}usersContentObserver.observe(root,{childList:true,subtree:true});decorateUsers()}
+  const peopleObserver=new MutationObserver(()=>queueMicrotask(decoratePeople));
+  function observePeople(){const root=document.getElementById('team');if(!root)return;peopleObserver.observe(root,{childList:true,subtree:true});decoratePeople()}
 
-  const originalSwitch=window.switchView;if(typeof originalSwitch==='function'&&!originalSwitch.__amoUsersAccessIntegration){const wrapped=function(id){const result=originalSwitch.apply(this,arguments);if(id==='users'||id==='team')setTimeout(refresh,0);return result};wrapped.__amoUsersAccessIntegration=true;window.switchView=wrapped}
+  const originalSwitch=window.switchView;if(typeof originalSwitch==='function'&&!originalSwitch.__amoUsersAccessIntegration){const wrapped=function(id){const result=originalSwitch.apply(this,arguments);if(id==='users'||id==='team')queueMicrotask(refresh);return result};wrapped.__amoUsersAccessIntegration=true;window.switchView=wrapped}
   window.addEventListener('amo-workspace-connected',refresh);window.addEventListener('amo-access-changed',refresh);window.addEventListener('amo-auth-changed',refresh);
 
   function loadScript(path,marker,next){if(marker&&document.querySelector(`script[${marker}]`)){next?.();return}const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset(path):path;if(marker)s.setAttribute(marker,'true');s.onload=()=>next?.();s.onerror=()=>console.error(`Could not load ${path}`);document.head.appendChild(s)}
-  const loadPersonLink=()=>{if(window.__amoPersonUserLinkLoaded){refresh();observeUsers();return}loadScript('app-person-user-link.js','data-amo-person-user-link',()=>{refresh();observeUsers()})};
+  const loadPersonLink=()=>{if(window.__amoPersonUserLinkLoaded){refresh();observeUsers();observePeople();return}loadScript('app-person-user-link.js','data-amo-person-user-link',()=>{refresh();observeUsers();observePeople()})};
   const afterUsersLoaded=()=>{ensureUsersNavigation();window.dispatchEvent(new CustomEvent('amo-access-changed'));loadPersonLink()};
   if(document.getElementById('usersContent'))loadPersonLink();else loadScript('app-users-admin.js','data-amo-users-admin',afterUsersLoaded);
-  [50,250,750,1500].forEach(delay=>setTimeout(refresh,delay))
+  refresh();observePeople()
 })();
