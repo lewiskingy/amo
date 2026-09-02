@@ -11,6 +11,8 @@ On a push to `main`, the normal GitHub Actions workflow deploys the API and fron
 
 The durable `test-current` release marker moves only after both acceptance profiles pass. Manual Production promotion therefore continues to promote the last Test release that passed deployed acceptance tests.
 
+The deployed acceptance workflow checks out the exact `head_sha` of the completed Validate and release workflow that triggered it. When several merges are validating or deploying close together, check the acceptance job's checkout SHA before attributing a failure to the newest merge.
+
 ## Acceptance tests are part of the change
 
 The acceptance suite is part of AMO's product contract and must be reviewed whenever observable application behaviour changes. Functional, UX, navigation, API, authentication, workspace, deployment and release changes should not be considered complete until their impact on `tests/e2e/` has been assessed.
