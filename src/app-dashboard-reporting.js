@@ -1,4 +1,6 @@
-/* Shared dashboard headline metrics and immutable status-report snapshots. */
+/* Shared dashboard headline metrics and immutable status-report snapshots.
+   The live Status Report page is an authoring surface: it captures this snapshot for Preview/Publish
+   but does not render Dashboard metrics above the draft table. */
 function dashboardHeadlineSnapshot(){
   const months=planningMonths(),active=db.demand.filter(isOpenDemand);
   const unallocated=active.filter(d=>!db.allocations.some(a=>a.demandId===d.id&&a.teamMemberId)).length;
@@ -16,10 +18,8 @@ function attentionSnapshotHtml(snapshot){const rows=snapshot.attentionRequired||
 function dashboardSnapshotHtml(snapshot){return `<div class="report-dashboard-snapshot">${dashboardCardsHtml(snapshot)}<div class="split" style="margin-top:16px">${capacitySnapshotHtml(snapshot)}${attentionSnapshotHtml(snapshot)}</div></div>`}
 function ensureDashboardReportingStyles(){if(document.getElementById('dashboard-reporting-styles'))return;const s=document.createElement('style');s.id='dashboard-reporting-styles';s.textContent='.report-headline-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.report-snapshot-panel{box-shadow:none}.report-dashboard-snapshot{margin:14px 0 22px}@media(max-width:1100px){.report-headline-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.report-headline-kpis{grid-template-columns:1fr}}';document.head.appendChild(s)}
 const baseRenderDashboardHeadline=renderDashboard;renderDashboard=function(){baseRenderDashboardHeadline();const snapshot=dashboardHeadlineSnapshot(),grid=$('kpiGrid');if(grid)grid.innerHTML=dashboardCardsHtml(snapshot).replace(/^<div class="grid kpis report-headline-kpis">|<\/div>$/g,'')};
-function ensureStatusDashboardSnapshot(){ensureDashboardReportingStyles();const section=$('status-report'),table=$('statusReportTable');if(!section||!table)return;let host=$('statusDashboardSnapshot');if(!host){host=document.createElement('div');host.id='statusDashboardSnapshot';const currentHeading=[...section.querySelectorAll('.section-title h2')].find(h=>h.textContent.trim()==='Current Draft')?.closest('.section-title');if(currentHeading)section.insertBefore(host,currentHeading);else table.closest('.table-wrap')?.before(host)}host.innerHTML=`<div class="section-title"><h2>Portfolio Snapshot</h2><span class="muted">Current live position; captured when the report is published.</span></div>${dashboardSnapshotHtml(dashboardHeadlineSnapshot())}`}
-const baseRenderStatusReportingHeadline=renderStatusReporting;renderStatusReporting=function(){baseRenderStatusReportingHeadline();ensureStatusDashboardSnapshot()};
-const baseBuildPreviewReportHeadline=buildPreviewReport;buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();return report};
-const baseReportNarrativeHtmlHeadline=reportNarrativeHtml;reportNarrativeHtml=function(report){ensureDashboardReportingStyles();const base=baseReportNarrativeHtmlHeadline(report),snapshot=report.dashboardSnapshot;if(!snapshot)return base;const opening='<div class="report-card">';return base.startsWith(opening)?opening+dashboardSnapshotHtml(snapshot)+base.slice(opening.length):dashboardSnapshotHtml(snapshot)+base};
+/* Snapshot composition belongs to the report artefact, not the live authoring page. */
+const baseBuildPreviewReportHeadline=buildPreviewReport;buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();report.dashboardSnapshots=report.dashboardSnapshots||{};report.dashboardSnapshots.department=report.dashboardSnapshots.department||report.dashboardSnapshot;return report};
 ensureDashboardReportingStyles();
 
 /* Application branding and persisted workspace appearance. */
