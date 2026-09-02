@@ -11,7 +11,7 @@
   const navSections=[
     {id:'work',label:'Work',views:['demand','allocations','team']},
     {id:'planning',label:'Planning & Reporting',views:['resource','roadmap','status-report','status-history']},
-    {id:'administration',label:'Administration',views:['config','data','restore']},
+    {id:'administration',label:'Administration',views:['users','config','actuals','data','restore']},
     {id:'help',label:'Help',views:['ideas','process-overview','readme']}
   ];
   const mobileQuery=window.matchMedia('(max-width:760px)');
