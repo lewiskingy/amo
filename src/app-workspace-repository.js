@@ -21,6 +21,10 @@
     async listStatusReports(){throw new Error('listStatusReports() not implemented')}
     async getStatusReport(){throw new Error('getStatusReport() not implemented')}
     async saveStatusReport(){throw new Error('saveStatusReport() not implemented')}
+    async readActuals(){throw new Error('readActuals() not implemented')}
+    async readActualsManifest(){throw new Error('readActualsManifest() not implemented')}
+    async saveActualsSnapshot(){throw new Error('saveActualsSnapshot() not implemented')}
+    async clearActuals(){throw new Error('clearActuals() not implemented')}
     async readLock(){throw new Error('readLock() not implemented')}
     async writeLock(){throw new Error('writeLock() not implemented')}
     async deleteLock(){throw new Error('deleteLock() not implemented')}
@@ -56,7 +60,7 @@
       const p=parts(path),name=p.pop();try{const d=await this.directory(p.join('/'));await d.removeEntry(name,{recursive})}catch(e){if(!(ignoreMissing&&e.name==='NotFoundError'))throw e}
     }
     async listEntries(path,{optional=false}={}){
-      try{const d=await this.directory(path),out=[];for await(const [name,handle] of d.entries())out.push({name,kind:handle.kind,handle});return out}
+      try{const d=await this.directory(path),out=[];for await(const [name,handle] of d.entries())out.push({name,kind:handle.kind,handle});return out
       catch(e){if(optional&&e.name==='NotFoundError')return[];throw e}
     }
     async listJsonRecords(folder,{optional=false}={}){
@@ -90,6 +94,20 @@
     async listStatusReports(){const entries=await this.listEntries('status-reports',{optional:true});return entries.filter(e=>e.kind==='file'&&e.name.toLowerCase().endsWith('.json')).map(e=>e.name)}
     async getStatusReport(idOrFile){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.readJson(`status-reports/${name}`,{required:true})}
     async saveStatusReport(idOrFile,record){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.writeJson(`status-reports/${name}`,record)}
+
+    async readActuals(){return this.readJson('actuals/facts.json')}
+    async readActualsManifest(){return this.readJson('actuals/manifest.json')}
+    async saveActualsSnapshot(factsDocument,manifest){
+      if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to save Actuals.');
+      const folder=await this.directory('actuals',{create:true});
+      const token=`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+      const factsTmp=`facts.${token}.tmp`,manifestTmp=`manifest.${token}.tmp`;
+      const writeFile=async(name,data)=>{const h=await folder.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(jsonText(data));await w.close()};
+      await writeFile(factsTmp,factsDocument);await writeFile(manifestTmp,manifest);
+      const replace=async(tmpName,targetName)=>{const source=await folder.getFileHandle(tmpName),file=await source.getFile(),target=await folder.getFileHandle(targetName,{create:true}),w=await target.createWritable();await w.write(await file.arrayBuffer());await w.close();await folder.removeEntry(tmpName)};
+      try{await replace(factsTmp,'facts.json');await replace(manifestTmp,'manifest.json')}catch(e){try{await folder.removeEntry(factsTmp)}catch{}try{await folder.removeEntry(manifestTmp)}catch{}throw e}
+    }
+    async clearActuals(){if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to clear Actuals.');await this.deletePath('actuals/facts.json');await this.deletePath('actuals/manifest.json')}
 
     async readLock(fileName='.lock.json'){return this.readJson(fileName)}
     async writeLock(record,fileName='.lock.json'){return this.writeJson(fileName,record)}
