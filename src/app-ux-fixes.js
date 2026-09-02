@@ -61,3 +61,10 @@
   setTimeout(restoreTheme,150);
   setTimeout(restoreTheme,600);
 })();
+
+/* Users remain a distinct security identity from People, but the two surfaces are deliberately
+   integrated in the application shell and Person experience. */
+(function loadUsersAccessIntegration(){
+  if(document.querySelector('script[data-amo-users-access-integration]'))return;
+  const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset('app-users-access-integration.js'):'app-users-access-integration.js';s.dataset.amoUsersAccessIntegration='true';document.head.appendChild(s)
+})();
