@@ -68,26 +68,17 @@ Then('the navigation shell should be usable at the selected viewport', async fun
     assert.equal(await sidebar.isVisible(),true,'Desktop sidebar is not visible.');
   }
   const navText=String(await sidebar.locator('nav').textContent()||'');
-  for(const expected of ['Dashboard','Demand','Allocations','Resource Plan','Roadmap','Settings','Improvement Ideas','Process Guide']){
+  for(const expected of ['Dashboard','Demand','Allocations','Resource Plan','Roadmap','Users & Access','Settings','Improvement Ideas','Process Guide']){
     assert.ok(navText.includes(expected),`Navigation is missing ${expected}.`);
   }
 });
 
 Then('there should be one account identity surface', async function(){
-  const hostCount=await waitFor(async()=>{
-    const n=await this.page.locator('#amoSidebarIdentity').count();
-    return n===1?n:false;
-  },{timeout:10000});
-  assert.equal(hostCount,1,'Expected exactly one sidebar account identity host.');
-
-  const stateCount=await waitFor(async()=>{
-    const signedIn=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile').count();
-    const signedOut=await this.page.locator('#amoSidebarIdentity .amo-sidebar-signin').count();
-    const total=signedIn+signedOut;
-    return total===1?total:false;
-  },{timeout:10000});
-  assert.equal(stateCount,1,'Expected exactly one signed-in or signed-out account surface.');
-  assert.equal(await this.page.locator('.amo-sidebar-profile, .amo-sidebar-signin').count(),1,'Duplicate account/sign-in surfaces were rendered.');
+  const hostCount=await waitFor(async()=>{const n=await this.page.locator('#amoSidebarIdentity').count();return n===1?n:false},{timeout:10000});
+  assert.equal(hostCount,1,'Expected exactly one sidebar account identity surface.');
+  const stateCount=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count();
+  assert.equal(stateCount,1,'The account identity surface should contain exactly one signed-in or signed-out state.');
+  assert.equal(await this.page.locator('.amo-sidebar-profile, .amo-sidebar-signin').count(),1,'Duplicate account/sign-in states were rendered.');
 });
 
 Then('the legacy command menu should not be present', async function(){
