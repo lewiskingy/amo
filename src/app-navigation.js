@@ -166,3 +166,26 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
   if(document.querySelector('script[data-amo-ui-polish]'))return;
   const s=document.createElement('script');s.src=amoAsset('app-ui-polish.js');s.dataset.amoUiPolish='true';document.head.appendChild(s)
 })();
+
+/* Status Reporting is a first-class capability with an ordered composition chain. Keep the
+   lifecycle/Health/hierarchy model ahead of the thin report-view host so there is one predictable
+   implementation in both Local and Remote workspaces. */
+(function loadStatusReporting(){
+  const modules=[
+    ['app-status-rag-sync.js','amoStatusRagSync'],
+    ['app-status-report-collaboration.js','amoStatusReportCollaboration'],
+    ['app-organization-hierarchy.js','amoOrganizationHierarchy'],
+    ['app-organization-hierarchy-compat.js','amoOrganizationHierarchyCompat'],
+    ['app-report-renderer.js','amoReportRenderer'],
+    ['app-status-report-ui.js','amoStatusReportUi'],
+    ['app-status-report-history-compat.js','amoStatusReportHistoryCompat'],
+    ['app-status-report-deep-links.js','amoStatusReportDeepLinks']
+  ];
+  const loadAt=index=>{
+    if(index>=modules.length)return;
+    const[path,key]=modules[index],selector=`script[data-${key.replace(/[A-Z]/g,m=>`-${m.toLowerCase()}`)}]`;
+    if(document.querySelector(selector)){loadAt(index+1);return}
+    const s=document.createElement('script');s.src=amoAsset(path);s.dataset[key]='true';s.async=false;s.onload=()=>loadAt(index+1);s.onerror=()=>console.error(`Could not load ${path}`);document.head.appendChild(s)
+  };
+  loadAt(0)
+})();
