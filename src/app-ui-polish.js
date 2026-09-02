@@ -1,28 +1,38 @@
 /* Page-title hierarchy, navigation taxonomy and organisational scope polish. */
 (function initUiPolish(){
   const css=document.createElement('link');css.rel='stylesheet';css.href='app-ui-polish.css';document.head.appendChild(css);
+  const shellStyle=document.createElement('style');shellStyle.id='amo-sidebar-order-styles';shellStyle.textContent=`
+    .sidebar .amo-sidebar-identity{margin-bottom:0!important;border-bottom:0!important;padding-bottom:8px!important}
+    .sidebar .amo-drawer-utilities{margin:0 0 10px!important;padding:0 10px 14px!important;border-top:0!important;border-bottom:1px solid rgba(255,255,255,.14)!important}
+    .sidebar nav>[data-amo-nav-section="work"]{margin-top:12px!important;padding-top:12px;border-top:1px solid rgba(255,255,255,.14)}
+  `;document.head.appendChild(shellStyle);
   const scopedViews=new Set(['dashboard','demand','allocations','resource','roadmap','status-report','status-history','team']);
   const pageTitles={dashboard:'Portfolio overview',demand:'Demand',allocations:'Allocations',resource:'Resource plan',roadmap:'Roadmap','status-report':'Status report','status-history':'Status report history',team:'People'};
   const navSections=[
-    {id:'overview',label:'Overview',open:true,views:['dashboard']},
     {id:'work',label:'Work',views:['demand','allocations','team']},
-    {id:'planning',label:'Planning & Reporting',open:true,views:['resource','roadmap','status-report','status-history']},
+    {id:'planning',label:'Planning & Reporting',views:['resource','roadmap','status-report','status-history']},
     {id:'administration',label:'Administration',views:['config','data','restore']},
     {id:'help',label:'Help',views:['ideas','process-overview','readme']}
   ];
   const mobileQuery=window.matchMedia('(max-width:760px)');
+  let navigationInitialised=false;
 
   function setButtonLabel(button,label){if(!button)return;const dot=button.querySelector('.nav-dot');button.textContent='';if(dot)button.appendChild(dot);button.appendChild(document.createTextNode(label))}
-  function ensureNavSection(nav,section){let group=nav.querySelector(`[data-amo-nav-section="${section.id}"]`);if(!group){group=document.createElement('details');group.className='nav-group';group.dataset.amoNavSection=section.id;group.innerHTML=`<summary>${section.label}</summary><div class="nav-group-items"></div>`;nav.appendChild(group)}group.querySelector('summary').textContent=section.label;if(section.open)group.open=true;return group.querySelector('.nav-group-items')}
+  function ensureNavSection(nav,section){let group=nav.querySelector(`[data-amo-nav-section="${section.id}"]`);if(!group){group=document.createElement('details');group.className='nav-group';group.dataset.amoNavSection=section.id;group.innerHTML=`<summary>${section.label}</summary><div class="nav-group-items"></div>`;nav.appendChild(group)}group.querySelector('summary').textContent=section.label;return group.querySelector('.nav-group-items')}
   function activeViewId(){return document.querySelector('.view.active')?.id||'dashboard'}
   function openActiveNavGroup(){const active=document.querySelector('.sidebar .nav-btn.active')||document.querySelector(`.sidebar .nav-btn[data-view="${activeViewId()}"]`);const group=active?.closest('details.nav-group');if(group)group.open=true}
 
   function arrangeNavigation(){
     const nav=document.querySelector('.sidebar nav');if(!nav)return;const buttons=[...nav.querySelectorAll('.nav-btn')];const byView=view=>buttons.find(b=>b.dataset.view===view)||nav.querySelector(`[data-view="${view}"]`);
+    const dashboard=byView('dashboard');
     setButtonLabel(byView('config'),'Settings');setButtonLabel(byView('process-overview'),'Process Guide');setButtonLabel(byView('ideas'),'Improvement Ideas');
     navSections.forEach(section=>{const host=ensureNavSection(nav,section);section.views.forEach(view=>{const button=byView(view);if(button&&button.parentElement!==host)host.appendChild(button)})});
     [...nav.querySelectorAll('details.nav-group')].filter(g=>!g.dataset.amoNavSection).forEach(g=>{if(!g.querySelector('.nav-btn'))g.remove()});
-    const anchor=document.getElementById('primaryNavAnchor');let cursor=anchor;navSections.forEach(section=>{const group=nav.querySelector(`[data-amo-nav-section="${section.id}"]`);if(group){cursor?.after(group);cursor=group}});openActiveNavGroup()
+    const anchor=document.getElementById('primaryNavAnchor');let cursor=anchor;
+    if(dashboard){cursor?.after(dashboard);cursor=dashboard}
+    const assistant=nav.querySelector('[data-amo-assistant]');if(assistant){cursor?.after(assistant);cursor=assistant}
+    navSections.forEach(section=>{const group=nav.querySelector(`[data-amo-nav-section="${section.id}"]`);if(group){cursor?.after(group);cursor=group}});
+    if(!navigationInitialised){nav.querySelectorAll('details.nav-group').forEach(group=>{group.open=false});navigationInitialised=true}else openActiveNavGroup()
   }
 
   function scopeLabel(){try{return typeof window.scopeLabel==='function'?window.scopeLabel():'Whole organisation'}catch{return'Whole organisation'}}
@@ -43,7 +53,7 @@
     const local=shell.querySelector('[data-workspace-source="openWorkspaceBtn"]'),remote=shell.querySelector('[data-workspace-source="remoteWorkspaceBtn"]');if(local){const source=document.getElementById('openWorkspaceBtn');local.disabled=!source||source.disabled;local.textContent=source?.textContent?.replace(/\s+/g,' ').trim()||'Local workspace'}if(remote){const source=document.getElementById('remoteWorkspaceBtn');remote.disabled=!source||source.disabled;remote.textContent=source?.textContent?.replace(/\s+/g,' ').trim()||'Remote workspace'}return shell
   }
 
-  function ensureSidebarWorkspace(){const sidebar=document.querySelector('.sidebar');if(!sidebar)return null;let host=document.getElementById('amoDrawerUtilities');if(!host){host=document.createElement('div');host.id='amoDrawerUtilities';host.className='amo-drawer-utilities';host.innerHTML='<div class="amo-drawer-section-label">Workspace</div><div id="amoDrawerWorkspace"></div>';sidebar.appendChild(host)}return host}
+  function ensureSidebarWorkspace(){const sidebar=document.querySelector('.sidebar');if(!sidebar)return null;let host=document.getElementById('amoDrawerUtilities');if(!host){host=document.createElement('div');host.id='amoDrawerUtilities';host.className='amo-drawer-utilities';host.innerHTML='<div class="amo-drawer-section-label">Workspace</div><div id="amoDrawerWorkspace"></div>'}const identity=document.getElementById('amoSidebarIdentity'),brandSub=sidebar.querySelector('.brand-sub');if(identity){if(identity.nextElementSibling!==host)identity.after(host)}else if(brandSub&&brandSub.nextElementSibling!==host)brandSub.after(host);else if(!host.parentElement)sidebar.prepend(host);return host}
   function placeShellControls(){const host=ensureSidebarWorkspace(),workspace=ensureWorkspaceControl();if(!host||!workspace)return;const workspaceHost=host.querySelector('#amoDrawerWorkspace');if(workspace.parentElement!==workspaceHost)workspaceHost.appendChild(workspace);document.getElementById('commandMenuShell')?.remove()}
   function applyMobileMode(){if(!mobileQuery.matches){closeMobileNav();document.getElementById('amoPageContext')?.classList.remove('amo-scope-open');document.getElementById('amoMobileScopeToggle')?.setAttribute('aria-expanded','false')}placeShellControls()}
 
