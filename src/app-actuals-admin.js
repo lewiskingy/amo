@@ -1,0 +1,51 @@
+(function initActualsAdmin(){
+  let filterText='',filterMonth='';
+  const fmtInt=n=>Number(n||0).toLocaleString();
+  const fmtHours=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+  const fmtMoney=n=>Number(n||0).toLocaleString(undefined,{style:'currency',currency:'GBP',maximumFractionDigits:2});
+  const esc=value=>typeof escHtml==='function'?escHtml(String(value??'')):String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  async function renderActualsAdmin(){
+    const host=document.getElementById('actualsAdminContent');if(!host)return;
+    if(!window.workspaceRepository){host.innerHTML='<div class="notice">Open a workspace to view Actuals.</div>';return}
+    const local=window.workspaceRepository.mode==='local',config=window.Actuals?.settings?.()||{},stored=await window.Actuals.readStored(),manifest=stored.manifest,facts=stored.factsDocument?.facts||[],months=[...new Set(facts.map(f=>f.month))].sort().reverse();
+    const needle=filterText.trim().toLowerCase(),visible=facts.filter(f=>(!filterMonth||f.month===filterMonth)&&(!needle||[f.projectNumber,f.projectName,f.personNumber,f.personName].some(v=>String(v??'').toLowerCase().includes(needle)))).slice(0,500);
+    host.innerHTML=`
+      <div class="card"><div class="section-title" style="margin-top:0"><div><h2>Actuals Import</h2><p class="muted">Client-side YTD Oracle Actuals ingestion. Generated Actuals are not yet used by Dashboard or reporting.</p></div></div>
+      <div class="config-list">
+        <div class="config-row"><span><strong>Enabled</strong><br><span class="muted">Controls whether Actuals refresh is available.</span></span><label><input type="checkbox" id="actualsEnabled" ${config.enabled?'checked':''} ${local?'':'disabled'}> Enabled</label></div>
+        <div class="config-row"><span><strong>Actuals Folder</strong><br><span class="muted">Browser-local binding; choose the OneDrive/SharePoint synced root containing Period folders.</span></span><span>${esc(window.Actuals.sourceName()||'Not selected')} ${local?'<button class="btn" id="chooseActualsFolder">Choose folder</button>':''}</span></div>
+        <div class="config-row"><label><strong>Period folder prefix</strong><br><input class="cell-input" id="actualsPeriodPrefix" value="${esc(config.periodFolderPrefix)}" ${local?'':'disabled'}></label><label><strong>File prefix</strong><br><input class="cell-input" id="actualsFilePrefix" value="${esc(config.filePrefix)}" ${local?'':'disabled'}></label></div>
+        <div class="config-row"><label><strong>File extension</strong><br><input class="cell-input" id="actualsFileExtension" value="${esc(config.fileExtension)}" ${local?'':'disabled'}></label><label><strong>Worksheet</strong><br><input class="cell-input" id="actualsWorksheet" value="${esc(config.worksheet)}" ${local?'':'disabled'}></label></div>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">${local?'<button class="btn primary" id="saveActualsSettings">Save settings</button><button class="btn" id="refreshActuals">Refresh Actuals</button><button class="btn danger" id="clearActuals">Clear Actuals</button>':''}</div></div>
+      ${manifest?`<div class="card"><h2>Current Actuals</h2><div class="config-list">
+        <div class="config-row"><span><strong>Latest source</strong></span><span>${esc(manifest.source?.periodFolder)} / ${esc(manifest.source?.fileName)}</span></div>
+        <div class="config-row"><span><strong>Worksheet</strong></span><span>${esc(manifest.source?.worksheet)}</span></div>
+        <div class="config-row"><span><strong>Coverage</strong></span><span>${esc(manifest.import?.firstMonth||'—')} – ${esc(manifest.import?.latestMonth||'—')}</span></div>
+        <div class="config-row"><span><strong>Imported</strong></span><span>${manifest.import?.completedAt?esc(new Date(manifest.import.completedAt).toLocaleString()):'—'}</span></div>
+        <div class="config-row"><span><strong>Rows</strong></span><span>${fmtInt(manifest.import?.sourceRows)} source → ${fmtInt(manifest.import?.factRows)} facts</span></div>
+        <div class="config-row"><span><strong>Totals</strong></span><span>${fmtHours(manifest.totals?.hours)} hours · ${fmtMoney(manifest.totals?.costGbp)}</span></div>
+      </div>${(manifest.warnings||[]).map(w=>`<div class="notice">${esc(w)}</div>`).join('')}</div>`:'<div class="card"><h2>Current Actuals</h2><div class="notice">No Actuals fact table has been imported.</div></div>'}
+      <div class="card"><div class="section-title"><div><h2>Actuals fact table</h2><p class="muted">Monthly Project × Person aggregation. Showing at most 500 matching rows.</p></div></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem"><input class="cell-input" id="actualsFilterText" placeholder="Project or person…" value="${esc(filterText)}"><select class="cell-input" id="actualsFilterMonth"><option value="">All months</option>${months.map(m=>`<option value="${esc(m)}" ${filterMonth===m?'selected':''}>${esc(m)}</option>`).join('')}</select></div>
+        <div class="table-wrap"><table><thead><tr><th>Month</th><th>Project #</th><th>Project</th><th>Person #</th><th>Person</th><th class="num">Hours</th><th class="num">Cost GBP</th></tr></thead><tbody>${visible.length?visible.map(f=>`<tr><td>${esc(f.month)}</td><td>${esc(f.projectNumber)}</td><td>${esc(f.projectName)}</td><td>${esc(f.personNumber||'')}</td><td>${esc(f.personName||'')}</td><td class="num">${fmtHours(f.actualHours)}</td><td class="num">${fmtMoney(f.actualCostGbp)}</td></tr>`).join(''):'<tr><td colspan="7" class="muted">No matching Actuals facts.</td></tr>'}</tbody></table></div>
+      </div>`;
+    bind(local)
+  }
+
+  function bind(local){
+    document.getElementById('actualsFilterText')?.addEventListener('input',e=>{filterText=e.target.value;renderActualsAdmin()});
+    document.getElementById('actualsFilterMonth')?.addEventListener('change',e=>{filterMonth=e.target.value;renderActualsAdmin()});
+    if(!local)return;
+    document.getElementById('chooseActualsFolder')?.addEventListener('click',async()=>{try{await window.Actuals.chooseFolder();await renderActualsAdmin()}catch(e){if(e.name!=='AbortError')alert(e.message||e)}});
+    document.getElementById('saveActualsSettings')?.addEventListener('click',async()=>{try{
+      const next={enabled:document.getElementById('actualsEnabled').checked,periodFolderPrefix:document.getElementById('actualsPeriodPrefix').value,filePrefix:document.getElementById('actualsFilePrefix').value,fileExtension:document.getElementById('actualsFileExtension').value,worksheet:document.getElementById('actualsWorksheet').value};
+      db.settings={...db.settings,actualsImport:next};db.configFiles['settings.json']=clone(db.settings);configDirty=true;if(typeof requestAutosave==='function')requestAutosave();log?.('Actuals import settings updated.');await renderActualsAdmin()
+    }catch(e){alert(e.message||e)}});
+    document.getElementById('refreshActuals')?.addEventListener('click',async e=>{const btn=e.currentTarget;try{btn.disabled=true;btn.textContent='Refreshing…';const r=await window.Actuals.refresh({force:true});log?.(`Actuals refreshed from ${r.manifest.source.periodFolder}.`);await renderActualsAdmin()}catch(err){alert(err.message||err)}finally{btn.disabled=false}});
+    document.getElementById('clearActuals')?.addEventListener('click',async()=>{if(!confirm('Clear the generated Actuals fact table? Source settings and folder binding will be retained.'))return;try{await window.Actuals.clear();log?.('Actuals fact table cleared.');await renderActualsAdmin()}catch(e){alert(e.message||e)}})
+  }
+  window.renderActualsAdmin=renderActualsAdmin;
+  window.addEventListener('amo:actuals-updated',()=>renderActualsAdmin());window.addEventListener('amo:actuals-source-changed',()=>renderActualsAdmin());
+})();
