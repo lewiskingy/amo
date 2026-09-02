@@ -17,6 +17,26 @@ async function waitFor(fn,{timeout=5000,interval=100}={}){
   throw new Error(`Condition was not met within ${timeout}ms.`);
 }
 
+async function openNavView(world,view){
+  const page=world.page;
+  const profile=process.env.E2E_PROFILE||'desktop';
+  const sidebar=page.locator('.sidebar');
+  if(profile==='mobile'&&!await sidebar.isVisible()){
+    const toggle=page.locator('#amoMobileNavToggle');
+    await waitFor(async()=>await toggle.isVisible());
+    await toggle.click();
+    await waitFor(async()=>await sidebar.isVisible());
+  }
+  const button=page.locator(`.sidebar .nav-btn[data-view="${view}"]`);
+  await waitFor(async()=>await button.count()===1);
+  const group=button.locator('xpath=ancestor::details[1]');
+  if(await group.count()===1&&!await group.evaluate(node=>node.open)){
+    await group.locator(':scope > summary').click();
+  }
+  await button.click();
+  await waitFor(async()=>await page.locator(`#${view}.view.active`).count()===1);
+}
+
 Given('the deployed AMO Test application', function(){
   this.baseUrl=requiredEnv('E2E_BASE_URL');
   this.apiBaseUrl=requiredEnv('E2E_API_BASE_URL');
@@ -74,13 +94,73 @@ Then('the navigation shell should be usable at the selected viewport', async fun
 });
 
 Then('there should be one account identity surface', async function(){
-  const hostCount=await waitFor(async()=>{const n=await this.page.locator('#amoSidebarIdentity').count();return n===1?n:false},{timeout:10000});
+  const hostCount=await waitFor(async()=>{const n=await this.page.locator('#amoSidebarIdentity').count();return n===1?n:false},{timeout:4000});
   assert.equal(hostCount,1,'Expected exactly one sidebar account identity surface.');
-  const stateCount=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count();
-  assert.equal(stateCount,1,'The account identity surface should contain exactly one signed-in or signed-out state.');
+  await waitFor(async()=>{
+    const states=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count();
+    return states===1?states:false
+  },{timeout:4000});
+  assert.equal(await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count(),1,'The account identity surface should contain exactly one signed-in or signed-out state.');
   assert.equal(await this.page.locator('.amo-sidebar-profile, .amo-sidebar-signin').count(),1,'Duplicate account/sign-in states were rendered.');
 });
 
 Then('the legacy command menu should not be present', async function(){
   assert.equal(await this.page.locator('#commandMenuShell').count(),0,'The removed global command menu has reappeared.');
+});
+
+Then('Users & Access should be available under Administration', async function(){
+  const group=this.page.locator('.sidebar nav [data-amo-nav-section="administration"]');
+  await waitFor(async()=>await group.count()===1);
+  const button=group.locator('.nav-btn[data-view="users"]');
+  assert.equal(await button.count(),1,'Administration does not contain a Users & Access navigation item.');
+  assert.equal(String(await button.textContent()||'').trim(),'Users & Access','The Users navigation item is not labelled Users & Access.');
+});
+
+When('I open Users & Access', async function(){
+  await openNavView(this,'users');
+});
+
+Then('the Users & Access page should be displayed', async function(){
+  const view=this.page.locator('#users.view.active');
+  await waitFor(async()=>await view.count()===1);
+  assert.equal(String(await view.locator(':scope > .hero h1').textContent()||'').trim(),'Users & Access','The Users & Access page heading is incorrect.');
+});
+
+Then('the user administration surface should expose identity, access and status information', async function(){
+  const content=this.page.locator('#usersContent');
+  await waitFor(async()=>await content.count()===1);
+  const table=content.locator('table.users-table');
+  if(await table.count()===1){
+    const headings=(await table.locator('thead th').allTextContents()).map(x=>x.trim());
+    for(const expected of ['User','Company / Entra account','Google email','Access','Status']){
+      assert.ok(headings.includes(expected),`Users & Access is missing the ${expected} column.`);
+    }
+    assert.ok(headings.includes('Person'),'Users & Access does not expose the linked Person relationship.');
+  }else{
+    const text=String(await content.textContent()||'');
+    assert.ok(/Workspace not claimed|Current sign-in|not signed in/i.test(text),'Users & Access rendered neither its administration table nor an expected access/bootstrap state.');
+  }
+});
+
+When('I open People', async function(){
+  await openNavView(this,'team');
+});
+
+Then('People should expose AMO access separately from the Person record', async function(){
+  const view=this.page.locator('#team.view.active');
+  await waitFor(async()=>await view.count()===1);
+  const text=String(await view.textContent()||'');
+  assert.ok(text.includes('AMO access'),'People does not expose the Person-to-User relationship as AMO access.');
+});
+
+Then('People should provide a Manage Users & Access action', async function(){
+  const action=this.page.locator('#teamToolbar [data-manage-amo-access]');
+  await waitFor(async()=>await action.count()===1);
+  assert.equal(String(await action.textContent()||'').trim(),'Manage Users & Access','People does not provide the expected Users & Access management action.');
+});
+
+When('I choose Manage Users & Access', async function(){
+  const action=this.page.locator('#teamToolbar [data-manage-amo-access]');
+  await action.click();
+  await waitFor(async()=>await this.page.locator('#users.view.active').count()===1);
 });
