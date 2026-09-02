@@ -60,7 +60,7 @@
       const p=parts(path),name=p.pop();try{const d=await this.directory(p.join('/'));await d.removeEntry(name,{recursive})}catch(e){if(!(ignoreMissing&&e.name==='NotFoundError'))throw e}
     }
     async listEntries(path,{optional=false}={}){
-      try{const d=await this.directory(path),out=[];for await(const [name,handle] of d.entries())out.push({name,kind:handle.kind,handle});return out
+      try{const d=await this.directory(path),out=[];for await(const [name,handle] of d.entries())out.push({name,kind:handle.kind,handle});return out}
       catch(e){if(optional&&e.name==='NotFoundError')return[];throw e}
     }
     async listJsonRecords(folder,{optional=false}={}){
