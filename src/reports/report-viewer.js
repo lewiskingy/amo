@@ -2,12 +2,14 @@
    loading the AMO workspace, then delegates all presentation and scope projection to AmoReportRenderer. */
 (function initReportViewer(){
   const WORKSPACE_DB_NAME='amo-browser-state',WORKSPACE_DB_VERSION=1,WORKSPACE_STORE='handles',DEFAULT_WORKSPACE_KEY='defaultWorkspace';
-  const REMOTE_URL_KEY='amo.remoteWorkspaceUrl',DEFAULT_REMOTE_URL='https://api.amo.theflat.me.uk',ORG='organization',ALL='department';
+  const REMOTE_URL_KEY='amo.remoteWorkspaceUrl',DEFAULT_REMOTE_URL='https://api.amo.theflat.me.uk',ORG='organization',ALL='department',PREVIEW_PREFIX='amo.statusReportPreview.',PREVIEW_TTL_MS=10*60*1000;
   const $=id=>document.getElementById(id);
   const query=new URLSearchParams(location.search),pathParts=location.pathname.split('/').filter(Boolean);
   const reportId=decodeURIComponent(query.get('id')||(pathParts[0]==='reports'&&pathParts[1]?pathParts[1]:''));
+  const previewToken=query.get('preview')||'';
   const source=(query.get('source')||'remote').toLowerCase()==='local'?'local':'remote';
-  let currentReport=null,currentScope={departmentId:ORG,teamId:ALL};
+  const requestedScope={departmentId:query.get('department')||ORG,teamId:query.get('team')||ALL};
+  let currentReport=null,currentScope={...requestedScope};
 
   function setState(message,{error=false}={}){const el=$('reportViewerState');if(!el)return;el.hidden=false;el.innerHTML=error?`<span>${escapeHtml(message)}</span>`:`<span class="report-viewer-spinner" aria-hidden="true"></span>${escapeHtml(message)}`}
   function hideState(){if($('reportViewerState'))$('reportViewerState').hidden=true}
@@ -22,6 +24,14 @@
   async function rememberedLocalRepository({request=false}={}){const handle=await rememberedHandle();if(!handle)return null;const p=await permission(handle,'read');if(p==='granted')return new LocalWorkspaceRepository(handle);if(request&&await requestPermission(handle,'read'))return new LocalWorkspaceRepository(handle);return null}
   async function loadRemote(){return new RemoteWorkspaceRepository(remoteBaseUrl()).getStatusReport(reportId)}
   async function loadFromRepo(repo){return repo?repo.getStatusReport(reportId):null}
+  function loadPreview(){
+    if(!previewToken)throw new Error('No Draft Preview token was supplied.');const key=`${PREVIEW_PREFIX}${previewToken}`;let raw='';
+    try{raw=localStorage.getItem(key)||'';localStorage.removeItem(key)}catch(_e){throw new Error('This browser could not read the temporary Draft Preview.')}
+    if(!raw)throw new Error('This Draft Preview is no longer available. Open Preview again from the Status Report page.');
+    let record;try{record=JSON.parse(raw)}catch(_e){throw new Error('The temporary Draft Preview is invalid.')}
+    if(!record?.createdAt||Date.now()-Number(record.createdAt)>PREVIEW_TTL_MS||!record.report)throw new Error('This Draft Preview has expired. Open Preview again from the Status Report page.');
+    return record.report
+  }
 
   function showReconnect(message){
     hideState();const host=$('reportViewerReconnect');host.hidden=false;host.innerHTML=`<h2>Reconnect Local Workspace</h2><p>${escapeHtml(message)}</p><p class="muted">The report address identifies the report, but browser security does not allow a URL to reopen a local folder by path. AMO can reuse the workspace remembered by this browser, or you can choose it again.</p><div class="toolbar"><button class="btn primary" id="reconnectLocalReport">Reconnect Remembered</button><button class="btn" id="chooseLocalReportWorkspace">Choose Workspace</button></div>`;
@@ -40,10 +50,13 @@
     const dep=catalog.departments.find(d=>d.id===currentScope.departmentId),team=catalog.teams.find(t=>t.id===currentScope.teamId);
     return{departmentId:currentScope.departmentId,teamId:currentScope.teamId,departmentName:dep?.name||'',teamName:team?.name||'',label:currentScope.departmentId===ORG?'Whole organisation':currentScope.teamId===ALL?(dep?.name||'Whole department'):[dep?.name,team?.name].filter(Boolean).join(' · ')}
   }
+  function normalizeScope(catalog){
+    if(currentScope.departmentId!==ORG&&!catalog.departments.some(d=>d.id===currentScope.departmentId))currentScope={departmentId:ORG,teamId:ALL};
+    if(currentScope.teamId!==ALL&&!catalog.teams.some(t=>t.id===currentScope.teamId&&(!t.departmentId||t.departmentId===currentScope.departmentId)))currentScope.teamId=ALL
+  }
   function renderScopeControls(report){
     const host=$('reportViewerScope'),catalog=scopeCatalog(report);if(!host)return catalog;
-    if(!catalog.departments.length&&!catalog.teams.length){host.hidden=true;return catalog}
-    if(currentScope.departmentId!==ORG&&!catalog.departments.some(d=>d.id===currentScope.departmentId))currentScope={departmentId:ORG,teamId:ALL};
+    if(!catalog.departments.length&&!catalog.teams.length){host.hidden=true;return catalog}normalizeScope(catalog);
     const depOptions=`<option value="${ORG}" ${currentScope.departmentId===ORG?'selected':''}>Organisation-wide</option>${catalog.departments.map(d=>`<option value="${escapeHtml(d.id)}" ${currentScope.departmentId===d.id?'selected':''}>${escapeHtml(d.name)}</option>`).join('')}`;
     const available=currentScope.departmentId===ORG?[]:catalog.teams.filter(t=>!t.departmentId||t.departmentId===currentScope.departmentId);
     const teamOptions=currentScope.departmentId===ORG?'<option value="department">All teams</option>':`<option value="${ALL}" ${currentScope.teamId===ALL?'selected':''}>Whole department</option>${available.map(t=>`<option value="${escapeHtml(t.id)}" ${currentScope.teamId===t.id?'selected':''}>${escapeHtml(t.name)}</option>`).join('')}`;
@@ -52,18 +65,19 @@
     $('reportTeam').onchange=e=>{currentScope.teamId=e.target.value;render(currentReport,{preserveState:true})};return catalog
   }
   function render(report,{preserveState=false}={}){
-    if(!report)throw new Error(`Report ${reportId} was not found.`);currentReport=report;hideState();$('reportViewerReconnect').hidden=true;document.title=`${report.reportingDate||report.id||reportId} · AMO Status Report`;
-    if(!preserveState)currentScope={departmentId:ORG,teamId:ALL};const catalog=renderScopeControls(report);
+    if(!report)throw new Error(`Report ${reportId} was not found.`);currentReport=report;hideState();$('reportViewerReconnect').hidden=true;document.title=`${report.reportingDate||report.id||'Draft Preview'} · AMO Status Report`;
+    if(!preserveState)currentScope={...requestedScope};const catalog=renderScopeControls(report);
     $('reportViewerContent').innerHTML=AmoReportRenderer.renderReport(report,{scope:scopeInfo(catalog),catalog})
   }
   async function start(){
-    if(!reportId){setState('No report ID was supplied in the URL.',{error:true});return}
     try{
+      if(previewToken){setState('Opening Draft Preview…');render(loadPreview());return}
+      if(!reportId){setState('No report ID was supplied in the URL.',{error:true});return}
       if(source==='local'){
         setState(`Opening ${reportId} from the remembered local workspace…`);const repo=await rememberedLocalRepository();if(!repo){showReconnect('Local workspace permission is required before this report can be opened.');return}render(await loadFromRepo(repo));return
       }
       setState(`Loading ${reportId}…`);render(await loadRemote())
-    }catch(e){if(source==='local'){showReconnect(e.message||`Could not open ${reportId} from the local workspace.`);return}setState(e.message||`Could not load ${reportId}.`,{error:true})}
+    }catch(e){if(source==='local'&&!previewToken){showReconnect(e.message||`Could not open ${reportId} from the local workspace.`);return}setState(e.message||`Could not load ${reportId||'Draft Preview'}.`,{error:true})}
   }
   start();
 })();
