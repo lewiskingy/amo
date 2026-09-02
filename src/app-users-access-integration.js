@@ -67,6 +67,7 @@
 
   function loadScript(path,marker,next){if(marker&&document.querySelector(`script[${marker}]`)){next?.();return}const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset(path):path;if(marker)s.setAttribute(marker,'true');s.onload=()=>next?.();s.onerror=()=>console.error(`Could not load ${path}`);document.head.appendChild(s)}
   const loadPersonLink=()=>{if(window.__amoPersonUserLinkLoaded){refresh();observeUsers();return}loadScript('app-person-user-link.js','data-amo-person-user-link',()=>{refresh();observeUsers()})};
-  if(document.getElementById('usersContent'))loadPersonLink();else loadScript('app-users-admin.js','data-amo-users-admin',loadPersonLink);
+  const afterUsersLoaded=()=>{ensureUsersNavigation();window.dispatchEvent(new CustomEvent('amo-access-changed'));loadPersonLink()};
+  if(document.getElementById('usersContent'))loadPersonLink();else loadScript('app-users-admin.js','data-amo-users-admin',afterUsersLoaded);
   [50,250,750,1500].forEach(delay=>setTimeout(refresh,delay))
 })();
