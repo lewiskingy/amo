@@ -49,7 +49,7 @@ Then('the backend version and API contract should match the deployed candidate',
   const expectedBackend=requiredEnv('E2E_EXPECTED_BACKEND_VERSION');
   const expectedApi=requiredEnv('E2E_EXPECTED_API_VERSION');
   const response=await fetch(`${this.apiBaseUrl}/api/info`,{headers:{Accept:'application/json'}});
-  assert.ok(response.ok(),`AMO API info returned HTTP ${response.status()}.`);
+  assert.ok(response.ok,`AMO API info returned HTTP ${response.status}.`);
   const info=await response.json();
   assert.equal(info.product,'AMO');
   assert.equal(String(info.backendVersion||''),expectedBackend,`Expected backend ${expectedBackend}, received ${info.backendVersion||'not reported'}.`);
@@ -74,12 +74,20 @@ Then('the navigation shell should be usable at the selected viewport', async fun
 });
 
 Then('there should be one account identity surface', async function(){
-  const count=await waitFor(async()=>{
-    const n=await this.page.locator('#amoSidebarIdentity [data-amo-auth-profile]').count();
+  const hostCount=await waitFor(async()=>{
+    const n=await this.page.locator('#amoSidebarIdentity').count();
     return n===1?n:false;
   },{timeout:10000});
-  assert.equal(count,1,'Expected exactly one account/sign-in surface.');
-  assert.equal(await this.page.locator('[data-amo-auth-profile]').count(),1,'Duplicate account/sign-in surfaces were rendered.');
+  assert.equal(hostCount,1,'Expected exactly one sidebar account identity host.');
+
+  const stateCount=await waitFor(async()=>{
+    const signedIn=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile').count();
+    const signedOut=await this.page.locator('#amoSidebarIdentity .amo-sidebar-signin').count();
+    const total=signedIn+signedOut;
+    return total===1?total:false;
+  },{timeout:10000});
+  assert.equal(stateCount,1,'Expected exactly one signed-in or signed-out account surface.');
+  assert.equal(await this.page.locator('.amo-sidebar-profile, .amo-sidebar-signin').count(),1,'Duplicate account/sign-in surfaces were rendered.');
 });
 
 Then('the legacy command menu should not be present', async function(){
