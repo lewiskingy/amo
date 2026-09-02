@@ -76,19 +76,29 @@ Then('the modal report scope should start organisation-wide', async function(){
 });
 
 When('I scope the modal report to Department Alpha and Team Alpha One', async function(){
-  const department=this.page.locator('#recordModalBackdrop.open #statusModalDepartment');
-  const team=this.page.locator('#recordModalBackdrop.open #statusModalTeam');
-  await waitFor(async()=>await department.count()===1&&await team.count()===1&&await department.isVisible()&&await team.isVisible());
-  const departmentValues=await department.locator('option').evaluateAll(options=>options.map(option=>option.value));
-  assert.ok(departmentValues.includes('DEPT-A'),'Modal Department scope does not offer Department Alpha.');
-  await department.evaluate(element=>{element.value='DEPT-A';element.dispatchEvent(new Event('change',{bubbles:true}))});
-  await waitFor(async()=>await department.inputValue()==='DEPT-A'&&!await team.isDisabled());
-  const teamValues=await team.locator('option').evaluateAll(options=>options.map(option=>option.value));
-  assert.ok(teamValues.includes('TEAM-A1'),'Modal Team scope does not offer Team Alpha One after selecting Department Alpha.');
-  await team.evaluate(element=>{element.value='TEAM-A1';element.dispatchEvent(new Event('change',{bubbles:true}))});
-  await waitFor(async()=>await team.inputValue()==='TEAM-A1');
-  const report=await modalReport(this.page);
-  await waitFor(async()=>{const text=String(await report.textContent()||'');return text.includes('Demand Alpha')&&!text.includes('Demand Beta')});
+  const result=await this.page.evaluate(()=>{
+    const department=document.querySelector('#recordModalBackdrop.open #statusModalDepartment');
+    const team=document.querySelector('#recordModalBackdrop.open #statusModalTeam');
+    if(!department||!team)return{error:'Modal scope controls are missing.'};
+    const departmentValues=[...department.options].map(option=>option.value);
+    if(!departmentValues.includes('DEPT-A'))return{error:'Modal Department scope does not offer Department Alpha.',departmentValues};
+    department.value='DEPT-A';
+    department.dispatchEvent(new Event('change',{bubbles:true}));
+    const teamValues=[...team.options].map(option=>option.value);
+    if(team.disabled)return{error:'Modal Team scope remained disabled after selecting Department Alpha.',departmentValue:department.value,teamValues};
+    if(!teamValues.includes('TEAM-A1'))return{error:'Modal Team scope does not offer Team Alpha One after selecting Department Alpha.',departmentValue:department.value,teamValues};
+    team.value='TEAM-A1';
+    team.dispatchEvent(new Event('change',{bubbles:true}));
+    const reportText=String(document.querySelector('#recordModalBackdrop.open #statusModalReportContent .shared-report-renderer')?.textContent||'');
+    return{departmentValue:department.value,teamValue:team.value,teamDisabled:team.disabled,teamValues,reportText};
+  });
+  assert.equal(result.error,undefined,result.error||'Modal scope interaction failed.');
+  assert.equal(result.departmentValue,'DEPT-A','Modal Department scope did not remain on Department Alpha.');
+  assert.equal(result.teamDisabled,false,'Modal Team scope remained disabled after selecting Department Alpha.');
+  assert.ok(result.teamValues.includes('TEAM-A1'),'Modal Team scope does not offer Team Alpha One after selecting Department Alpha.');
+  assert.equal(result.teamValue,'TEAM-A1','Modal Team scope did not remain on Team Alpha One.');
+  assert.ok(result.reportText.includes('Demand Alpha'),'Modal Team scope did not render Demand Alpha.');
+  assert.ok(!result.reportText.includes('Demand Beta'),'Modal Team scope still rendered Demand Beta.');
 });
 
 Then('the modal report should contain only Demand Alpha', async function(){
