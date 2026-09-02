@@ -49,14 +49,15 @@
   }
 
   if(typeof teamCols!=='undefined'){
-    if(!teamCols.some(col=>col.key==='userId'))teamCols.splice(1,0,{key:'userId',label:'AMO User',type:'text',editable:false});
+    if(!teamCols.some(col=>col.key==='userId'))teamCols.splice(1,0,{key:'userId',label:'AMO access',type:'text',editable:false});
+    else{const accessCol=teamCols.find(col=>col.key==='userId');if(accessCol)accessCol.label='AMO access'}
     const nameIndex=teamCols.findIndex(col=>col.key==='name');
     if(!teamCols.some(col=>col.key==='email'))teamCols.splice(nameIndex>=0?nameIndex+1:2,0,{key:'email',label:'Company / Entra Email',type:'text',editable:true})
   }
 
   if(typeof displayVal==='function'){
     const baseDisplay=displayVal;displayVal=function(row,col){
-      if(col?.key==='userId')return row?.userId?userLabel(userById(row.userId)):'Not linked';
+      if(col?.key==='userId')return row?.userId?userLabel(userById(row.userId)):'No application access';
       if(row?.userId&&col?.key==='name')return clean(userById(row.userId)?.displayName)||baseDisplay(row,col);
       if(row?.userId&&col?.key==='email')return clean(userById(row.userId)?.companyAccount)||baseDisplay(row,col);
       return baseDisplay(row,col)
@@ -67,7 +68,7 @@
     const baseEdit=editControl;editControl=function(row,col){
       if(row?.userId&&(col?.key==='name'||col?.key==='email')){
         const value=col.key==='name'?clean(userById(row.userId)?.displayName)||clean(row.name):clean(userById(row.userId)?.companyAccount)||clean(row.email);
-        return`<input class="cell-input" type="text" value="${typeof escHtml==='function'?escHtml(value):value}" disabled title="Managed from the linked AMO User">`
+        return`<input class="cell-input" type="text" value="${typeof escHtml==='function'?escHtml(value):value}" disabled title="Managed from the linked AMO access identity">`
       }
       return baseEdit(row,col)
     }
@@ -77,8 +78,8 @@
     renderTeamModal=function(r){
       const linked=userById(r.userId),roles=[{value:'',label:'Unassigned'},...(typeof configuredRoles==='function'?configuredRoles():[]).map(role=>({value:role.id,label:role.name}))];
       if(linked)applyUserIdentity(r);
-      const managed=!!linked,identityNote=managed?'<div class="field full"><div class="notice">Name and Company / Entra Email are managed from the linked AMO User. Unlink the User to edit them manually.</div></div>':'<div class="field full"><div class="muted">No AMO User is required. Company / Entra Email can be maintained manually until this Person is linked.</div></div>';
-      return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('AMO User','userId',r.userId||'','select',userOptions())}${modalField('Name','name',r.name,'text',null,true,false,managed)}${modalField('Company / Entra Email','email',r.email||'','email',null,false,false,managed)}${identityNote}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`
+      const managed=!!linked,identityNote=managed?'<div class="field full"><div class="notice">Name and Company / Entra Email are managed from the linked AMO access identity. Roles and authentication mappings are managed under Users & Access.</div></div>':'<div class="field full"><div class="muted">This Person does not currently have application access. Link an existing User here, or use Users & Access to grant and manage access.</div></div>';
+      return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('AMO access','userId',r.userId||'','select',userOptions())}${modalField('Name','name',r.name,'text',null,true,false,managed)}${modalField('Company / Entra Email','email',r.email||'','email',null,false,false,managed)}${identityNote}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`
     }
   }
 
