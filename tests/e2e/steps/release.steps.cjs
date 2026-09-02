@@ -17,6 +17,21 @@ async function waitFor(fn,{timeout=5000,interval=100}={}){
   throw new Error(`Condition was not met within ${timeout}ms.`);
 }
 
+async function fetchJsonWithRetry(url,{attempts=2,timeout=4000,delay=500}={}){
+  let lastError;
+  for(let attempt=1;attempt<=attempts;attempt++){
+    try{
+      const response=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(timeout)});
+      if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    }catch(error){
+      lastError=error;
+      if(attempt<attempts)await new Promise(resolve=>setTimeout(resolve,delay));
+    }
+  }
+  throw new Error(`Could not read ${url} after ${attempts} attempts: ${lastError?.message||lastError}`);
+}
+
 async function ensureMobileNavOpen(page){
   const toggle=page.locator('#amoMobileNavToggle');
   await waitFor(async()=>await toggle.isVisible());
@@ -76,9 +91,7 @@ Then('the client version should match the deployed candidate', async function(){
 Then('the backend version and API contract should match the deployed candidate', async function(){
   const expectedBackend=requiredEnv('E2E_EXPECTED_BACKEND_VERSION');
   const expectedApi=requiredEnv('E2E_EXPECTED_API_VERSION');
-  const response=await fetch(`${this.apiBaseUrl}/api/info`,{headers:{Accept:'application/json'}});
-  assert.ok(response.ok,`AMO API info returned HTTP ${response.status}.`);
-  const info=await response.json();
+  const info=await fetchJsonWithRetry(`${this.apiBaseUrl}/api/info`);
   assert.equal(info.product,'AMO');
   assert.equal(String(info.backendVersion||''),expectedBackend,`Expected backend ${expectedBackend}, received ${info.backendVersion||'not reported'}.`);
   assert.equal(String(info.apiVersion||''),expectedApi,`Expected API contract ${expectedApi}, received ${info.apiVersion||'not reported'}.`);
