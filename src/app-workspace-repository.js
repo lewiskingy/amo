@@ -99,13 +99,7 @@
     async readActualsManifest(){return this.readJson('actuals/manifest.json')}
     async saveActualsSnapshot(factsDocument,manifest){
       if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to save Actuals.');
-      const folder=await this.directory('actuals',{create:true});
-      const token=`${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-      const factsTmp=`facts.${token}.tmp`,manifestTmp=`manifest.${token}.tmp`;
-      const writeFile=async(name,data)=>{const h=await folder.getFileHandle(name,{create:true}),w=await h.createWritable();await w.write(jsonText(data));await w.close()};
-      await writeFile(factsTmp,factsDocument);await writeFile(manifestTmp,manifest);
-      const replace=async(tmpName,targetName)=>{const source=await folder.getFileHandle(tmpName),file=await source.getFile(),target=await folder.getFileHandle(targetName,{create:true}),w=await target.createWritable();await w.write(await file.arrayBuffer());await w.close();await folder.removeEntry(tmpName)};
-      try{await replace(factsTmp,'facts.json');await replace(manifestTmp,'manifest.json')}catch(e){try{await folder.removeEntry(factsTmp)}catch{}try{await folder.removeEntry(manifestTmp)}catch{}throw e}
+      await this.writeJson('actuals/facts.json',factsDocument);await this.writeJson('actuals/manifest.json',manifest)
     }
     async clearActuals(){if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to clear Actuals.');await this.deletePath('actuals/facts.json');await this.deletePath('actuals/manifest.json')}
 
