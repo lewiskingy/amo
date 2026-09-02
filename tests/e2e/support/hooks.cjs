@@ -1,7 +1,12 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
-const { BeforeAll, AfterAll, Before, After, Status } = require('@cucumber/cucumber');
+const { BeforeAll, AfterAll, Before, After, Status, setDefaultTimeout } = require('@cucumber/cucumber');
+
+/* Deployed acceptance exercises real browser navigation and remote startup. Keep individual
+   assertions bounded, but do not let Cucumber's 5s default terminate a step before those
+   explicit waits can report the actual failure. */
+setDefaultTimeout(15000);
 
 let browser;
 
