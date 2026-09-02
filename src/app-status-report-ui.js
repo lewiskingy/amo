@@ -51,17 +51,25 @@
     const available=catalog.teams.filter(t=>!t.departmentId||t.departmentId===modalScope.departmentId);
     return `<option value="${ALL}" ${modalScope.teamId===ALL?'selected':''}>Whole department</option>${available.map(t=>`<option value="${escHtml(t.id)}" ${modalScope.teamId===t.id?'selected':''}>${escHtml(t.name)}</option>`).join('')}`
   }
+  function normalizeModalScope(catalog){
+    if(modalScope.departmentId!==ORG&&!catalog.departments.some(d=>d.id===modalScope.departmentId))modalScope={departmentId:ORG,teamId:ALL};
+    if(modalScope.teamId!==ALL&&!catalog.teams.some(t=>t.id===modalScope.teamId&&(!t.departmentId||t.departmentId===modalScope.departmentId)))modalScope.teamId=ALL
+  }
+  function renderScopedReport(catalog=reportCatalog()){
+    normalizeModalScope(catalog);const content=$('statusModalReportContent');if(content)content.innerHTML=AmoReportRenderer.renderReport(modalReport,{scope:scopeInfo(catalog),catalog})
+  }
+  function refreshTeamControl(catalog=reportCatalog()){
+    normalizeModalScope(catalog);const team=$('statusModalTeam');if(!team)return;team.disabled=modalScope.departmentId===ORG;team.innerHTML=teamOptions(catalog);team.value=modalScope.teamId
+  }
   function close(){modalReport=null;document.querySelector('#recordModalBackdrop .record-modal')?.classList.remove('status-modal');if(typeof closeRecordModal==='function')closeRecordModal();else $('recordModalBackdrop')?.classList.remove('open')}
   async function renderModal(){
-    if(!modalReport)return;await ensureRenderer();ensureRendererStyles();const catalog=reportCatalog();
-    if(modalScope.departmentId!==ORG&&!catalog.departments.some(d=>d.id===modalScope.departmentId))modalScope={departmentId:ORG,teamId:ALL};
-    if(modalScope.teamId!==ALL&&!catalog.teams.some(t=>t.id===modalScope.teamId&&(!t.departmentId||t.departmentId===modalScope.departmentId)))modalScope.teamId=ALL;
+    if(!modalReport)return;await ensureRenderer();ensureRendererStyles();const catalog=reportCatalog();normalizeModalScope(catalog);
     const body=$('recordModalBody'),actions=$('recordModalActions'),title=$('recordModalTitle'),subtitle=$('recordModalSubtitle'),modal=document.querySelector('#recordModalBackdrop .record-modal');if(!body||!actions||!modal)return;
     modal.classList.add('status-modal');if(title)title.textContent=draftPreview(modalReport)?'Status Report Preview':'Status Report';if(subtitle)subtitle.textContent=draftPreview(modalReport)?'Preview of the current working draft':`${modalReport.id||''} · ${modalReport.reportingDate||''} · ${modalReport.status||''}`;
     body.innerHTML=`<div class="status-modal-toolbar"><div class="status-scope-controls"><label><span>Department</span><select id="statusModalDepartment">${departmentOptions(catalog)}</select></label><label><span>Team</span><select id="statusModalTeam" ${modalScope.departmentId===ORG?'disabled':''}>${teamOptions(catalog)}</select></label></div><button class="btn" id="statusOpenReport">Open Report ↗</button></div><div id="statusModalReportContent">${AmoReportRenderer.renderReport(modalReport,{scope:scopeInfo(catalog),catalog})}</div>`;
     actions.innerHTML='<button class="btn" id="closeStatusReport">Close</button>';
-    $('statusModalDepartment')?.addEventListener('change',e=>{modalScope.departmentId=e.target.value;modalScope.teamId=ALL;renderModal()});
-    $('statusModalTeam')?.addEventListener('change',e=>{modalScope.teamId=e.target.value;renderModal()});
+    $('statusModalDepartment')?.addEventListener('change',e=>{modalScope.departmentId=e.target.value;modalScope.teamId=ALL;const nextCatalog=reportCatalog();refreshTeamControl(nextCatalog);renderScopedReport(nextCatalog)});
+    $('statusModalTeam')?.addEventListener('change',e=>{modalScope.teamId=e.target.value;renderScopedReport(reportCatalog())});
     $('statusOpenReport')?.addEventListener('click',()=>openReportWindow(modalReport,modalScope));
     $('closeStatusReport')?.addEventListener('click',close)
   }
