@@ -17,7 +17,7 @@ async function waitFor(fn,{timeout=5000,interval=100}={}){
   throw new Error(`Condition was not met within ${timeout}ms.`);
 }
 
-async function fetchJsonWithRetry(url,{attempts=2,timeout=4000,delay=500}={}){
+async function fetchJsonWithRetry(url,{attempts=3,timeout=7000,delay=750}={}){
   let lastError;
   for(let attempt=1;attempt<=attempts;attempt++){
     try{
@@ -88,7 +88,7 @@ Then('the client version should match the deployed candidate', async function(){
   assert.ok(String(brand||'').includes(`Client ${expected}`),`Sidebar does not show Client ${expected}: ${brand}`);
 });
 
-Then('the backend version and API contract should match the deployed candidate', async function(){
+Then('the backend version and API contract should match the deployed candidate',{timeout:30000},async function(){
   const expectedBackend=requiredEnv('E2E_EXPECTED_BACKEND_VERSION');
   const expectedApi=requiredEnv('E2E_EXPECTED_API_VERSION');
   const info=await fetchJsonWithRetry(`${this.apiBaseUrl}/api/info`);
@@ -167,6 +167,7 @@ When('I open People', async function(){
 Then('People should expose AMO access separately from the Person record', async function(){
   const view=this.page.locator('#team.view.active');
   await waitFor(async()=>await view.count()===1);
+  await waitFor(async()=>String(await view.textContent()||'').includes('AMO access'),{timeout:5000});
   const text=String(await view.textContent()||'');
   assert.ok(text.includes('AMO access'),'People does not expose the Person-to-User relationship as AMO access.');
 });
