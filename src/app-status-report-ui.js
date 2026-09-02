@@ -55,6 +55,7 @@
 
   function focusAuthoringPage(){
     const section=$('status-report');if(!section)return;
+    const title=section.querySelector(':scope > .hero h1');if(title)title.textContent='Status Report';
     $('statusDashboardSnapshot')?.remove();
     [...section.querySelectorAll(':scope > .section-title')].forEach(x=>{const h=x.querySelector('h2')?.textContent.trim();if(h==='Portfolio Snapshot'||h==='Demand highlights'||h==='Capacity outlook'||h==='Portfolio forecast'||h==='Allocation outlook')x.remove()});
     const current=[...section.querySelectorAll('.section-title h2')].find(h=>h.textContent.trim()==='Current Draft');if(current)current.textContent='Architecture Status Report';

@@ -28,6 +28,13 @@ async function applicationShell(request,env,url,path){
   })
 }
 
+function isReportDeepLink(pathname){
+  const match=pathname.match(/^\/reports\/([^/]+)\/?$/);
+  if(!match)return false;
+  // Files such as /reports/report-viewer.js and .css are static assets, not report IDs.
+  return !match[1].includes('.')
+}
+
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
@@ -38,7 +45,7 @@ export default {
     if(url.pathname==='/'||url.pathname==='/index.html'){
       return applicationShell(request,env,url,'/index.html')
     }
-    if(/^\/reports\/[^/]+\/?$/.test(url.pathname)){
+    if(isReportDeepLink(url.pathname)){
       return applicationShell(request,env,url,'/reports/index.html')
     }
     return env.ASSETS.fetch(request)
