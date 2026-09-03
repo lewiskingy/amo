@@ -49,7 +49,10 @@ const context={
 };
 vm.createContext(context);vm.runInContext(code,context);const rm=context.window.ReportingModel;
 (async()=>{
+  assert.equal(rm.loadState().loaded,false);
   await rm.load();
+  assert.equal(rm.loadState().loaded,true);
+  assert.deepEqual(Array.from(rm.loadState().months),['2026-07']);
   assert.equal(rm.actualsAvailable('2026-07-01'),true);
   assert.equal(rm.actualsAvailable('2026-08-01'),false);
   assert.equal(rm.periodBasis('2026-07-01'),'actual');
