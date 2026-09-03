@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'server/**'
       - 'infra/**'
+      - 'tests/**'
       - 'worker.js'
       - 'wrangler.jsonc'
       - '.github/workflows/deploy-api.yml'
@@ -16,10 +17,10 @@ on:
       - 'src/**'
       - 'server/**'
       - 'infra/**'
+      - 'tests/**'
       - 'worker.js'
       - 'wrangler.jsonc'
       - '.github/workflows/deploy-api.yml'
-      - 'tests/e2e/**'
       - 'package.json'
       - '.github/workflows/acceptance.yml'
   workflow_dispatch:
@@ -59,6 +60,13 @@ jobs:
           for file in src/*.js worker.js; do
             node --check "$file"
           done
+
+      - name: Run Actuals and reporting model tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/actuals-import.test.js
+          node tests/reporting-model.test.js
 
   deploy-api:
     name: Deploy API · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
