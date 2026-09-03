@@ -69,7 +69,16 @@ When('I open the application', async function(){
   const response=await this.page.goto(this.baseUrl,{waitUntil:'domcontentloaded'});
   assert.ok(response,`No response received from ${this.baseUrl}`);
   assert.ok(response.ok(),`AMO returned HTTP ${response.status()} from ${this.baseUrl}`);
-  await this.page.waitForLoadState('networkidle',{timeout:10000}).catch(()=>{});
+  /* AMO deliberately continues authentication, dynamic-module and optional remote-workspace network
+     activity after DOMContentLoaded. Network-idle is therefore not an application-readiness signal.
+     Wait for the stable application shell and deployment config that every scenario actually uses. */
+  await waitFor(async()=>{
+    const shell=await this.page.locator('.app').count()===1;
+    const dashboard=await this.page.locator('#dashboard.view.active').count()===1;
+    const nav=await this.page.locator('.sidebar nav').count()===1;
+    const configured=await this.page.evaluate(()=>!!window.AMO_CONFIG?.targetStage);
+    return shell&&dashboard&&nav&&configured
+  },{timeout:5000});
 });
 
 Then('the public hostname should identify itself as the Test application', async function(){
