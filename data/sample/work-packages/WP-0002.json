@@ -1,0 +1,13 @@
+{
+  "id": "WP-0002",
+  "demandId": "DEM-2026-0042",
+  "title": "Authentication migration options",
+  "description": "Assess migration sequencing and dependencies for authentication flows.",
+  "acceptanceCriteria": "Preferred migration option, dependencies and key decisions are documented for the parent Demand.",
+  "status": "Planned",
+  "romDays": 6,
+  "targetStart": "2026-10-01",
+  "targetEnd": "2026-10-31",
+  "azureDevOpsWorkItemId": "18743",
+  "version": 1
+}

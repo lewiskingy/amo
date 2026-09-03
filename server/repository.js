@@ -2,8 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas'};
-const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','status-reports','actuals','archive','.locks'];
+const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas',workPackages:'work-packages'};
+const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','work-packages','status-reports','actuals','archive','.locks'];
 const jsonText=value=>JSON.stringify(value,null,2)+'\n';
 const COMMIT_LOCK_STALE_MS=30_000;
 
@@ -23,6 +23,7 @@ const defaultWorkspace=()=>{
       team:{path:'team',filePattern:'USR-*.json'},
       allocations:{path:'allocations',filePattern:'ALLOC-*.json'},
       ideas:{path:'ideas',filePattern:'IDEA-*.json'},
+      workPackages:{path:'work-packages',filePattern:'WP-*.json'},
       statusReports:{path:'status-reports',filePattern:'SR-*.json',draft:'draft.json'}
     }
   };

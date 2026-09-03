@@ -1,0 +1,82 @@
+# Work Packages and Defined Demand
+
+AMO uses **Demand** as the persisted name for the recognised body of Architecture work under management. Conceptually this is **Defined Demand**: it can exist while scope or ROM is still being established and it does not have to be a funded Project.
+
+A **Work Package** is a discrete delivery package beneath Defined Demand. It describes a tranche of work that can be estimated, given acceptance criteria, tracked and linked to an Azure DevOps work item without changing the resource/accounting boundary of the parent Demand.
+
+```text
+Raw Demand (SharePoint Front Door)
+        ↓
+Triage (AMO + Azure DevOps)
+        ↓
+Defined Demand (AMO Demand)
+        ├─ Work Package → Azure DevOps Work Item
+        ├─ Work Package → Azure DevOps Work Item
+        ├─ Allocations
+        └─ Actuals ← Oracle Project Number
+```
+
+## Work Package record
+
+Work Packages are first-class records stored separately from Demand. The initial record contains:
+
+- `id` — stable Work Package ID;
+- `demandId` — required parent Demand;
+- `title`;
+- `description` — delivery scope/description;
+- `acceptanceCriteria`;
+- `status`;
+- `romDays`;
+- `targetStart` and `targetEnd`;
+- `azureDevOpsWorkItemId` — optional numeric Azure DevOps Work Item Reference;
+- record version/modified metadata.
+
+Local workspaces store one JSON document per Work Package under `work-packages/`. Remote/Mongo workspaces use the same logical `workPackages` entity through the repository/API boundary.
+
+Work Packages deliberately do **not** own Allocations or Actuals. Allocations remain Person × Demand × Month. Oracle Actuals remain Person × Project Number × Month and reconcile through the optional unique Project Number on Demand. This keeps Plan versus Actual at the same management/accounting boundary.
+
+## Azure DevOps reference and inheritance
+
+A Work Package stores only the Azure DevOps **Work Item Reference** (the numeric work item ID). AMO derives the URL from inherited organisational configuration instead of persisting a full environment-specific URL on every Work Package.
+
+Organisation resolution is:
+
+```text
+Team Organisation override
+        ↓ otherwise
+Department Organisation override
+        ↓ otherwise
+System Default Organisation
+```
+
+Project resolution is:
+
+```text
+Team Project override
+        ↓ otherwise
+Department Default Project
+```
+
+Blank override fields mean **inherit**. Inherited values are not copied into child settings, so changing a Department or System default genuinely cascades to records that have not overridden it.
+
+With an effective Organisation, Project and Work Item Reference, AMO derives:
+
+```text
+https://dev.azure.com/{organisation}/{project}/_workitems/edit/{workItemId}
+```
+
+A Work Package may retain its Work Item Reference when the effective Organisation or Project is not yet configured; AMO simply cannot produce the hyperlink until the inherited context is complete.
+
+## Process responsibility
+
+The intended responsibility split is:
+
+- **SharePoint Front Door** — authoritative intake/source for Raw Demand;
+- **Azure DevOps** — triage/backlog and delivery work-item tracking;
+- **AMO** — Defined Demand, Work Packages, portfolio/resource planning and Actuals reconciliation.
+
+During triage, a request may be recognised as a genuinely new body of work and a Defined Demand can be created before ROM, final scope or Project Number is known. If the request belongs to existing Defined Demand, it should normally become or amend a Work Package beneath that Demand rather than create duplicate Demand.
+
+## Current transition
+
+The older Demand-level Azure DevOps link remains temporarily while Work Packages are introduced. It is not the target model. Roadmap Step 3 removes that Demand-level relationship and makes Work Package the canonical Azure DevOps linkage boundary.

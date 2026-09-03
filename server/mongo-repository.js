@@ -1,7 +1,7 @@
 import { MongoClient } from 'mongodb';
 import { randomUUID } from 'node:crypto';
 
-const ENTITY_TYPES=new Set(['demand','team','allocations','ideas']);
+const ENTITY_TYPES=new Set(['demand','team','allocations','ideas','workPackages']);
 const WORKSPACE_ID='default';
 const DOCUMENTS_COLLECTION='amoDocuments';
 const RUNTIME_COLLECTION='amoRuntime';

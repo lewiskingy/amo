@@ -1,0 +1,5 @@
+# Work Package Step 2 Acceptance
+
+Before merging the Step 2 feature candidate, verify in a Test workspace that a Work Package can be created, edited and deleted beneath Demand in both local and remote modes; Azure DevOps Organisation resolves Team → Department → System; Azure DevOps Project resolves Team → Department; and a numeric Work Item Reference produces the expected Azure DevOps link without storing a full URL.
+
+Confirm that existing Demand, Allocations and Actuals continue to operate unchanged and that the legacy Demand-level Azure DevOps link remains available until Step 3 removes it deliberately.

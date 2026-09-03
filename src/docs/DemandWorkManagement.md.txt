@@ -1,0 +1,63 @@
+# Demand Work Management
+
+This guidance defines how the Architecture team should use the Front Door, Azure DevOps and AMO together as the Demand model evolves.
+
+## Working model
+
+```text
+Raw Demand
+SharePoint Front Door
+      ↓
+Triage
+AMO + Azure DevOps
+      ↓
+Defined Demand
+AMO Demand record
+      ↓
+Work Packages
+Azure DevOps delivery references
+```
+
+**Raw Demand** is an incoming request that has not yet been qualified into a managed body of Architecture work.
+
+**Triage** assesses whether Architecture involvement is required, whether the request belongs to existing managed work, likely service/priority, ROM and capacity implications. AMO can support this assessment alongside Azure DevOps; it does not replace the Front Door.
+
+**Defined Demand** is the managed Architecture work boundary represented by an AMO Demand record. A Defined Demand may be created before ROM, final scope or an Oracle Project Number is known where it is already clear that a genuinely new body of work needs to be managed.
+
+**Work Package** is a discrete delivery tranche beneath Defined Demand. Work Packages carry delivery scope, acceptance criteria, ROM, dates/status and the Azure DevOps Work Item Reference.
+
+## Triage decision
+
+For each Raw Demand item, first decide whether the work belongs to an existing Defined Demand.
+
+- If **yes**, add or amend the appropriate Work Package beneath that Demand rather than creating duplicate Demand.
+- If **no**, create a new Defined Demand and then define the Work Package(s) needed to deliver it.
+
+The relationship is therefore not one Front Door request = one AMO Demand. Several incoming requests can contribute Work Packages to the same managed Demand boundary.
+
+## Planning and reporting boundaries
+
+Work Packages explain **what is being delivered**. Allocations explain **how much Person capacity is planned against the Defined Demand**. Actuals explain **how much effort was recorded against the Oracle Project Number associated with that Defined Demand**.
+
+Allocations and Actuals remain at Defined Demand level. Do not manufacture Work-Package-level resource or Actuals attribution where the planning/source data does not support it.
+
+## System responsibilities
+
+- **SharePoint Front Door** owns intake and the authoritative Raw Demand source record.
+- **Azure DevOps** owns backlog/triage and delivery work-item tracking.
+- **AMO** owns the managed Defined Demand boundary, Work Package context, resource allocations, portfolio reporting and Actuals reconciliation.
+
+AMO stores only the Azure DevOps Work Item Reference on a Work Package. Organisation and Project are inherited from System, Department and Team configuration so links can be derived without persisting repetitive URLs.
+
+## Azure DevOps inheritance
+
+- System supplies the default Azure DevOps Organisation.
+- Department inherits that Organisation unless it has an override, and supplies a default Azure DevOps Project.
+- Team inherits Department/System values unless it overrides Organisation and/or Project.
+- Work Package stores only the Work Item Reference.
+
+Blank child values mean inherit; inherited values should not be copied into child records.
+
+## Transition
+
+The legacy Demand-level Azure DevOps Work Item relationship remains temporarily during Step 2 of the Demand refactor. New delivery modelling should use Work Packages. The following roadmap step removes the legacy Demand-level relationship and makes Work Package the canonical Azure DevOps linkage point.
