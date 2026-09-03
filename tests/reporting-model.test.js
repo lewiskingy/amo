@@ -107,4 +107,5 @@ vm.createContext(context);vm.runInContext(code,context);const rm=context.window.
   assert(summary.actualToDateFte>0);
   assert.equal(summary.forecastRemainingFte,.9);
   console.log('Reporting model tests passed');
+  require('./report-renderer.test.js');
 })().catch(e=>{console.error(e);process.exit(1)});
