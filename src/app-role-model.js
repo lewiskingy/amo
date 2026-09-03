@@ -56,8 +56,18 @@
   if(typeof defaultTeamRecord==='function'){
     const baseDefaultTeamRole=defaultTeamRecord;defaultTeamRecord=function(){const r=baseDefaultTeamRole(),first=configuredRoles()[0];delete r.role;r.roleId=first?.id||'';r.role=first?.name||'';return r}
   }
+  /* The Person/User module and the canonical record modal own the People form layout. Role only
+     contributes role semantics. Preserve an existing roleId-aware modal (for example the Staff
+     Number + Linked User form) instead of replacing it wholesale. If no richer renderer is loaded,
+     fall back to the baseline People fields while still presenting Role as a configured lookup. */
   if(typeof renderTeamModal==='function'){
-    renderTeamModal=function(r){const roles=[{value:'',label:'Unassigned'},...configuredRoles().map(x=>({value:x.id,label:x.name}))];return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('Name','name',r.name,'text',null,true)}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`}
+    const baseRenderTeamRole=renderTeamModal;
+    renderTeamModal=function(r){
+      const existing=baseRenderTeamRole(r);
+      if(existing.includes('data-modal-field="roleId"'))return existing;
+      const roles=[{value:'',label:'Unassigned'},...configuredRoles().map(x=>({value:x.id,label:x.name}))];
+      return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('Staff Number','staffNumber',r.staffNumber||'','text',null,true)}${modalField('Name','name',r.name,'text',null,true)}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`
+    }
   }
   if(typeof saveTeamModal==='function'){
     const baseSaveTeamRole=saveTeamModal;saveTeamModal=function(next){const role=roleById(next.roleId);if(next.roleId&&!role){alert('Select a configured Role.');return}next.role=role?.name||'';return baseSaveTeamRole(next)}
