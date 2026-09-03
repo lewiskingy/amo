@@ -119,7 +119,8 @@
     for(const month of actualPeriodMonths){
       for(const person of db?.team||[]){
         const pm=personMonthSummary(person.id,month),row=pm.demandRows.find(r=>r.demandId===demandId);if(!row)continue;
-        if(pm.redirected&&row.plannedFte-row.actualFte>=SIGNAL_THRESHOLDS.minimumFte)redirectedAwayFte+=Math.min(row.plannedFte-row.actualFte,pm.redirectedFte);
+        const rowShortfall=Math.max(0,row.plannedFte-row.actualFte),totalShortfall=pm.shortfallRows.reduce((sum,r)=>sum+Math.max(0,r.plannedFte-r.actualFte),0);
+        if(pm.redirected&&rowShortfall>=SIGNAL_THRESHOLDS.minimumFte&&totalShortfall>0)redirectedAwayFte+=pm.redirectedFte*(rowShortfall/totalShortfall);
         if(row.unplanned)unplannedFte+=row.actualFte;
         if(row.plannedFte>=SIGNAL_THRESHOLDS.minimumFte&&row.actualFte<SIGNAL_THRESHOLDS.zeroFte)plannedPeopleWithoutActual.add(person.id)
       }
@@ -165,13 +166,10 @@
 
   function renderDashboardIntegration(){
     if(!workspaceHandle||!ensureLoaded())return;
-    const months=typeof planningPeriods==='function'?planningPeriods():[],capacity=capacityFte(),capacityList=document.getElementById('capacityList');
-    if(capacityList)capacityList.innerHTML=months.map(m=>{const used=reportedTotalFte(m),pct=capacity?Math.round(used/capacity*100):0,basis=actualsAvailable(m)?'Actual':'Forecast';return`<div style="margin:10px 0"><div class="flex" style="justify-content:space-between"><strong>${monthLabel(m)} <span class="muted" style="font-size:.68rem">${basis.toUpperCase()}</span></strong><span>${used.toFixed(1)} / ${capacity.toFixed(1)} FTE (${pct}%)</span></div><div class="bar ${pct>100?'bad':pct>85?'warn':'good'}"><span style="width:${Math.min(pct,100)}%"></span></div></div>`}).join('')||'<span class="muted">No planning periods configured.</span>';
-    const conflicts=(db.team||[]).reduce((sum,t)=>sum+months.filter(m=>reportedFte(t.id,null,m)>n(t.fte)).length,0),card=[...document.querySelectorAll('#kpiGrid .card')].find(x=>/capacity conflicts/i.test(x.querySelector('.kpi-label')?.textContent||''));
-    if(card){const value=card.querySelector('.kpi-value'),sub=card.querySelector('.kpi-sub');if(value)value.textContent=String(conflicts);if(sub)sub.textContent='Actual/forecast person-period over-capacity'}
-    const attention=[];for(const d of unresolvedWithoutAllocation())attention.push(`<li><strong>${escHtml(d.id)}</strong> — ${escHtml(d.title)}: no resource allocation.</li>`);
-    for(const item of dashboardAttentionSignals())attention.push(`<li>${item.kind==='data'?'<strong>Data:</strong> ':''}${escHtml(item.text)}</li>`);
-    const host=document.getElementById('attentionList');if(host)host.innerHTML=attention.length?attention.join(''):'<li>No immediate allocation or Actuals issues.</li>'
+    const snapshot=typeof dashboardHeadlineSnapshot==='function'?dashboardHeadlineSnapshot():null,capacityList=document.getElementById('capacityList');if(!snapshot)return;
+    if(capacityList)capacityList.innerHTML=(snapshot.capacityOutlook||[]).map(r=>{const pct=Number(r.utilisationPct||0),used=Number(r.reportedFte??r.allocatedFte??0),capacity=Number(r.capacityFte||0),basis=String(r.basis||'forecast').toUpperCase();return`<div style="margin:10px 0"><div class="flex" style="justify-content:space-between"><strong>${escHtml(r.label||r.month)} <span class="muted" style="font-size:.68rem">${basis}</span></strong><span>${used.toFixed(1)} / ${capacity.toFixed(1)} FTE (${pct}%)</span></div><div class="bar ${pct>100?'bad':pct>85?'warn':'good'}"><span style="width:${Math.min(pct,100)}%"></span></div></div>`}).join('')||'<span class="muted">No planning periods configured.</span>';
+    const card=[...document.querySelectorAll('#kpiGrid .card')].find(x=>/capacity conflicts/i.test(x.querySelector('.kpi-label')?.textContent||''));if(card){const value=card.querySelector('.kpi-value'),sub=card.querySelector('.kpi-sub');if(value)value.textContent=String(snapshot.capacityConflicts||0);if(sub)sub.textContent='Actual/forecast person-period over-capacity'}
+    const attention=document.getElementById('attentionList');if(attention){const rows=snapshot.attentionRequired||[];attention.innerHTML=rows.length?rows.map(item=>`<li>${item.kind==='data'?'<strong>Data:</strong> ':''}${item.demandId?`<strong>${escHtml(item.demandId)}</strong>${item.title?` — ${escHtml(item.title)}`:''}: `:''}${escHtml(item.reason||'')}</li>`).join(''):'<li>No immediate allocation or Actuals issues.</li>'}
   }
 
   function renderDemandInsights(){
