@@ -1,6 +1,6 @@
 /* Application versioning, target-stage identity and workspace data-stage safety controls. */
 (function initTargetStageSafety(){
-  const APP_VERSION='1.1.1';
+  const APP_VERSION='1.1.2';
   const normalizeStage=value=>{
     const v=String(value||'').trim().toLowerCase();
     if(v==='test'||v==='testing')return'test';
