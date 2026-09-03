@@ -19,34 +19,18 @@ function attentionSnapshotItemHtml(item){let prefix=item.kind==='data'?'<strong>
 function attentionSnapshotHtml(snapshot){const rows=snapshot.attentionRequired||[],content=rows.length?`<ul>${rows.map(attentionSnapshotItemHtml).join('')}</ul>`:'<span class="muted">No immediate allocation or Actuals issues.</span>';return `<div class="card report-snapshot-panel"><div class="section-title" style="margin-top:0"><h3>Attention required</h3></div>${content}</div>`}
 function dashboardSnapshotHtml(snapshot){return `<div class="report-dashboard-snapshot">${dashboardCardsHtml(snapshot)}<div class="split" style="margin-top:16px">${capacitySnapshotHtml(snapshot)}${attentionSnapshotHtml(snapshot)}</div></div>`}
 
+/* Demand effort is captured into each composed Preview/Published report entry. The canonical
+   report renderer owns presentation; this module only composes immutable snapshot data. */
 function statusEffortSnapshot(demandId){
   const rm=window.ReportingModel;if(!rm?.ensureLoaded?.()||!rm.actualMonths().length)return null;
   const c=rm.demandEffortContext(demandId);if(!c.actualToDateFte&&!c.historicalForecastFte&&!c.unplannedFte)return null;
   return{capturedAt:new Date().toISOString(),coverage:rm.coverageLabel(),actualToDateFte:c.actualToDateFte,historicalForecastFte:c.historicalForecastFte,forecastRemainingFte:c.forecastRemainingFte,projectedFte:c.projectedFte,varianceToDateFte:c.varianceToDateFte,variancePct:c.variancePct,signal:c.signal,redirectedAwayFte:c.redirectedAwayFte,unplannedFte:c.unplannedFte,plannedPeopleWithoutActual:c.plannedPeopleWithoutActual,message:rm.demandEffortMessage(demandId)}
 }
-function effortContextHtml(context){
-  if(!context)return'';const actual=Number(context.actualToDateFte||0).toFixed(1),plan=Number(context.historicalForecastFte||0).toFixed(1),variance=Number(context.varianceToDateFte||0),signal=context.signal||'on-plan',pill=signal==='over-plan'||signal==='no-actual'?'amber':signal==='under-plan'?'amber':signal==='unplanned'?'blue':'gray';
-  return `<div class="report-effort-context"><div class="flex" style="justify-content:space-between;gap:10px;align-items:flex-start"><div><strong>Effort to date</strong><div class="muted">Actual ${actual} FTE-mo · plan ${plan} FTE-mo · variance ${variance>=0?'+':''}${variance.toFixed(1)} FTE-mo</div>${context.message?`<div class="muted" style="margin-top:4px">${escHtml(context.message)}</div>`:''}</div><span class="pill ${pill}">${escHtml(signal.replaceAll('-',' '))}</span></div></div>`
-}
-function decorateStatusAuthoringEffort(){
-  const rm=window.ReportingModel;if(!rm?.ensureLoaded?.()||!rm.actualMonths().length)return;const table=$('statusReportTable');if(!table)return;
-  table.querySelectorAll('tbody tr[data-status-demand]').forEach(tr=>{const demandId=tr.dataset.statusDemand,cell=tr.querySelector('td');if(!cell)return;cell.querySelector('.status-effort-context')?.remove();const c=rm.demandEffortContext(demandId),message=rm.demandEffortMessage(demandId);if(!c.actualToDateFte&&!c.historicalForecastFte&&!message)return;const div=document.createElement('div');div.className='status-effort-context';div.innerHTML=`<span class="muted">Actual ${Number(c.actualToDateFte||0).toFixed(1)} vs plan ${Number(c.historicalForecastFte||0).toFixed(1)} FTE-mo</span>${message?`<br><span class="muted"><strong>${escHtml(message)}</strong></span>`:''}`;cell.appendChild(div)})
-}
 
-if(typeof snapshotStatusEntry==='function'){
-  const baseSnapshotStatusEntryEffort=snapshotStatusEntry;snapshotStatusEntry=function(d,e){const snapshot=baseSnapshotStatusEntryEffort(d,e),context=statusEffortSnapshot(d.id);if(context)snapshot.effortContext=context;return snapshot}
-}
-if(typeof renderStatusReporting==='function'){
-  const baseRenderStatusReportingEffort=renderStatusReporting;renderStatusReporting=function(){const result=baseRenderStatusReportingEffort.apply(this,arguments);decorateStatusAuthoringEffort();return result}
-}
-if(typeof reportNarrativeHtml==='function'){
-  const baseReportNarrativeHtmlEffort=reportNarrativeHtml;reportNarrativeHtml=function(report){const html=baseReportNarrativeHtmlEffort(report),host=document.createElement('div');host.innerHTML=html;const entries=host.querySelectorAll('.report-entry');(report.entries||[]).forEach((entry,index)=>{if(!entry.effortContext||!entries[index])return;const wrapper=document.createElement('div');wrapper.innerHTML=effortContextHtml(entry.effortContext);const block=wrapper.firstElementChild,head=entries[index].querySelector('.report-entry-head');if(block)head?.insertAdjacentElement('afterend',block)});return host.innerHTML}
-}
-
-function ensureDashboardReportingStyles(){if(document.getElementById('dashboard-reporting-styles'))return;const s=document.createElement('style');s.id='dashboard-reporting-styles';s.textContent='.report-headline-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.report-snapshot-panel{box-shadow:none}.report-dashboard-snapshot{margin:14px 0 22px}.status-effort-context{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:.78rem;line-height:1.35}.report-effort-context{padding:10px 14px;background:#fbfcfe;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:.82rem}@media(max-width:1100px){.report-headline-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.report-headline-kpis{grid-template-columns:1fr}}';document.head.appendChild(s)}
+function ensureDashboardReportingStyles(){if(document.getElementById('dashboard-reporting-styles'))return;const s=document.createElement('style');s.id='dashboard-reporting-styles';s.textContent='.report-headline-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}.report-snapshot-panel{box-shadow:none}.report-dashboard-snapshot{margin:14px 0 22px}@media(max-width:1100px){.report-headline-kpis{grid-template-columns:repeat(3,1fr)}}@media(max-width:760px){.report-headline-kpis{grid-template-columns:1fr}}';document.head.appendChild(s)}
 const baseRenderDashboardHeadline=renderDashboard;renderDashboard=function(){baseRenderDashboardHeadline();const snapshot=dashboardHeadlineSnapshot(),grid=$('kpiGrid');if(grid)grid.innerHTML=dashboardCardsHtml(snapshot).replace(/^<div class="grid kpis report-headline-kpis">|<\/div>$/g,'')};
 /* Snapshot composition belongs to the report artefact, not the live authoring page. */
-const baseBuildPreviewReportHeadline=buildPreviewReport;buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();report.dashboardSnapshots=report.dashboardSnapshots||{};report.dashboardSnapshots.department=report.dashboardSnapshots.department||report.dashboardSnapshot;return report};
+const baseBuildPreviewReportHeadline=buildPreviewReport;buildPreviewReport=function(){const report=baseBuildPreviewReportHeadline();report.dashboardSnapshot=dashboardHeadlineSnapshot();report.dashboardSnapshots=report.dashboardSnapshots||{};report.dashboardSnapshots.department=report.dashboardSnapshots.department||report.dashboardSnapshot;report.entries=(report.entries||[]).map(entry=>{const effortContext=statusEffortSnapshot(entry.demandId);return effortContext?{...entry,effortContext}:entry});return report};
 ensureDashboardReportingStyles();
 
 /* Application branding and persisted workspace appearance. */
