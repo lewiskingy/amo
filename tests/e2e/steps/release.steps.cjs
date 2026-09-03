@@ -71,7 +71,7 @@ When('I open the application', async function(){
   assert.ok(response.ok(),`AMO returned HTTP ${response.status()} from ${this.baseUrl}`);
   /* AMO deliberately continues authentication, dynamic-module and optional remote-workspace network
      activity after DOMContentLoaded. Network-idle is therefore not an application-readiness signal.
-     Wait for the stable application shell and deployment config that every scenario actually uses. */
+     Wait only for the stable core shell; feature-specific steps wait for their dynamic capability. */
   await waitFor(async()=>{
     const shell=await this.page.locator('.app').count()===1;
     const dashboard=await this.page.locator('#dashboard.view.active').count()===1;
@@ -93,8 +93,11 @@ Then('the client version should match the deployed candidate', async function(){
   const expected=requiredEnv('E2E_EXPECTED_CLIENT_VERSION');
   const version=await this.page.evaluate(()=>window.AMO_APP_VERSION||'');
   assert.equal(version,expected,`Expected client ${expected}, received ${version||'no client version'}.`);
-  const brand=await this.page.locator('.brand-sub').textContent();
-  assert.ok(String(brand||'').includes(`Client ${expected}`),`Sidebar does not show Client ${expected}: ${brand}`);
+  /* The target-stage layer initially renders "Version x · Schema y" and the optional compatibility
+     module later enriches that to "Client x · ...". Both are valid presentations of the same
+     authoritative AMO_APP_VERSION, so test the version value rather than transient wording. */
+  const brand=String(await this.page.locator('.brand-sub').textContent()||'');
+  assert.ok(brand.includes(expected),`Sidebar does not show version ${expected}: ${brand}`);
 });
 
 Then('the backend version and API contract should match the deployed candidate',{timeout:30000},async function(){
@@ -114,6 +117,9 @@ Then('the navigation shell should be usable at the selected viewport', async fun
   }else{
     assert.equal(await sidebar.isVisible(),true,'Desktop sidebar is not visible.');
   }
+  /* Users & Access and the final information architecture are dynamically composed. Wait for the
+     Administration capability to be installed before asserting the complete navigation contract. */
+  await waitFor(async()=>await sidebar.locator('.nav-btn[data-view="users"]').count()===1,{timeout:5000});
   const navText=String(await sidebar.locator('nav').textContent()||'');
   for(const expected of ['Dashboard','Demand','Allocations','Resource Plan','Roadmap','Users & Access','Settings','Improvement Ideas','Process Guide']){
     assert.ok(navText.includes(expected),`Navigation is missing ${expected}.`);
@@ -139,7 +145,7 @@ Then('Users & Access should be available under Administration', async function()
   const group=this.page.locator('.sidebar nav [data-amo-nav-section="administration"]');
   await waitFor(async()=>await group.count()===1);
   const button=group.locator('.nav-btn[data-view="users"]');
-  assert.equal(await button.count(),1,'Administration does not contain a Users & Access navigation item.');
+  await waitFor(async()=>await button.count()===1);
   assert.equal(String(await button.textContent()||'').trim(),'Users & Access','The Users navigation item is not labelled Users & Access.');
 });
 
