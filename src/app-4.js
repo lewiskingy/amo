@@ -31,3 +31,7 @@ function renderResource(){
 /* Actuals load asynchronously from the workspace repository. Re-render Resource Plan when the
    canonical reporting model announces that its cache has been hydrated or refreshed. */
 window.addEventListener('amo:reporting-model-updated',()=>{if(workspaceHandle)renderResource()});
+
+/* Keep the existing lazy bootstrap for now. The Resource Plan no longer depends on the script-load
+   callback to refresh: repository hydration itself emits amo:reporting-model-updated. */
+(function loadReportingModel(){if(window.ReportingModel||document.querySelector('script[data-amo-reporting-model]'))return;const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset('app-reporting-model.js'):'app-reporting-model.js';s.dataset.amoReportingModel='true';s.onload=()=>{window.ReportingModel?.ensureLoaded?.();if(typeof refreshAll==='function'&&workspaceHandle)refreshAll()};document.head.appendChild(s)})();
