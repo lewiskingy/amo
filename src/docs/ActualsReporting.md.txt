@@ -1,0 +1,65 @@
+# Actuals Reporting
+
+AMO keeps planning and observed effort as separate facts.
+
+- **Allocations** are the planning / forecast source of truth.
+- **Actuals** are imported observed effort from Oracle.
+- Reporting composes them month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation forecast.
+- The calendar date does not move the cut-over. If Actuals currently end in June, July onward remains Forecast even if the current month is September.
+- A loaded Actuals month is authoritative for the period. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
+
+## Identity and effort conversion
+
+Oracle `Person #` matches the AMO Person `staffNumber` field. Name matching is not used. Rows for a Person identifier that cannot be matched are excluded from the curated People Actuals and surfaced as reconciliation information during import.
+
+Actual hours are converted to FTE using the System setting **Standard working hours per day** (7.5 by default) and Monday-Friday working days in each month. Person utilisation then compares reported FTE with the Person's configured available FTE.
+
+## Management classifications
+
+The shared Reporting Model owns the classifications so Dashboard, Resource Plan, Demand and Status Reporting do not invent different rules.
+
+Initial materiality thresholds are:
+
+- material Demand variance: 20%;
+- low overall effort: less than 50% of planned total effort;
+- redirected-effort eligibility: at least 80% of planned total effort was recorded overall, with material offsetting Demand shortfall/increase;
+- over capacity: more than 110% of the Person's available FTE;
+- minimum material effort: 0.1 FTE;
+- effectively zero effort: less than 0.01 FTE.
+
+The classifications are:
+
+- **No Actuals against plan** — the Person had material planned allocation in an Actuals month but recorded effectively no Actual effort overall.
+- **Low overall effort** — the Person recorded materially less effort overall than planned. This is distinct from moving effort between Demand.
+- **Effort redirected** — the Person's total Actual effort is broadly consistent with plan, but material shortfall on one Demand is offset by increased effort on other Demand.
+- **Unplanned Demand effort** — Actual effort was recorded against a known Demand where that Person had no corresponding allocation for the period.
+- **Over capacity** — total Actual effort exceeds the configured capacity threshold.
+- **Unmapped project facts** — Actuals for a known Person cannot be mapped to AMO Demand. This is a data/reconciliation signal, not a delivery judgement.
+
+AMO deliberately does not infer why effort moved. A redirected-effort message states that a planned shortfall coincides with the same People recording effort on other Demand. Status commentary is where the business reason, such as a priority change, should be explained.
+
+## Views
+
+### Resource Plan
+
+Resource Plan is the detailed People view. Historical Actuals periods show observed effort and plan variance; periods without Actuals show Forecast. Capacity signals summarise the latest Actuals period. Individual utilisation and allocation detail distinguish no Actuals, low overall effort, redirected effort, unplanned effort and over-capacity conditions.
+
+### Dashboard
+
+Capacity Outlook uses Actual effort for loaded periods and Forecast elsewhere. Attention Required aggregates material People and Demand signals, while reconciliation items are visibly identified as data issues. Organisational Team/Department scopes use the same Actual/Forecast semantics.
+
+### Demand
+
+Demand effort outlook shows Actual effort to date, historical plan for the same Actuals periods, forecast remaining, projected total effort, Actual hours/cost and variance. It also explains material over/under-plan, unplanned effort and planned shortfall that coincides with the same People recording effort elsewhere.
+
+### Status Report
+
+The live Status Report remains an authoring surface, not another Dashboard. Each Demand row can show a compact current Actual-versus-plan prompt to support meaningful commentary.
+
+Preview and Publish capture both the Dashboard snapshot and each reported Demand's effort context into the report artefact. Published and Final reports therefore retain the evidence available at publication time instead of recalculating against newer Actuals later.
+
+`app-report-renderer.js` is the canonical report renderer. It renders only persisted report snapshot data and never reads live workspace Actuals.
+
+## Forecast preservation
+
+Actuals do not overwrite Allocations. Allocation forecast remains available as the planning baseline so AMO can compare what was expected with what actually happened. The Allocation Outlook section in a Status Report remains forecast-only by design; Actuals are represented in Capacity Outlook and Demand effort context.
