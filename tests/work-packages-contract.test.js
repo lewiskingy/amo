@@ -1,5 +1,7 @@
 const fs=require('fs'),assert=require('assert');
 const workPackages=fs.readFileSync('src/app-work-packages.js','utf8');
+const demandGrid=fs.readFileSync('src/app-2.js','utf8');
+const demandDetail=fs.readFileSync('src/app-5.js','utf8');
 const localRepository=fs.readFileSync('src/app-workspace-repository.js','utf8');
 const serverRepository=fs.readFileSync('server/repository.js','utf8');
 const mongoRepository=fs.readFileSync('server/mongo-repository.js','utf8');
@@ -16,6 +18,10 @@ assert.match(workPackages,/const project=trim\(teamConfig\.project\)\|\|trim\(de
 assert.match(workPackages,/https:\/\/dev\.azure\.com\/\$\{encodeURIComponent\(ctx\.organization\)\}\/\$\{encodeURIComponent\(ctx\.project\)\}\/_workitems\/edit\/\$\{encodeURIComponent\(id\)\}/);
 assert.match(workPackages,/Azure DevOps Work Item Reference/);
 assert.doesNotMatch(workPackages,/azureDevOpsUrl\s*:/);
+
+assert.match(demandGrid,/selectedDemandId=tr\.dataset\.row;renderDemandDetail\(\);window\.WorkPackages\?\.renderDemandPanel\?\.\(\)/);
+assert.match(demandDetail,/window\.WorkPackages\?\.renderDemandPanel\?\.\(\)/);
+assert.match(workPackages,/\+ Work Package/);
 
 assert.match(localRepository,/workPackages:'work-packages'/);
 assert.match(localRepository,/\['demand','team','allocations','ideas','work-packages','config','actuals'\]/);
