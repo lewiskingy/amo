@@ -29,6 +29,6 @@ assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 assert.ok(index.includes('app-work-packages.js?v=20260903-1'),'Work Package module is not loaded by the application shell.');
-assert.match(targetStage,/const APP_VERSION='1\.1\.1'/);
+assert.match(targetStage,/const APP_VERSION='1\.1\.2'/);
 
 console.log('Work Package domain and Azure DevOps inheritance contract tests passed');
