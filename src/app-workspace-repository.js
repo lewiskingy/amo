@@ -3,7 +3,7 @@
    the browser File System Access API. LocalWorkspaceRepository is the first implementation;
    RemoteWorkspaceRepository can implement the same contract later over HTTP. */
 (function initWorkspaceRepository(){
-  const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas'};
+  const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas',workPackages:'work-packages'};
   const jsonText=data=>JSON.stringify(data,null,2)+'\n';
   const parts=path=>String(path||'').split('/').filter(Boolean);
 
@@ -121,7 +121,7 @@
     }
     async createSafetyBackup({name,manifest}){
       if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to create the workspace safety backup.');const backups=await this.rootHandle.getDirectoryHandle('backups',{create:true}),snapshot=await backups.getDirectoryHandle(name,{create:true});
-      await this.copyFile(await this.rootHandle.getFileHandle('workspace.json'),snapshot,'workspace.json');for(const folder of ['demand','team','allocations','ideas','config','actuals'])await this.copyJsonDirectory(snapshot,folder);
+      await this.copyFile(await this.rootHandle.getFileHandle('workspace.json'),snapshot,'workspace.json');for(const folder of ['demand','team','allocations','ideas','work-packages','config','actuals'])await this.copyJsonDirectory(snapshot,folder);
       try{const reports=await this.rootHandle.getDirectoryHandle('status-reports'),draft=await reports.getFileHandle('draft.json'),dest=await snapshot.getDirectoryHandle('status-reports',{create:true});await this.copyFile(draft,dest,'draft.json')}catch(e){if(e.name!=='NotFoundError')throw e}
       const manifestHandle=await snapshot.getFileHandle('backup-manifest.json',{create:true}),w=await manifestHandle.createWritable();await w.write(jsonText(manifest));await w.close();return name
     }
