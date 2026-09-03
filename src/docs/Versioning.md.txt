@@ -1,0 +1,25 @@
+# AMO Client Versioning
+
+AMO client versions use `MAJOR.MINOR.BUILD`.
+
+- **MAJOR** changes only for intentionally breaking application/data-contract changes that require a new compatibility boundary.
+- **MINOR** identifies a significant non-breaking feature release or feature milestone.
+- **BUILD** identifies successive client change candidates while a feature/change is being developed and validated.
+
+A BUILD increment represents a material client change/candidate, not a CI execution. Re-running CI against the same candidate does not increment the version.
+
+Example:
+
+```text
+1.1.0   released baseline
+1.1.1   first candidate for the next change
+1.1.2   amended candidate after review/test feedback
+1.1.3   another candidate if required
+1.2.0   accepted significant non-breaking feature release
+```
+
+Small fixes may be released with a BUILD version; production deployment does not by itself require a MINOR increment. When a significant feature milestone is accepted for release, increment MINOR and reset BUILD to zero.
+
+Every material client change should therefore include the appropriate version increment once for that candidate before the PR is approved. The exact deployment/build identity remains separate and is supplied by the deployment platform; it must not be confused with the application version.
+
+Workspace schema version is also independent. A client version change does not imply a schema change, and a supported schema migration does not automatically require a MAJOR application version increment.
