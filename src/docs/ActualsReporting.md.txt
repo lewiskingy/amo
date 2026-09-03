@@ -2,15 +2,29 @@
 
 AMO keeps planning and observed effort as separate facts.
 
-- **Allocations** are the planning / forecast source of truth.
+- **Allocations** are the planning / forecast source of truth and are held against AMO Demand.
 - **Actuals** are imported observed effort from Oracle.
 - Reporting composes them month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation forecast.
 - The calendar date does not move the cut-over. If Actuals currently end in June, July onward remains Forecast even if the current month is September.
 - A loaded Actuals month is authoritative for the period. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
 
+## Defined Demand and Project Number
+
+AMO Demand represents the recognised body of Architecture work being managed (Defined Demand). It does not have to be a formal Project and it may exist before a Project Number is known.
+
+Where work is charged through Oracle, Demand can hold an optional **Project Number**. This is the sole accounting reference used to reconcile Oracle Project Actuals to Demand:
+
+```text
+Oracle Project Number -> Demand.projectNumber -> Defined Demand
+```
+
+Project Number is stored as a string so source identifiers are preserved exactly, but the current UI accepts digits only. A Project Number must not be assigned to more than one Demand. Existing legacy Cost Centre / Project Code values are not an Actuals mapping source and are not migrated into Project Number.
+
+If Oracle Actuals contain a Project Number that is not mapped to Demand, facts for known AMO People are retained without Demand attribution so Person-level recorded effort remains factual. If an existing workspace contains duplicate Demand Project Numbers, AMO also retains those facts without Demand attribution rather than arbitrarily selecting one Demand; the duplicate mapping is surfaced as a reconciliation issue.
+
 ## Identity and effort conversion
 
-Oracle `Person #` matches the AMO Person `staffNumber` field. Name matching is not used. Rows for a Person identifier that cannot be matched are excluded from the curated People Actuals and surfaced as reconciliation information during import.
+Oracle `People #` (or `Person #` in older exports) matches the AMO Person `staffNumber` field. Name matching is not used. Rows for a Person identifier that cannot be matched are excluded from the curated People Actuals and surfaced as reconciliation information during import.
 
 Actual hours are converted to FTE using the System setting **Standard working hours per day** (7.5 by default) and Monday-Friday working days in each month. Person utilisation then compares reported FTE with the Person's configured available FTE.
 
@@ -34,7 +48,7 @@ The classifications are:
 - **Effort redirected** — the Person's total Actual effort is broadly consistent with plan, but material shortfall on one Demand is offset by increased effort on other Demand.
 - **Unplanned Demand effort** — Actual effort was recorded against a known Demand where that Person had no corresponding allocation for the period.
 - **Over capacity** — total Actual effort exceeds the configured capacity threshold.
-- **Unmapped project facts** — Actuals for a known Person cannot be mapped to AMO Demand. This is a data/reconciliation signal, not a delivery judgement.
+- **Unmapped project facts** — Actuals for a known Person cannot be mapped unambiguously to AMO Demand. This includes missing Demand Project Number mappings and duplicate mappings. It is a data/reconciliation signal, not a delivery judgement.
 
 AMO deliberately does not infer why effort moved. A redirected-effort message states that a planned shortfall coincides with the same People recording effort on other Demand. Status commentary is where the business reason, such as a priority change, should be explained.
 
