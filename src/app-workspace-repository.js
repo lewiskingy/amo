@@ -21,9 +21,10 @@
     async listStatusReports(){throw new Error('listStatusReports() not implemented')}
     async getStatusReport(){throw new Error('getStatusReport() not implemented')}
     async saveStatusReport(){throw new Error('saveStatusReport() not implemented')}
-    async readActuals(){throw new Error('readActuals() not implemented')}
+    async listActualsPeriods(){throw new Error('listActualsPeriods() not implemented')}
+    async readActualsPeriod(){throw new Error('readActualsPeriod() not implemented')}
     async readActualsManifest(){throw new Error('readActualsManifest() not implemented')}
-    async saveActualsSnapshot(){throw new Error('saveActualsSnapshot() not implemented')}
+    async replaceActualsPeriods(){throw new Error('replaceActualsPeriods() not implemented')}
     async clearActuals(){throw new Error('clearActuals() not implemented')}
     async readLock(){throw new Error('readLock() not implemented')}
     async writeLock(){throw new Error('writeLock() not implemented')}
@@ -95,13 +96,15 @@
     async getStatusReport(idOrFile){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.readJson(`status-reports/${name}`,{required:true})}
     async saveStatusReport(idOrFile,record){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.writeJson(`status-reports/${name}`,record)}
 
-    async readActuals(){return this.readJson('actuals/facts.json')}
+    async listActualsPeriods(){const entries=await this.listEntries('actuals',{optional:true});return entries.filter(e=>e.kind==='file'&&/^\d{4}-\d{2}\.json$/.test(e.name)).map(e=>e.name.slice(0,7)).sort()}
+    async readActualsPeriod(month){return this.readJson(`actuals/${month}.json`)}
     async readActualsManifest(){return this.readJson('actuals/manifest.json')}
-    async saveActualsSnapshot(factsDocument,manifest){
+    async replaceActualsPeriods(periods,manifest){
       if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to save Actuals.');
-      await this.writeJson('actuals/facts.json',factsDocument);await this.writeJson('actuals/manifest.json',manifest)
+      for(const period of periods||[]){if(!/^\d{4}-\d{2}$/.test(String(period?.month||'')))throw new Error('Actuals period month must use YYYY-MM.');await this.writeJson(`actuals/${period.month}.json`,period)}
+      await this.writeJson('actuals/manifest.json',manifest);await this.deletePath('actuals/facts.json')
     }
-    async clearActuals(){if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to clear Actuals.');await this.deletePath('actuals/facts.json');await this.deletePath('actuals/manifest.json')}
+    async clearActuals(){if(!await this.ensureWritePermission())throw new Error('Read/write permission is required to clear Actuals.');for(const month of await this.listActualsPeriods())await this.deletePath(`actuals/${month}.json`);await this.deletePath('actuals/facts.json');await this.deletePath('actuals/manifest.json')}
 
     async readLock(fileName='.lock.json'){return this.readJson(fileName)}
     async writeLock(record,fileName='.lock.json'){return this.writeJson(fileName,record)}
