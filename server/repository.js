@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 const ENTITY_FOLDERS={demand:'demand',team:'team',allocations:'allocations',ideas:'ideas'};
-const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','status-reports','archive','.locks'];
+const REQUIRED_FOLDERS=['config','demand','team','allocations','ideas','status-reports','actuals','archive','.locks'];
 const jsonText=value=>JSON.stringify(value,null,2)+'\n';
 const COMMIT_LOCK_STALE_MS=30_000;
 
@@ -69,6 +69,7 @@ const repairRequiredSettings=settings=>{
 
 const safeLockName=resource=>String(resource||'resource').replace(/[^a-zA-Z0-9._-]+/g,'--');
 const lockAge=lock=>{const t=Date.parse(lock?.createdAt||'');return Number.isFinite(t)?Date.now()-t:Number.POSITIVE_INFINITY};
+const validActualsMonth=month=>/^\d{4}-\d{2}$/.test(String(month||''));
 
 export class ServerJsonWorkspaceRepository{
   constructor(root){this.root=path.resolve(root);this.bootstrapped=false}
@@ -98,6 +99,11 @@ export class ServerJsonWorkspaceRepository{
   async listStatusReports(){await this.ensureWorkspace();return (await this.listDir('status-reports')).filter(e=>e.isFile()&&e.name.endsWith('.json')).map(e=>e.name)}
   async getStatusReport(idOrFile){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;return this.readJson(path.join('status-reports',name),{required:true})}
   async saveStatusReport(idOrFile,record){const name=String(idOrFile).endsWith('.json')?String(idOrFile):`${idOrFile}.json`;await this.writeJson(path.join('status-reports',name),record)}
+  async listActualsPeriods(){await this.ensureWorkspace();return(await this.listDir('actuals')).filter(e=>e.isFile()&&/^\d{4}-\d{2}\.json$/.test(e.name)).map(e=>e.name.slice(0,7)).sort()}
+  async readActualsPeriod(month){if(!validActualsMonth(month))throw new Error('Actuals period must use YYYY-MM.');return this.readJson(path.join('actuals',`${month}.json`))}
+  async readActualsManifest(){return this.readJson(path.join('actuals','manifest.json'))}
+  async replaceActualsPeriods(periods,manifest){await this.ensureWorkspace();for(const period of periods||[]){if(!validActualsMonth(period?.month))throw new Error('Actuals period must use YYYY-MM.');await this.writeJson(path.join('actuals',`${period.month}.json`),period)}await this.writeJson(path.join('actuals','manifest.json'),manifest);await this.deletePath(path.join('actuals','facts.json'));return{changed:(periods||[]).length}}
+  async clearActuals(){for(const month of await this.listActualsPeriods())await this.deletePath(path.join('actuals',`${month}.json`));await this.deletePath(path.join('actuals','facts.json'));await this.deletePath(path.join('actuals','manifest.json'));return{changed:true}}
   async readLock(){return this.readJson('.lock.json')}
   async writeLock(lock){await this.writeJson('.lock.json',lock)}
   async deleteLock(){await this.deletePath('.lock.json')}
