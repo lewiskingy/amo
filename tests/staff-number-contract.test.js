@@ -1,0 +1,12 @@
+const fs=require('fs'),assert=require('assert');
+const peopleGrid=fs.readFileSync('src/app-2.js','utf8');
+const recordModal=fs.readFileSync('src/app-record-modal.js','utf8');
+const userLink=fs.readFileSync('src/app-person-user-link.js','utf8');
+const actuals=fs.readFileSync('src/app-actuals.js','utf8');
+assert.match(peopleGrid,/key:'staffNumber',label:'Staff Number \*'/);
+assert.match(recordModal,/modalField\('Staff Number','staffNumber'/);
+assert.match(userLink,/modalField\('Linked User','userId'/);
+assert.match(userLink,/modalField\('Staff Number','staffNumber'/);
+assert.match(actuals,/person\?\.staffNumber/);
+assert.doesNotMatch(actuals,/person\?\.personNumber/);
+console.log('Staff Number contract tests passed');
