@@ -20,19 +20,25 @@
     return changed
   }
 
+  /* Validate one Person being created/changed against its peers. Untouched legacy People may still
+     have no Staff Number while the workspace is migrated progressively. They do not block saving
+     another Person, but any Staff Number or linked User that is supplied must remain unique. */
+  function validatePersonLink(person,peers=[]){
+    person.userId=clean(person.userId);person.email=clean(person.email);person.staffNumber=clean(person.staffNumber);
+    if(!person.staffNumber)throw new Error(`Staff Number is required for ${person.name||person.id}.`);
+    const staffKey=person.staffNumber.toLowerCase();
+    const duplicateStaff=(peers||[]).find(other=>other&&other.id!==person.id&&clean(other.staffNumber)&&clean(other.staffNumber).toLowerCase()===staffKey);
+    if(duplicateStaff)throw new Error(`Staff Number ${person.staffNumber} is already used by ${duplicateStaff.name||duplicateStaff.id}.`);
+    if(!person.userId)return true;
+    const user=userById(person.userId);if(!user)throw new Error(`Person ${person.name||person.id} is linked to a User that no longer exists.`);
+    const duplicateUser=(peers||[]).find(other=>other&&other.id!==person.id&&clean(other.userId)===person.userId);
+    if(duplicateUser)throw new Error(`${user.displayName||user.companyAccount||user.id} is already linked to ${duplicateUser.name||duplicateUser.id}. A User can only be linked to one Person.`);
+    applyUserIdentity(person);return true
+  }
+
   function validatePeopleLinks(rows){
-    const assignedUsers=new Map(),assignedStaffNumbers=new Map();
-    for(const person of rows||[]){
-      person.userId=clean(person.userId);person.email=clean(person.email);person.staffNumber=clean(person.staffNumber);
-      if(!person.staffNumber)throw new Error(`Staff Number is required for ${person.name||person.id}.`);
-      const staffKey=person.staffNumber.toLowerCase();
-      if(assignedStaffNumbers.has(staffKey))throw new Error(`Staff Number ${person.staffNumber} is already used by ${assignedStaffNumbers.get(staffKey)}.`);
-      assignedStaffNumbers.set(staffKey,person.name||person.id);
-      if(!person.userId)continue;
-      const user=userById(person.userId);if(!user)throw new Error(`Person ${person.name||person.id} is linked to a User that no longer exists.`);
-      if(assignedUsers.has(person.userId))throw new Error(`${user.displayName||user.companyAccount||user.id} is already linked to ${assignedUsers.get(person.userId)}. A User can only be linked to one Person.`);
-      assignedUsers.set(person.userId,person.name||person.id);applyUserIdentity(person)
-    }
+    const people=rows||[];
+    for(const person of people)validatePersonLink(person,people);
     return true
   }
 
@@ -104,8 +110,8 @@
     const baseSaveTeam=saveTeamModal;saveTeamModal=function(next){
       try{
         if(next.userId)applyUserIdentity(next);
-        const source=recordModalState.isNew?[...(gridState.team.editing?gridState.team.draft:db.team),next]:(gridState.team.editing?gridState.team.draft:db.team).map(person=>person.id===recordModalState.id?next:person);
-        validatePeopleLinks(source)
+        const peers=(gridState.team.editing?gridState.team.draft:db.team).filter(person=>person.id!==recordModalState.id);
+        validatePersonLink(next,peers)
       }catch(error){alert(error.message);return}
       return baseSaveTeam(next)
     }
@@ -126,5 +132,5 @@
   window.addEventListener('amo-access-changed',refreshIdentitySurfaces);
   setTimeout(refreshIdentitySurfaces,150);
 
-  window.amoPersonUserLink={userById,userOptions,applyUserIdentity,validatePeopleLinks,syncLinkedPeople};
+  window.amoPersonUserLink={userById,userOptions,applyUserIdentity,validatePersonLink,validatePeopleLinks,syncLinkedPeople};
 })();
