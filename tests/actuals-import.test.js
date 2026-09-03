@@ -27,3 +27,4 @@ const august=result.periods.find(p=>p.month==='2026-08');assert.equal(august.fac
 const preview=Actuals.replacementPreview(result,['2026-01','2026-07']);assert.deepEqual(Array.from(preview.replace),['2026-07']);assert.deepEqual(Array.from(preview.add),['2026-08']);
 const bad={'!ref':'A1:I1'};header.filter(h=>h!=='UOM').forEach((v,c)=>bad[encodeCell({r:0,c})]={v});assert.throws(()=>Actuals.aggregateWorksheet(bad,{team:[],demand:[]}),/missing required columns/);
 console.log('Actuals import tests passed');
+require('./staff-number-contract.test.js');
