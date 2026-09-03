@@ -28,6 +28,15 @@ function getLastConnectionPreference(){try{const value=JSON.parse(localStorage.g
 function setLastConnectionPreference(value){try{if(value?.mode)localStorage.setItem(AMO_CONNECTION_PREF_KEY,JSON.stringify({...value,updatedAt:new Date().toISOString()}))}catch(_){}return value}
 function beginWorkspaceConnection(mode,detail=''){workspaceConnectionGeneration+=1;workspaceConnectionIntent={token:workspaceConnectionGeneration,mode,detail};return workspaceConnectionGeneration}
 function workspaceConnectionIsCurrent(token,mode=null){return token===workspaceConnectionIntent.token&&(!mode||workspaceConnectionIntent.mode===mode)}
+/* Canonical lifecycle notification: fire only after the repository and loaded workspace data have
+   both been installed. Consumers such as Access, Users, reporting and scope can then read db.settings
+   without racing the default emptyDb() state. */
+function notifyWorkspaceConnected(mode=window.workspaceRepository?.mode||null){
+  const detail={mode,workspaceId:db.workspace?.id||null,workspaceName:db.workspace?.name||workspaceHandle?.name||''};
+  try{window.dispatchEvent(new CustomEvent('amo-workspace-connected',{detail}))}catch(_e){}
+  window.amoAccess?.refresh?.();
+  return detail
+}
 function renderWorkspaceConnectionBadge(){const el=$('workspaceConnectionBadge');if(!el)return;const repo=window.workspaceRepository;if(repo?.mode==='remote'){el.textContent=`Remote: ${repo.baseUrl||repo.name||'API workspace'}`;el.title=repo.baseUrl||'Remote API workspace';el.dataset.mode='remote';return}if(repo?.mode==='local'&&workspaceHandle){el.textContent=`Local: ${workspaceHandle.name||'Workspace'}`;el.title='Local browser folder. Browsers do not expose the full filesystem path to web applications.';el.dataset.mode='local';return}el.textContent='No workspace open';el.title='No workspace is currently connected.';el.dataset.mode='none'}
 
 function log(m){activity.unshift(`${new Date().toLocaleTimeString()}  ${m}`);activity=activity.slice(0,100);$('activityLog').textContent=activity.join('\n')}
@@ -86,7 +95,7 @@ async function openWorkspace(){
     const prepared=prepareLoadedWorkspace(rawBundle),{workspace,demand,team,allocations,ideas,configFiles,loadedSettings}=prepared;
     if(!workspaceConnectionIsCurrent(connectionToken,'local'))return;
     workspaceHandle=h;setWorkspaceRepository(repo);setLastConnectionPreference({mode:'local',name:h.name||'Workspace'});
-    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);selectedDemandId=null;resetEdits();refreshAll();log(`Loaded ${demand.length} demand, ${team.length} team, ${allocations.length} allocations and ${ideas.length} ideas through LocalWorkspaceRepository. Safety backup created.`);if(prepared.migrated&&typeof requestAutosave==='function')requestAutosave()
+    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);selectedDemandId=null;resetEdits();notifyWorkspaceConnected('local');refreshAll();log(`Loaded ${demand.length} demand, ${team.length} team, ${allocations.length} allocations and ${ideas.length} ideas through LocalWorkspaceRepository. Safety backup created.`);if(prepared.migrated&&typeof requestAutosave==='function')requestAutosave()
   }catch(e){if(e.name!=='AbortError'){alert(e.message);log(`ERROR: ${e.message}`)}}
 }
 async function saveWorkspace(options={}){
