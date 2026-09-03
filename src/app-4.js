@@ -30,7 +30,11 @@ function renderResource(){
 
 /* Actuals load asynchronously from the workspace repository. Re-render Resource Plan when the
    canonical reporting model announces that its cache has been hydrated or refreshed. */
-window.addEventListener('amo:reporting-model-updated',()=>{if(workspaceHandle)renderResource()});
+window.addEventListener('amo:reporting-model-updated',event=>{
+  if(!workspaceHandle)return;
+  if(event?.detail?.error){const notice=$('resource')?.querySelector('.notice');if(notice)notice.innerHTML=`<strong>Actuals reporting unavailable:</strong> ${escHtml(event.detail.error)}. Allocation Forecast has not been presented as Actuals.`;return}
+  renderResource()
+});
 
 /* Keep the existing lazy bootstrap for now. The Resource Plan no longer depends on the script-load
    callback to refresh: repository hydration itself emits amo:reporting-model-updated. */
