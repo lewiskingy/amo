@@ -18,6 +18,10 @@
     if(typeof archiveStaleTerminalDemand==='function')await archiveStaleTerminalDemand(repo);
     if(typeof readWorkspaceLock==='function'){try{workspaceLock=await repo.readLock()}catch{workspaceLock=null}}
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
+    /* db.settings, Users, People and the repository are now authoritative. Notify lifecycle
+       consumers before the general render so access-control and identity surfaces cannot render
+       from the startup emptyDb() state. */
+    notifyWorkspaceConnected('remote');
     refreshAll();if(typeof renderStatusReporting==='function')renderStatusReporting();if(typeof renderStatusHistory==='function')renderStatusHistory();if(typeof renderLockStatus==='function')renderLockStatus();updateBanner();
     setLastConnectionPreference({mode:'remote',url:repo.baseUrl});
     try{localStorage.setItem(REMOTE_URL_KEY,repo.baseUrl)}catch{}
