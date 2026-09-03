@@ -11,7 +11,7 @@
     minimumFte:.10,
     zeroFte:.01
   };
-  let cache={repo:null,loading:null,loaded:false,months:new Set(),periods:new Map(),facts:[],manifest:null};
+  let cache={repo:null,loading:null,loaded:false,error:null,months:new Set(),periods:new Map(),facts:[],manifest:null};
 
   const monthKey=value=>{const m=String(value||'').match(/^(\d{4})-(\d{2})/);return m?`${m[1]}-${m[2]}`:''};
   const monthStart=value=>{const m=monthKey(value);return m?`${m}-01`:''};
@@ -28,18 +28,20 @@
   const fullTimeHours=value=>workingDays(value)*hoursPerDay();
   const actualFteFromHours=(hours,month)=>{const available=fullTimeHours(month);return available?round(n(hours)/available):0};
 
-  function reset(repo=window.workspaceRepository){cache={repo,loading:null,loaded:false,months:new Set(),periods:new Map(),facts:[],manifest:null}}
+  function reset(repo=window.workspaceRepository){cache={repo,loading:null,loaded:false,error:null,months:new Set(),periods:new Map(),facts:[],manifest:null}}
+  function loadState(){return{loaded:cache.loaded,loading:!!cache.loading,error:cache.error,months:[...cache.months].sort()}}
   async function load({force=false}={}){
     const repo=window.workspaceRepository;
     if(!repo?.listActualsPeriods){reset(repo);cache.loaded=true;return cache}
     if(cache.repo!==repo)reset(repo);if(cache.loaded&&!force)return cache;if(cache.loading)return cache.loading;
+    cache.error=null;
     cache.loading=(async()=>{
       const months=(await repo.listActualsPeriods()).map(monthKey).filter(Boolean).sort(),periods=new Map(),facts=[];
       for(const month of months){const period=await repo.readActualsPeriod(month);if(!period)continue;periods.set(month,period);for(const fact of period.facts||[])facts.push({...fact,month})}
       const manifest=await repo.readActualsManifest();
-      cache={repo,loading:null,loaded:true,months:new Set(months),periods,facts,manifest};
+      cache={repo,loading:null,loaded:true,error:null,months:new Set(months),periods,facts,manifest};
       window.dispatchEvent(new CustomEvent('amo:reporting-model-updated',{detail:{months}}));renderIntegratedViews();return cache
-    })().catch(error=>{cache.loading=null;console.warn('Could not load Actuals reporting cache.',error);return cache});
+    })().catch(error=>{cache.loading=null;cache.error=error;console.warn('Could not load Actuals reporting cache.',error);window.dispatchEvent(new CustomEvent('amo:reporting-model-updated',{detail:{error:String(error?.message||error)}}));return cache});
     return cache.loading
   }
   function ensureLoaded(){if(window.workspaceRepository&&(!cache.loaded||cache.repo!==window.workspaceRepository)&&!cache.loading)load();return cache.loaded&&cache.repo===window.workspaceRepository}
@@ -145,8 +147,7 @@
   }
 
   function unplannedFacts(month=null){return actualFacts(f=>(!month||f.month===monthKey(month))&&f.teamMemberId&&!f.demandId)}
-  function coverageLabel(){ensureLoaded();const months=actualMonths();if(!months.length)return'No Actuals loaded';const first=months[0],last=months.at(-1),fmt=m=>new Date(`${m}-01T00:00:00`).toLocaleDateString('en-GB',{month:'short',year:'numeric'});return first===last?`Actuals for ${fmt(first)}`:`Actuals ${fmt(first)}–${fmt(last)}`}
-
+  function coverageLabel(){ensureLoaded();const months=actualMonths();if(!months.length)return'No Actuals loaded';const first=months[0],last=months.at(-1),fmt=m=>new Date(`${m}-01T00:00:00`).toLocaleDateString('en-GB',{month:'short',year:'numeric'});return first===last?`Actuals for ${fmt(first)}`:`Actuals ${fmt(first)} – ${fmt(last)}`}
   function signalLabel(summary){
     if(summary.noActual)return'No Actuals';if(summary.lowOverall)return'Low overall';if(summary.redirected)return'Redirected';if(summary.overCapacity)return'Over capacity';if(summary.unplannedFte>=SIGNAL_THRESHOLDS.minimumFte)return'Unplanned';return''
   }
@@ -184,5 +185,5 @@
   function decorateConfig(){const content=document.getElementById('configContent');if(!content||!content.querySelector('[data-settings-tab="system"].active'))return;const grid=content.querySelector('.settings-grid');if(!grid||document.getElementById('amoReportingAssumptionsCard'))return;const canEdit=window.amoAccess?.can?.('system.configure')!==false,card=document.createElement('div');card.className='card';card.id='amoReportingAssumptionsCard';card.innerHTML=`<div class="section-title" style="margin-top:0"><div><h2>Reporting assumptions</h2><p class="muted config-description">Converts imported Actual hours into comparable FTE for resource reporting.</p></div></div><div class="settings-field"><label>Standard working hours per day</label>${canEdit?`<div class="flex" style="gap:8px;align-items:center"><input class="cell-input" id="amoStandardHoursPerDay" type="number" min="0.1" max="24" step="0.1" value="${hoursPerDay()}"><button class="btn success" id="amoSaveStandardHours">Save</button></div>`:`<strong>${hoursPerDay()}</strong>`}<div class="settings-note" style="margin-top:6px">Monthly full-time capacity = Monday–Friday working days × this value. Individual available FTE is still taken from People.</div></div>`;card.querySelector('#amoSaveStandardHours')?.addEventListener('click',async()=>{const button=card.querySelector('#amoSaveStandardHours');try{button.disabled=true;await saveHoursPerDay(card.querySelector('#amoStandardHoursPerDay')?.value);if(typeof log==='function')log('Reporting standard working hours updated.');if(typeof refreshAll==='function')refreshAll()}catch(e){alert(e.message||e)}finally{button.disabled=false}});grid.appendChild(card)}
   const configContent=document.getElementById('configContent');if(configContent)new MutationObserver(decorateConfig).observe(configContent,{childList:true,subtree:true});
   window.addEventListener('amo:actuals-updated',()=>{reset(window.workspaceRepository);load({force:true}).then(()=>typeof refreshAll==='function'&&refreshAll())});window.addEventListener('amo:reporting-model-updated',renderIntegratedViews);
-  window.ReportingModel={DEFAULT_HOURS_PER_DAY,SIGNAL_THRESHOLDS,monthKey,monthStart,hoursPerDay,workingDays,fullTimeHours,actualFteFromHours,load,ensureLoaded,reset,actualsAvailable,periodBasis,actualMonths,latestActualMonth,actualHours,actualCost,actualFte,forecastFte,reportedFte,varianceFte,capacityFte,reportedTotalFte,utilisationPct,forecastUtilisationPct,knownMonths,personDemandRows,personMonthSummary,managementSignals,demandSummary,demandEffortContext,demandEffortMessage,unplannedFacts,coverageLabel,signalLabel,dashboardAttentionSignals,renderDashboardIntegration,renderDemandInsights,renderIntegratedViews};
+  window.ReportingModel={DEFAULT_HOURS_PER_DAY,SIGNAL_THRESHOLDS,monthKey,monthStart,hoursPerDay,workingDays,fullTimeHours,actualFteFromHours,load,loadState,ensureLoaded,reset,actualsAvailable,periodBasis,actualMonths,latestActualMonth,actualHours,actualCost,actualFte,forecastFte,reportedFte,varianceFte,capacityFte,reportedTotalFte,utilisationPct,forecastUtilisationPct,knownMonths,personDemandRows,personMonthSummary,managementSignals,demandSummary,demandEffortContext,demandEffortMessage,unplannedFacts,coverageLabel,signalLabel,dashboardAttentionSignals,renderDashboardIntegration,renderDemandInsights,renderIntegratedViews};
 })();
