@@ -1,0 +1,7 @@
+Work Package Step 2 acceptance focus:
+- create/edit/delete a Work Package under Demand;
+- local and remote persistence;
+- Team > Department > System Azure DevOps Organisation inheritance;
+- Team > Department Azure DevOps Project inheritance;
+- derived Work Item URL from numeric reference;
+- Allocations and Actuals remain Demand-level.
