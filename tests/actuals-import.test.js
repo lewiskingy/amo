@@ -43,3 +43,4 @@ const bad={'!ref':'A1:I1'};header.filter(h=>h!=='UOM').forEach((v,c)=>bad[encode
 console.log('Actuals import tests passed');
 require('./demand-project-number-contract.test.js');
 require('./staff-number-contract.test.js');
+require('./work-packages-contract.test.js');
