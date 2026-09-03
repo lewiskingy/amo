@@ -62,6 +62,11 @@
     async listStatusReports(){return this.request('/api/status-reports')}
     async getStatusReport(id){const name=String(id).endsWith('.json')?String(id):`${id}.json`,key=`statusReport:${name}`;if(this.info?.capabilities?.optimisticConcurrency){const value=await this.request(`/api/status-reports/${encodeURIComponent(id)}?meta=1`);if(value?.version!=null)this.versions[key]=value.version;return value?.record}return this.request(`/api/status-reports/${encodeURIComponent(id)}`)}
     async saveStatusReport(id,record){const name=String(id).endsWith('.json')?String(id):`${id}.json`,key=`statusReport:${name}`,version=this.versions[key],result=await this.request(`/api/status-reports/${encodeURIComponent(id)}`,{method:'PUT',headers:version!=null?{'If-Match':String(version)}:{},body:JSON.stringify(record)});return this.rememberVersions(result)}
+    async listActualsPeriods(){const value=await this.request('/api/actuals');return Array.isArray(value?.periods)?value.periods:[]}
+    async readActualsPeriod(month){return this.request(`/api/actuals/${encodeURIComponent(month)}`)}
+    async readActualsManifest(){const value=await this.request('/api/actuals');return value?.manifest||null}
+    async replaceActualsPeriods(periods,manifest){return this.rememberVersions(await this.request('/api/actuals/import',{method:'POST',body:JSON.stringify({periods,manifest})}))}
+    async clearActuals(){return this.rememberVersions(await this.request('/api/actuals',{method:'DELETE'}))}
     async readLock(){if(this.info?.capabilities?.locking===false)return null;return this.request('/api/lock')}
     async writeLock(record){if(this.info?.capabilities?.locking===false)return record;return this.request('/api/lock',{method:'PUT',body:JSON.stringify(record)})}
     async deleteLock(){if(this.info?.capabilities?.locking===false)return;return this.request('/api/lock',{method:'DELETE'})}
