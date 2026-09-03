@@ -3,7 +3,7 @@ function renderResource(){
   const reportingReady=!!rm?.ensureLoaded?.();const reported=m=>reportingReady&&rm?.reportedTotalFte?rm.reportedTotalFte(m):allocatedTotal(m),basis=m=>reportingReady?rm?.periodBasis?.(m)||'forecast':'forecast',actual=m=>basis(m)==='actual';
   const peak=months.map(m=>({m,used:reported(m)})).sort((a,b)=>b.used-a.used)[0]||{m:months[0],used:0},overMonths=months.filter(m=>reported(m)>capacity).length;
   const now=new Date(),calendarCurrent=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`,currentMonth=months.includes(calendarCurrent)?calendarCurrent:(months[0]||calendarCurrent),currentUsed=reported(currentMonth),currentBasis=reportingReady?(actual(currentMonth)?'actual effort':'forecast allocation'):'loading Actuals';
-  const coverage=!rm?'Actuals reporting unavailable':reportingReady?(rm.coverageLabel?.()||'No Actuals loaded'):'Loading Actuals…';
+  const bootstrapState=window.__amoReportingModelState||'',coverage=!rm?(bootstrapState==='error'?'Actuals reporting unavailable':'Loading Actuals reporting…'):reportingReady?(rm.coverageLabel?.()||'No Actuals loaded'):'Loading Actuals…';
   $('resourceKpis').innerHTML=[['Available capacity',`${capacity.toFixed(1)} FTE`,'Active team baseline'],['Current reported effort',`${currentUsed.toFixed(1)} FTE`,`${monthLabel(currentMonth)} ${currentBasis}`],['Unmet demand',unmet.length,'Unresolved items with no resource'],['Over-capacity periods',overMonths,peak.m?`Peak ${monthLabel(peak.m)}: ${peak.used.toFixed(1)} FTE`:'No planning periods']].map(k=>`<div class="card"><div class="kpi-label">${k[0]}</div><div class="kpi-value">${k[1]}</div><div class="kpi-sub">${k[2]}</div></div>`).join('');
   const notice=$('resource')?.querySelector('.notice');if(notice)notice.innerHTML=`Reporting periods follow the <strong>Planning Window</strong>. <strong>${coverage}</strong>. Months with imported Actuals use observed effort; other months use allocation forecast. Allocations remain unchanged as the planning baseline.`;
   const monthHead=m=>`${monthLabel(m)}<br><span class="muted" style="font-size:.66rem">${reportingReady?(actual(m)?'ACTUAL':'FORECAST'):'LOADING'}</span>`,metric=(label,cls,fn)=>`<tr class="metric-row ${cls}"><td>${label}</td>${months.map(m=>`<td>${fn(m)}</td>`).join('')}</tr>`;
@@ -36,6 +36,16 @@ window.addEventListener('amo:reporting-model-updated',event=>{
   renderResource()
 });
 
-/* Keep the existing lazy bootstrap for now. The Resource Plan no longer depends on the script-load
-   callback to refresh: repository hydration itself emits amo:reporting-model-updated. */
-(function loadReportingModel(){if(window.ReportingModel||document.querySelector('script[data-amo-reporting-model]'))return;const s=document.createElement('script');s.src=typeof amoAsset==='function'?amoAsset('app-reporting-model.js'):'app-reporting-model.js';s.dataset.amoReportingModel='true';s.onload=()=>{window.ReportingModel?.ensureLoaded?.();if(typeof refreshAll==='function'&&workspaceHandle)refreshAll()};document.head.appendChild(s)})();
+/* ReportingModel is a first-class reporting dependency. It is still loaded without changing the
+   large application shell, but the request is now tied to the deployed build rather than a bare,
+   cache-prone URL or the later-loaded amoAsset helper. */
+(function loadReportingModel(){
+  if(window.ReportingModel){window.__amoReportingModelState='loaded';return}
+  if(document.querySelector('script[data-amo-reporting-model]'))return;
+  window.__amoReportingModelState='loading';
+  const s=document.createElement('script'),build=String(window.AMO_CONFIG?.buildId||'').trim(),base='app-reporting-model.js';
+  s.src=build?`${base}?v=${encodeURIComponent(build)}`:base;s.dataset.amoReportingModel='true';s.async=false;
+  s.onload=()=>{window.__amoReportingModelState=window.ReportingModel?'loaded':'error';if(window.ReportingModel){window.ReportingModel.ensureLoaded?.();if(typeof refreshAll==='function'&&workspaceHandle)refreshAll()}else if(workspaceHandle)renderResource()};
+  s.onerror=()=>{window.__amoReportingModelState='error';console.error(`Could not load ${s.src}`);if(workspaceHandle)renderResource()};
+  document.head.appendChild(s)
+})();
