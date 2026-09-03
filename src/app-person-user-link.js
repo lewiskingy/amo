@@ -1,6 +1,6 @@
-/* Optional People -> AMO User relationship.
+/* Optional Person -> AMO User relationship.
    Person remains the workforce/resource record. User remains the authoritative application identity.
-   When linked, User.displayName and User.companyAccount own the Person name/email snapshot. */
+   Staff Number is the stable workforce identifier used to reconcile Oracle Actuals Person # values. */
 (function initPersonUserLink(){
   if(window.__amoPersonUserLinkLoaded)return;window.__amoPersonUserLinkLoaded=true;
 
@@ -15,19 +15,23 @@
     if(!person?.userId)return false;
     const user=userById(person.userId);if(!user)return false;
     const name=clean(user.displayName),email=clean(user.companyAccount);let changed=false;
-    if(clean(person.name)!==name){person.name=name;changed=true}
-    if(clean(person.email)!==email){person.email=email;changed=true}
+    if(name&&clean(person.name)!==name){person.name=name;changed=true}
+    if(email&&clean(person.email)!==email){person.email=email;changed=true}
     return changed
   }
 
   function validatePeopleLinks(rows){
-    const assigned=new Map();
+    const assignedUsers=new Map(),assignedStaffNumbers=new Map();
     for(const person of rows||[]){
-      person.userId=clean(person.userId);person.email=clean(person.email);
+      person.userId=clean(person.userId);person.email=clean(person.email);person.staffNumber=clean(person.staffNumber);
+      if(!person.staffNumber)throw new Error(`Staff Number is required for ${person.name||person.id}.`);
+      const staffKey=person.staffNumber.toLowerCase();
+      if(assignedStaffNumbers.has(staffKey))throw new Error(`Staff Number ${person.staffNumber} is already used by ${assignedStaffNumbers.get(staffKey)}.`);
+      assignedStaffNumbers.set(staffKey,person.name||person.id);
       if(!person.userId)continue;
       const user=userById(person.userId);if(!user)throw new Error(`Person ${person.name||person.id} is linked to a User that no longer exists.`);
-      if(assigned.has(person.userId))throw new Error(`${user.displayName||user.companyAccount||user.id} is already linked to ${assigned.get(person.userId)}. A User can only be linked to one Person.`);
-      assigned.set(person.userId,person.name||person.id);applyUserIdentity(person)
+      if(assignedUsers.has(person.userId))throw new Error(`${user.displayName||user.companyAccount||user.id} is already linked to ${assignedUsers.get(person.userId)}. A User can only be linked to one Person.`);
+      assignedUsers.set(person.userId,person.name||person.id);applyUserIdentity(person)
     }
     return true
   }
@@ -43,21 +47,22 @@
     return changed
   }
 
-  /* Extend existing People records without migrating or requiring either field. */
   if(typeof defaultTeamRecord==='function'){
-    const baseDefault=defaultTeamRecord;defaultTeamRecord=function(){return{...baseDefault(),userId:'',email:''}}
+    const baseDefault=defaultTeamRecord;defaultTeamRecord=function(){const record=baseDefault();delete record.personNumber;return{...record,staffNumber:'',userId:'',email:''}}
   }
 
   if(typeof teamCols!=='undefined'){
-    if(!teamCols.some(col=>col.key==='userId'))teamCols.splice(1,0,{key:'userId',label:'AMO access',type:'text',editable:false});
-    else{const accessCol=teamCols.find(col=>col.key==='userId');if(accessCol)accessCol.label='AMO access'}
+    const oldPeopleNumber=teamCols.findIndex(col=>col.key==='personNumber');if(oldPeopleNumber>=0)teamCols.splice(oldPeopleNumber,1);
+    if(!teamCols.some(col=>col.key==='staffNumber'))teamCols.splice(1,0,{key:'staffNumber',label:'Staff Number *',type:'text',editable:true});
+    if(!teamCols.some(col=>col.key==='userId'))teamCols.splice(2,0,{key:'userId',label:'Linked User',type:'text',editable:false});
+    else{const accessCol=teamCols.find(col=>col.key==='userId');if(accessCol)accessCol.label='Linked User'}
     const nameIndex=teamCols.findIndex(col=>col.key==='name');
-    if(!teamCols.some(col=>col.key==='email'))teamCols.splice(nameIndex>=0?nameIndex+1:2,0,{key:'email',label:'Company / Entra Email',type:'text',editable:true})
+    if(!teamCols.some(col=>col.key==='email'))teamCols.splice(nameIndex>=0?nameIndex+1:3,0,{key:'email',label:'Company / Entra Email',type:'text',editable:true})
   }
 
   if(typeof displayVal==='function'){
     const baseDisplay=displayVal;displayVal=function(row,col){
-      if(col?.key==='userId')return row?.userId?userLabel(userById(row.userId)):'No application access';
+      if(col?.key==='userId')return row?.userId?userLabel(userById(row.userId)):'Not linked';
       if(row?.userId&&col?.key==='name')return clean(userById(row.userId)?.displayName)||baseDisplay(row,col);
       if(row?.userId&&col?.key==='email')return clean(userById(row.userId)?.companyAccount)||baseDisplay(row,col);
       return baseDisplay(row,col)
@@ -68,7 +73,7 @@
     const baseEdit=editControl;editControl=function(row,col){
       if(row?.userId&&(col?.key==='name'||col?.key==='email')){
         const value=col.key==='name'?clean(userById(row.userId)?.displayName)||clean(row.name):clean(userById(row.userId)?.companyAccount)||clean(row.email);
-        return`<input class="cell-input" type="text" value="${typeof escHtml==='function'?escHtml(value):value}" disabled title="Managed from the linked AMO access identity">`
+        return`<input class="cell-input" type="text" value="${typeof escHtml==='function'?escHtml(value):value}" disabled title="Managed from the linked AMO User">`
       }
       return baseEdit(row,col)
     }
@@ -78,8 +83,8 @@
     renderTeamModal=function(r){
       const linked=userById(r.userId),roles=[{value:'',label:'Unassigned'},...(typeof configuredRoles==='function'?configuredRoles():[]).map(role=>({value:role.id,label:role.name}))];
       if(linked)applyUserIdentity(r);
-      const managed=!!linked,identityNote=managed?'<div class="field full"><div class="notice">Name and Company / Entra Email are managed from the linked AMO access identity. Roles and authentication mappings are managed under Users & Access.</div></div>':'<div class="field full"><div class="muted">This Person does not currently have application access. Link an existing User here, or use Users & Access to grant and manage access.</div></div>';
-      return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('AMO access','userId',r.userId||'','select',userOptions())}${modalField('Name','name',r.name,'text',null,true,false,managed)}${modalField('Company / Entra Email','email',r.email||'','email',null,false,false,managed)}${identityNote}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`
+      const managed=!!linked,identityNote=managed?'<div class="field full"><div class="notice">Name and Company / Entra Email are populated from the linked User. Staff Number remains workforce data on the Person and is used to match Oracle Actuals.</div></div>':'<div class="field full"><div class="muted">Optionally pick an existing User to populate Name and Company / Entra Email. A Person does not need application access to exist in resource planning.</div></div>';
+      return`<div class="record-form">${modalField('Team ID','id',r.id,'text',null,false,false,true)}${modalField('Staff Number','staffNumber',r.staffNumber||'','text',null,true)}${modalField('Linked User','userId',r.userId||'','select',userOptions())}${modalField('Name','name',r.name,'text',null,true,false,managed)}${modalField('Company / Entra Email','email',r.email||'','email',null,false,false,managed)}${identityNote}${modalField('Role','roleId',r.roleId||'','select',roles)}${modalField('FTE','fte',r.fte,'number')}${modalField('Active','active',String(r.active),'select',[{value:'true',label:'Yes'},{value:'false',label:'No'}])}</div>`
     }
   }
 
@@ -98,10 +103,11 @@
   if(typeof saveTeamModal==='function'){
     const baseSaveTeam=saveTeamModal;saveTeamModal=function(next){
       try{
+        if(next.userId)applyUserIdentity(next);
         const source=recordModalState.isNew?[...(gridState.team.editing?gridState.team.draft:db.team),next]:(gridState.team.editing?gridState.team.draft:db.team).map(person=>person.id===recordModalState.id?next:person);
         validatePeopleLinks(source)
       }catch(error){alert(error.message);return}
-      if(next.userId)applyUserIdentity(next);return baseSaveTeam(next)
+      return baseSaveTeam(next)
     }
   }
 
