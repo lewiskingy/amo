@@ -15,6 +15,7 @@ export function openApiDocument(req){
       {name:'Workspace',description:'Workspace loading and bulk persistence'},
       {name:'Records',description:'Typed workspace records'},
       {name:'Settings',description:'Workspace configuration'},
+      {name:'Actuals',description:'Monthly imported Oracle Actuals facts'},
       {name:'Status Reports',description:'Demand status reports'},
       {name:'Locking',description:'Compatibility locking/coordination endpoints'},
       {name:'Archive',description:'Record archiving'},
@@ -34,6 +35,12 @@ export function openApiDocument(req){
         get:{tags:['Settings'],summary:'Get workspace settings; add ?meta=1 for version metadata',responses:{'200':ok}},
         put:{tags:['Settings'],summary:'Replace workspace settings',requestBody:{required:true,content:{'application/json':{schema:json}}},responses:{'200':ok,'409':error}}
       },
+      '/api/actuals':{
+        get:{tags:['Actuals'],summary:'List stored Actuals months and latest import manifest',responses:{'200':ok}},
+        delete:{tags:['Actuals'],summary:'Clear all stored Actuals periods',responses:{'200':ok,'500':error}}
+      },
+      '/api/actuals/{month}':{get:{tags:['Actuals'],summary:'Get one monthly Actuals period document',parameters:[{name:'month',in:'path',required:true,schema:{type:'string',pattern:'^\\d{4}-\\d{2}$'}}],responses:{'200':ok,'404':error}}},
+      '/api/actuals/import':{post:{tags:['Actuals'],summary:'Replace the monthly periods represented by a prepared client-side Actuals import',requestBody:{required:true,content:{'application/json':{schema:json}}},responses:{'200':ok,'400':error,'409':error,'500':error}}},
       '/api/status-reports':{get:{tags:['Status Reports'],summary:'List status reports',responses:{'200':ok}}},
       '/api/status-reports/{id}':{
         get:{tags:['Status Reports'],summary:'Get a status report; add ?meta=1 for version metadata',parameters:[{name:'id',in:'path',required:true,schema:{type:'string'}}],responses:{'200':ok,'404':error}},
