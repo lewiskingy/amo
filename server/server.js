@@ -21,11 +21,27 @@ repo.storage=repo.storage||(REPOSITORY_MODE==='mongo'?'mongodb':'json-filesystem
 function cors(req,res){const origin=req.headers.origin;if(origin&&(!allowedOrigins.length||allowedOrigins.includes(origin))){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin')}res.setHeader('Access-Control-Allow-Headers','Content-Type,Authorization,If-Match,X-AMO-Actor');res.setHeader('Access-Control-Allow-Methods','GET,POST,PUT,DELETE,OPTIONS')}
 function send(res,status,data,headers={}){const payload=data==null?'':JSON.stringify(data);res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(payload)}
 function sendHtml(res,status,html){res.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(html)}
-async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>10_000_000)throw new Error('Request body too large.')}return raw?JSON.parse(raw):{}}
+async function body(req){let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>30_000_000)throw new Error('Request body too large.')}return raw?JSON.parse(raw):{}}
 function parts(pathname){return pathname.split('/').filter(Boolean).map(decodeURIComponent)}
 function actor(req){return String(req.headers['x-amo-actor']||'Remote user').slice(0,200)}
 function expectedVersion(req){const raw=String(req.headers['if-match']||'').replace(/^W\//,'').replace(/^"|"$/g,'');return /^\d+$/.test(raw)?Number(raw):undefined}
 function meta(url){return url.searchParams.get('meta')==='1'||url.searchParams.get('includeVersion')==='true'}
+function validMonth(month){return /^\d{4}-\d{2}$/.test(String(month||''))}
+const mongoDocumentId=(type,id)=>`${type}:${id}`;
+async function actualsSummary(){
+  if(repo.listActualsPeriods)return{periods:await repo.listActualsPeriods(),manifest:await repo.readActualsManifest()};
+  const periods=(await repo.listDocuments('actualsPeriod')).map(d=>d.entityId).sort(),manifestDoc=await repo.getDocument('actualsManifest','default',{required:false});return{periods,manifest:manifestDoc?.data||null}
+}
+async function actualsPeriod(month){if(!validMonth(month))throw new Error('Actuals period must use YYYY-MM.');if(repo.readActualsPeriod)return repo.readActualsPeriod(month);const doc=await repo.getDocument('actualsPeriod',month,{required:false});return doc?.data||null}
+async function replaceActuals(periods,manifest,who){
+  for(const period of periods||[])if(!validMonth(period?.month))throw new Error('Actuals period must use YYYY-MM.');
+  if(repo.replaceActualsPeriods)return repo.replaceActualsPeriods(periods,manifest,{actor:who});
+  const operations=(periods||[]).map(period=>({documentId:mongoDocumentId('actualsPeriod',period.month),documentType:'actualsPeriod',entityId:period.month,after:period}));operations.push({documentId:mongoDocumentId('actualsManifest','default'),documentType:'actualsManifest',entityId:'default',after:manifest});return repo.commitDocumentChanges({type:'actuals-import',reason:`Import Actuals ${manifest?.import?.firstMonth||''} to ${manifest?.import?.latestMonth||''}`.trim(),actor:who,operations})
+}
+async function clearActuals(who){
+  if(repo.clearActuals)return repo.clearActuals({actor:who});
+  const docs=await repo.listDocuments('actualsPeriod'),operations=docs.map(d=>({documentId:d._id,documentType:'actualsPeriod',entityId:d.entityId,after:null}));const manifest=await repo.getDocument('actualsManifest','default',{required:false});if(manifest)operations.push({documentId:manifest._id,documentType:'actualsManifest',entityId:'default',after:null});return repo.commitDocumentChanges({type:'actuals-clear',reason:'Clear Actuals',actor:who,operations})
+}
 
 const bootstrap=await repo.ensureWorkspace();
 console.log(bootstrap.created?`Bootstrapped new AMO ${repo.storage} workspace.`:`Using existing AMO ${repo.storage} workspace.`);
@@ -38,7 +54,7 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==='GET'&&(url.pathname==='/swagger'||url.pathname==='/swagger/'))return sendHtml(res,200,swaggerHtml());
     if(req.method==='GET'&&url.pathname==='/api/info'){
       let workspace=null;try{workspace=await repo.connect()}catch{}
-      const mongo=repo.storage==='mongodb';return send(res,200,{product:'AMO',backendVersion:BACKEND_VERSION,backendBuild:BACKEND_BUILD,apiVersion:API_VERSION,storage:repo.storage,workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,locking:!mongo,commitLocking:true,archive:true,bulkSave:true,optimisticConcurrency:mongo,databaseTransactions:mongo,recovery:mongo,auditRetentionDays:mongo?28:null,managedBackup:mongo?'cosmos-continuous':null}})
+      const mongo=repo.storage==='mongodb';return send(res,200,{product:'AMO',backendVersion:BACKEND_VERSION,backendBuild:BACKEND_BUILD,apiVersion:API_VERSION,storage:repo.storage,workspaceName:workspace?.name||null,initialized:Boolean(workspace),capabilities:{records:true,statusReports:true,actuals:true,locking:!mongo,commitLocking:true,archive:true,bulkSave:true,optimisticConcurrency:mongo,databaseTransactions:mongo,recovery:mongo,auditRetentionDays:mongo?28:null,managedBackup:mongo?'cosmos-continuous':null}})
     }
     if(req.method==='GET'&&url.pathname==='/api/workspace')return send(res,200,await repo.loadWorkspace());
     if(req.method==='POST'&&url.pathname==='/api/workspace/save'){const result=await repo.saveChanges(await body(req),{actor:actor(req)});return send(res,200,{ok:true,...(result||{})})}
@@ -53,6 +69,12 @@ const server=http.createServer(async(req,res)=>{
       if(req.method==='GET'){if(meta(url)&&repo.getSettingsWithVersion)return send(res,200,await repo.getSettingsWithVersion());return send(res,200,await repo.getSettings())}
       if(req.method==='PUT'){const result=await repo.saveSettings(await body(req),{expectedVersion:expectedVersion(req),actor:actor(req)});return send(res,200,{ok:true,...(result||{})})}
     }
+    if(url.pathname==='/api/actuals'){
+      if(req.method==='GET')return send(res,200,await actualsSummary());
+      if(req.method==='DELETE'){const result=await clearActuals(actor(req));return send(res,200,{ok:true,...(result||{})})}
+    }
+    if(url.pathname==='/api/actuals/import'&&req.method==='POST'){const payload=await body(req);if(!Array.isArray(payload.periods)||!payload.manifest)return send(res,400,{error:'Actuals import requires periods and manifest.'});const result=await replaceActuals(payload.periods,payload.manifest,actor(req));return send(res,200,{ok:true,...(result||{})})}
+    if(p[0]==='api'&&p[1]==='actuals'&&p[2]&&p[2]!=='import'&&req.method==='GET'){const value=await actualsPeriod(p[2]);return value?send(res,200,value):send(res,404,{error:`Actuals period ${p[2]} was not found.`})}
     if(url.pathname==='/api/commit-locks'){
       const payload=await body(req),resource=String(payload?.resource||'').trim();if(!resource)return send(res,400,{error:'Commit lock resource is required.'});
       if(req.method==='POST'){const {resource:_resource,...owner}=payload,lock=await repo.acquireCommitLock(resource,owner);return lock?send(res,201,lock):send(res,423,{error:'Resource is currently being committed by another user. Try again.'})}
