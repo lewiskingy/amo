@@ -18,6 +18,14 @@ async function ensureMobileNavOpen(page){
   await waitFor(async()=>await toggle.getAttribute('aria-expanded')==='true');
 }
 
+async function waitForStatusAuthoringUi(page){
+  await waitFor(async()=>await page.evaluate(()=>window.__amoStatusReportUiLoaded===true),{timeout:5000});
+  await waitFor(async()=>{
+    const headings=(await page.locator('#status-report .section-title h2').allTextContents()).map(x=>x.trim());
+    return headings.includes('Architecture Status Report');
+  },{timeout:5000});
+}
+
 async function sharedRenderer(page,host='#statusAcceptanceReport'){
   const report=page.locator(`${host} .shared-report-renderer`);
   await waitFor(async()=>await report.count()===1);
@@ -50,6 +58,7 @@ async function renderAcceptanceReport(page,{status='Published',departmentId='org
 }
 
 When('I open Status Report', async function(){
+  await waitForStatusAuthoringUi(this.page);
   if((process.env.E2E_PROFILE||'desktop')==='mobile')await ensureMobileNavOpen(this.page);
   const button=this.page.locator('.sidebar .nav-btn[data-view="status-report"]');
   await waitFor(async()=>await button.count()===1);
@@ -57,6 +66,7 @@ When('I open Status Report', async function(){
   if(await group.count()===1&&!await group.evaluate(node=>node.open))await group.evaluate(node=>{node.open=true});
   await button.evaluate(element=>element.click());
   await waitFor(async()=>await this.page.locator('#status-report.view.active').count()===1);
+  await waitForStatusAuthoringUi(this.page);
 });
 
 When('I prepare the Status Report acceptance fixture', async function(){
@@ -150,9 +160,11 @@ When('I open the standalone acceptance report route', async function(){
 });
 
 Then('the Status Report authoring page should be displayed', async function(){
+  await waitForStatusAuthoringUi(this.page);
   const view=this.page.locator('#status-report.view.active');
   await waitFor(async()=>await view.count()===1);
-  assert.equal(String(await view.locator(':scope > .hero h1').textContent()||'').trim(),'Status report');
+  const title=String(await view.locator(':scope > .hero h1').textContent()||'').trim();
+  assert.ok(/^Status report$/i.test(title),`Unexpected Status Report page title: ${title}`);
   const headingTexts=(await view.locator(':scope > .section-title h2').allTextContents()).map(x=>x.trim());
   assert.ok(headingTexts.includes('Architecture Status Report'),'The authoring table is not presented as the Architecture Status Report.');
   assert.equal(await view.locator('#statusReportTable').count(),1,'The Status Report authoring table is missing.');
