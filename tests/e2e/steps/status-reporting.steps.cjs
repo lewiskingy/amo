@@ -70,7 +70,10 @@ When('I open Status Report', async function(){
 });
 
 When('I prepare the Status Report acceptance fixture', async function(){
-  await waitFor(async()=>await this.page.evaluate(()=>!!window.AmoReportRenderer&&typeof window.openStatusReportModal==='function'));
+  /* app-status-report.js defines the legacy modal before app-status-report-ui.js replaces it with
+     the canonical shared-renderer implementation. On slower/mobile startup, waiting for merely
+     "some" openStatusReportModal can therefore race the canonical module. */
+  await waitFor(async()=>await this.page.evaluate(()=>window.__amoStatusReportUiLoaded===true&&!!window.AmoReportRenderer&&typeof window.openStatusReportModal==='function'),{timeout:5000});
   await this.page.evaluate(()=>{
     window.__amoStatusAcceptanceFixture={
       id:'SR-ACCEPTANCE-001',
