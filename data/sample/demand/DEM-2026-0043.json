@@ -11,7 +11,6 @@
   "source": {"type": "SharePoint", "id": "FD-3940", "url": "https://sharepoint.example/frontdoor/3940"},
   "triage": {"architectureImpact": "Medium", "complexity": "Medium", "romDays": 18, "summary": "Upgrade impacts payment routing and integration interfaces.", "dependencies": ["Payments Engineering"]},
   "workPackage": {"objective": "Provide architecture for platform upgrade and migration sequencing.", "scope": "Target platform, integration changes and transition architecture.", "outOfScope": "Vendor implementation plan.", "architectureOwner": "USR-002", "targetStart": "2026-09-15", "targetEnd": "2026-12-15", "governance": "Technology Design Authority", "executionEstimateDays": 20, "requiredInputs": ["Vendor upgrade guide", "Current HLD", "Migration milestones"], "dependencies": ["Payments Engineering", "Operations"]},
-  "azureDevOps": {"id": 18811, "type": "Feature", "url": "https://dev.azure.com/example/_workitems/edit/18811", "state": "Active"},
   "deliverables": [{"id": "DEL-0043-01", "type": "HLD Lite", "title": "Payments Upgrade HLD Lite", "status": "Review", "libraryUrl": "https://sharepoint.example/architecture/HLD/PaymentsUpgrade"}],
   "version": 3,
   "modifiedAt": "2026-08-19T10:05:00+01:00",
