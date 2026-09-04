@@ -3,6 +3,17 @@
    It can shrink as those modules are decomposed further. */
 (function initWorkspaceRepositoryBridge(){
   const currentRepo=()=>window.workspaceRepository||(workspaceHandle&&window.workspaceRepositoryForHandle?workspaceRepositoryForHandle(workspaceHandle):null);
+  async function readRepositoryLock(repo){
+    if(!repo)return null;
+    try{return await repo.readLock(WORKSPACE_LOCK_FILE)}
+    catch(e){
+      if(repo.mode==='local'&&(e instanceof SyntaxError||/JSON|Unexpected end/i.test(String(e?.message||'')))){
+        log?.(`Invalid local workspace lock file detected: ${e.message}. It will be treated as stale and may be replaced explicitly.`);
+        return{type:'amo-workspace-lock-invalid',invalid:true,userId:'invalid-lock',userDisplayName:'Unreadable local lock',acquiredAt:'',heartbeatAt:''}
+      }
+      throw e
+    }
+  }
 
   if(typeof persistStatusReports==='function'){
     persistStatusReports=async function(){
@@ -12,9 +23,9 @@
     }
   }
 
-  if(typeof readWorkspaceLock==='function')readWorkspaceLock=async function(){const repo=currentRepo();return repo?repo.readLock(WORKSPACE_LOCK_FILE):null};
+  if(typeof readWorkspaceLock==='function')readWorkspaceLock=async function(){return readRepositoryLock(currentRepo())};
   if(typeof writeWorkspaceLock==='function')writeWorkspaceLock=async function(lock){const repo=currentRepo();if(!repo)throw new Error('No workspace repository is connected.');await repo.writeLock(lock,WORKSPACE_LOCK_FILE)};
-  if(typeof removeWorkspaceLock==='function')removeWorkspaceLock=async function(){const repo=currentRepo();if(!repo)return;const current=await repo.readLock(WORKSPACE_LOCK_FILE);if(current&&current.sessionId!==lockSessionId)return;await repo.deleteLock(WORKSPACE_LOCK_FILE)};
+  if(typeof removeWorkspaceLock==='function')removeWorkspaceLock=async function(){const repo=currentRepo();if(!repo)return;const current=await readRepositoryLock(repo);if(current&&current.sessionId!==lockSessionId)return;await repo.deleteLock(WORKSPACE_LOCK_FILE)};
 
   if(typeof refreshBackupInventory==='function')refreshBackupInventory=async function(value=window.workspaceRepository){
     retainedBackupInventory=[];const repo=value?.listBackups?value:currentRepo();if(repo){try{for(const name of await repo.listBackups()){const date=parseBackupTimestamp(name);if(date)retainedBackupInventory.push({name,date})}}catch(e){log(`Could not list backups: ${e.message}`)}}retainedBackupInventory.sort((a,b)=>b.date-a.date);renderBackupInventory()
