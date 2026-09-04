@@ -7,6 +7,7 @@ const workflows=fs.readFileSync('src/app-service-workflows.js','utf8');
 const actuals=fs.readFileSync('src/app-actuals.js','utf8');
 const actualsAdmin=fs.readFileSync('src/app-actuals-admin.js','utf8');
 const index=fs.readFileSync('src/index.html','utf8');
+const worker=fs.readFileSync('worker.js','utf8');
 
 assert.match(recordModal,/projectNumber:''/);
 assert.match(recordModal,/modalField\('Project Number','projectNumber'/);
@@ -33,6 +34,7 @@ assert.doesNotMatch(workflows,/Cost Centre \/ Project Code/);
 assert.doesNotMatch(workflows,/costCentreOrProjectCode/);
 assert.match(index,/app-integrations\.js\?v=20260904-1/);
 assert.match(index,/app-service-workflows\.js\?v=20260904-1/);
+assert.match(worker,/window\.AMO_ASSET_VERSION=\$\{JSON\.stringify\(config\.buildId\)\}/);
 
 assert.match(actuals,/function projectNumber\(demand\)/);
 assert.match(actuals,/demand\?\.projectNumber/);
