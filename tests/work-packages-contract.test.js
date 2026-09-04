@@ -5,6 +5,7 @@ const app5=fs.readFileSync('src/app-5.js','utf8');
 const recordModal=fs.readFileSync('src/app-record-modal.js','utf8');
 const integrations=fs.readFileSync('src/app-integrations.js','utf8');
 const workflows=fs.readFileSync('src/app-service-workflows.js','utf8');
+const lock=fs.readFileSync('src/app-lock.js','utf8');
 const localRepository=fs.readFileSync('src/app-workspace-repository.js','utf8');
 const serverRepository=fs.readFileSync('server/repository.js','utf8');
 const mongoRepository=fs.readFileSync('server/mongo-repository.js','utf8');
@@ -27,6 +28,7 @@ assert.match(recordModal,/WorkPackages\?\.renderModalSection\?\.\(\$\('recordMod
 assert.match(workPackages,/function renderModalSection\(host,demandId\)/);
 assert.match(workPackages,/section\.id='demandWorkPackagesSection'/);
 assert.match(workPackages,/\+ Add Work Package/);
+assert.match(workPackages,/Save or cancel the Demand edit before changing its child Work Packages/);
 assert.doesNotMatch(workPackages,/renderDemandPanel/);
 assert.doesNotMatch(workPackages,/selectedDemandId/);
 assert.doesNotMatch(demandGrid,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
@@ -52,11 +54,21 @@ assert.match(localRepository,/\['demand','team','allocations','ideas','work-pack
 assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
+
+// Work Package writes participate in the same workspace edit lock and release only after the
+// direct repository write has completed.
+assert.match(lock,/\[data-wp-edit\],\[data-wp-delete\],#addWorkPackage/);
+assert.match(lock,/#wpCancel/);
+assert.doesNotMatch(lock,/#wpSave/);
+assert.match(workPackages,/await releaseEditLock\('Work Package edit completed'\)/);
+assert.match(workPackages,/finally\{await releaseEditLock\('Work Package delete completed'\)\}/);
+
 assert.match(index,/app-2\.js\?v=20260904-2/);
 assert.match(index,/app-record-modal\.js\?v=20260904-2/);
 assert.match(index,/app-5\.js\?v=20260904-2/);
 assert.match(index,/app-integrations\.js\?v=20260904-2/);
 assert.match(index,/app-service-workflows\.js\?v=20260904-2/);
+assert.match(index,/app-lock\.js\?v=20260904-2/);
 assert.match(index,/app-work-packages\.js\?v=20260904-2/);
 assert.match(targetStage,/const APP_VERSION='1\.1\.6'/);
 
