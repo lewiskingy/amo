@@ -11,7 +11,6 @@
   "source": {"type": "SharePoint", "id": "FD-3899", "url": "https://sharepoint.example/frontdoor/3899"},
   "triage": {"architectureImpact": "Low", "complexity": "Small", "romDays": 4, "summary": "Low-impact assurance against approved network pattern.", "dependencies": ["Network Platform"]},
   "workPackage": {"objective": "Assure branch refresh design against approved standards.", "scope": "Network topology and connectivity controls.", "outOfScope": "Site implementation.", "architectureOwner": "USR-002", "targetStart": "2026-07-01", "targetEnd": "2026-07-31", "governance": "N/A", "executionEstimateDays": 3, "requiredInputs": ["Vendor design"], "dependencies": ["Network Platform"]},
-  "azureDevOps": {"id": 18511, "type": "Feature", "url": "https://dev.azure.com/example/_workitems/edit/18511", "state": "Closed"},
   "deliverables": [{"id": "DEL-0049-01", "type": "Assurance", "title": "Branch Network Assurance", "status": "Published", "libraryUrl": "https://sharepoint.example/architecture/Assurance/BranchNetwork"}],
   "version": 4,
   "modifiedAt": "2026-07-31T16:00:00+01:00",
