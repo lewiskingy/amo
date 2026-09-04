@@ -25,13 +25,15 @@ assert.doesNotMatch(workPackages,/configuredDepartmentsSafe\(\)\[0\]/);
 // Step 3: Demand record is the canonical parent/child management surface.
 assert.match(recordModal,/WorkPackages\?\.renderModalSection\?\.\(\$\('recordModalBody'\),r\.id\)/);
 assert.match(workPackages,/function renderModalSection\(host,demandId\)/);
-assert.match(workPackages,/id='demandWorkPackagesSection'|id="demandWorkPackagesSection"|section\.id='demandWorkPackagesSection'/);
+assert.match(workPackages,/section\.id='demandWorkPackagesSection'/);
 assert.match(workPackages,/\+ Add Work Package/);
 assert.doesNotMatch(workPackages,/renderDemandPanel/);
 assert.doesNotMatch(workPackages,/selectedDemandId/);
 assert.doesNotMatch(demandGrid,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
 assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
-assert.doesNotMatch(app5,/function renderDemandDetail|renderDemandPanel/);
+assert.doesNotMatch(app5,/demandDetail|function renderDemandDetail|renderDemandPanel/);
+assert.doesNotMatch(index,/id="demandDetail"/);
+assert.match(index,/Double-click any row to open its record and manage its Work Packages/);
 
 // Work Package is the only Azure DevOps work-item relationship.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
@@ -50,7 +52,12 @@ assert.match(localRepository,/\['demand','team','allocations','ideas','work-pack
 assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
-assert.ok(index.includes('app-work-packages.js'),'Work Package module is not loaded by the application shell.');
-assert.match(targetStage,/const APP_VERSION='1\.1\.5'/);
+assert.match(index,/app-2\.js\?v=20260904-2/);
+assert.match(index,/app-record-modal\.js\?v=20260904-2/);
+assert.match(index,/app-5\.js\?v=20260904-2/);
+assert.match(index,/app-integrations\.js\?v=20260904-2/);
+assert.match(index,/app-service-workflows\.js\?v=20260904-2/);
+assert.match(index,/app-work-packages\.js\?v=20260904-2/);
+assert.match(targetStage,/const APP_VERSION='1\.1\.6'/);
 
 console.log('Work Package domain, Demand child UX and Azure DevOps relationship contract tests passed');
