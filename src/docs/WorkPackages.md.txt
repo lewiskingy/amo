@@ -31,9 +31,29 @@ Work Packages are first-class records stored separately from Demand. The initial
 - `azureDevOpsWorkItemId` — optional numeric Azure DevOps Work Item Reference;
 - record version/modified metadata.
 
-Local workspaces store one JSON document per Work Package under `work-packages/`. Remote/Mongo workspaces use the same logical `workPackages` entity through the repository/API boundary.
+Local workspaces store one JSON document per Work Package under `work-packages/`. Remote/Mongo workspaces use the same logical `workPackages` entity through the repository/API boundary. Application code uses the shared WorkspaceRepository contract for both storage modes rather than maintaining a separate Local implementation.
 
 Work Packages deliberately do **not** own Allocations or Actuals. Allocations remain Person × Demand × Month. Oracle Actuals remain Person × Project Number × Month and reconcile through the optional unique Project Number on Demand. This keeps Plan versus Actual at the same management/accounting boundary.
+
+Demand-level ROM, dates and scope remain present for now. A later refinement may deliberately derive or aggregate some of those values from child Work Packages; Step 3 does not invent that aggregation before its semantics are agreed.
+
+## Demand record experience
+
+Work Packages are managed as children of their parent Defined Demand. Double-click a Demand in the Demand Register to open its record; the same record view contains the Work Packages section and the actions to add, edit or delete child packages.
+
+The previous interaction in which a single click silently selected a Demand and rendered a separate detail/Work Package area at the bottom of the Demand page has been retired. There is no separate bottom-of-page Work Package management surface and no selected-Demand state is required to discover the child records.
+
+This keeps the interaction aligned with the domain model:
+
+```text
+Open Defined Demand
+        ↓
+Demand details
+        ↓
+Child Work Packages
+        ↓
+Azure DevOps Work Item
+```
 
 ## Azure DevOps reference and inheritance
 
@@ -59,6 +79,8 @@ Department Default Project
 
 Blank override fields mean **inherit**. Inherited values are not copied into child settings, so changing a Department or System default genuinely cascades to records that have not overridden it.
 
+AMO does not guess an organisational context when a Demand does not resolve to a Team/Department. If no applicable Department/Team is available, the Azure DevOps link remains unavailable until the context is configured explicitly.
+
 With an effective Organisation, Project and Work Item Reference, AMO derives:
 
 ```text
@@ -66,6 +88,12 @@ https://dev.azure.com/{organisation}/{project}/_workitems/edit/{workItemId}
 ```
 
 A Work Package may retain its Work Item Reference when the effective Organisation or Project is not yet configured; AMO simply cannot produce the hyperlink until the inherited context is complete.
+
+## Canonical Azure DevOps relationship
+
+The Work Package is the canonical AMO relationship to an Azure DevOps Feature/Epic/work item. The older Demand-level Azure DevOps URL/title relationship is retired in Step 3: it is no longer displayed or editable, and Demand records saved through current UI paths remove that obsolete property rather than perpetuating two competing linkage models.
+
+This also means Allocations, Resource Plan and Roadmap no longer surface an inherited Demand-level “Work Item” link. Where delivery-item context is needed, it should come from the Work Packages belonging to the Demand.
 
 ## Process responsibility
 
@@ -76,7 +104,3 @@ The intended responsibility split is:
 - **AMO** — Defined Demand, Work Packages, portfolio/resource planning and Actuals reconciliation.
 
 During triage, a request may be recognised as a genuinely new body of work and a Defined Demand can be created before ROM, final scope or Project Number is known. If the request belongs to existing Defined Demand, it should normally become or amend a Work Package beneath that Demand rather than create duplicate Demand.
-
-## Current transition
-
-The older Demand-level Azure DevOps link remains temporarily while Work Packages are introduced. It is not the target model. Roadmap Step 3 removes that Demand-level relationship and makes Work Package the canonical Azure DevOps linkage boundary.
