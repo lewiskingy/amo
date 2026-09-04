@@ -20,7 +20,7 @@ async function applicationShell(request,env,url,path){
   if(!response.ok)return response;
   const config=environmentConfig(env,url);
   const html=await response.text();
-  const script=`<script>window.AMO_CONFIG=Object.assign({},window.AMO_CONFIG||{},${JSON.stringify(config)});</script>`;
+  const script=`<script>window.AMO_CONFIG=Object.assign({},window.AMO_CONFIG||{},${JSON.stringify(config)});window.AMO_ASSET_VERSION=${JSON.stringify(config.buildId)};</script>`;
   return new Response(html.replace('</head>',`${script}</head>`),{
     status:response.status,
     statusText:response.statusText,
