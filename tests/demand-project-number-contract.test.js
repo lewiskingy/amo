@@ -1,7 +1,7 @@
 const fs=require('fs'),assert=require('assert');
 const recordModal=fs.readFileSync('src/app-record-modal.js','utf8');
 const demandGrid=fs.readFileSync('src/app-2.js','utf8');
-const demandDetail=fs.readFileSync('src/app-5.js','utf8');
+const app5=fs.readFileSync('src/app-5.js','utf8');
 const integrations=fs.readFileSync('src/app-integrations.js','utf8');
 const workflows=fs.readFileSync('src/app-service-workflows.js','utf8');
 const actuals=fs.readFileSync('src/app-actuals.js','utf8');
@@ -20,20 +20,18 @@ assert.match(demandGrid,/key:'projectNumber',label:'Project Number'/);
 assert.doesNotMatch(demandGrid,/key:'costCentreOrProjectCode',label:'Cost Centre \/ Project Code'/);
 assert.match(demandGrid,/Project Number for \$\{d\.id\} must contain digits only/);
 assert.match(demandGrid,/seenProjects\.has\(d\.projectNumber\)/);
-assert.match(demandDetail,/<strong>Project Number:<\/strong>/);
-assert.doesNotMatch(demandDetail,/<strong>Cost Centre \/ Project Code:<\/strong>/);
+assert.doesNotMatch(app5,/<strong>Cost Centre \/ Project Code:<\/strong>/);
 
-// Late-loaded integration/workflow layers must consume the canonical Demand model rather than
-// silently reintroducing retired fields or hiding the Work Package detail route.
+// Late-loaded layers consume the canonical Demand model and no longer recreate the old
+// bottom-of-page selection/Work Package route.
 assert.match(integrations,/const baseDemandColumns=demandCols\.filter/);
 assert.doesNotMatch(integrations,/key:'costCentreOrProjectCode'/);
 assert.doesNotMatch(integrations,/label:'Cost Centre \/ Project Code'/);
-assert.match(integrations,/selectedDemandId=tr\.dataset\.row;renderDemandDetail\(\);window\.WorkPackages\?\.renderDemandPanel/);
+assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
 assert.match(workflows,/modalField\('Project Number','projectNumber'/);
 assert.doesNotMatch(workflows,/Cost Centre \/ Project Code/);
 assert.doesNotMatch(workflows,/costCentreOrProjectCode/);
-assert.match(index,/app-integrations\.js\?v=20260904-1/);
-assert.match(index,/app-service-workflows\.js\?v=20260904-1/);
+assert.doesNotMatch(workflows,/Work Item — Azure DevOps/);
 assert.match(worker,/window\.AMO_ASSET_VERSION=\$\{JSON\.stringify\(config\.buildId\)\}/);
 
 assert.match(actuals,/function projectNumber\(demand\)/);
