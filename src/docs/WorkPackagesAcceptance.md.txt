@@ -1,5 +1,32 @@
-# Work Package Step 2 Acceptance
+# Work Package Step 3 Acceptance
 
-Before merging the Step 2 feature candidate, verify in a Test workspace that a Work Package can be created, edited and deleted beneath Demand in both local and remote modes; Azure DevOps Organisation resolves Team → Department → System; Azure DevOps Project resolves Team → Department; and a numeric Work Item Reference produces the expected Azure DevOps link without storing a full URL.
+Before merging the Step 3 candidate, verify the complete Defined Demand → Work Package → Azure DevOps experience in both Local and Remote workspaces.
 
-Confirm that existing Demand, Allocations and Actuals continue to operate unchanged and that the legacy Demand-level Azure DevOps link remains available until Step 3 removes it deliberately.
+## Demand and Work Package UX
+
+- Open Demand from the Demand Register by double-clicking a row.
+- The Demand record modal is the canonical parent/child management surface; there is no selected-Demand card or Work Package panel appended beneath the Demand page.
+- Existing Demand records show a clearly labelled **Work Packages** section with the child count.
+- From Demand view mode, **+ Add Work Package**, Edit and Delete operate directly on the selected Demand's children.
+- While the parent Demand itself is in edit mode, Work Packages remain visible but child editing is disabled until the Demand edit is saved or cancelled.
+- Creating, editing, cancelling and deleting a Work Package acquires/releases the normal workspace edit lock correctly and does not leave the workspace locked.
+- A new unsaved Demand does not offer Work Package creation until the parent Demand has first been saved.
+
+## Azure DevOps relationship
+
+- Demand no longer exposes or persists an Azure DevOps Work Item field/link.
+- Work Package is the canonical Azure DevOps relationship boundary.
+- A Work Package stores only the numeric Azure DevOps Work Item Reference.
+- Azure DevOps Organisation resolves Team → Department → System.
+- Azure DevOps Project resolves Team → Department.
+- A complete effective Organisation + Project + Work Item Reference produces the expected Azure DevOps URL.
+- Missing Organisation/Project leaves the Work Item Reference intact and shows a clear configuration notice rather than manufacturing a URL.
+- Allocation, Resource Plan and Roadmap views no longer add Demand-level Work Item links.
+
+## Integrity and compatibility
+
+- Existing Demand, Allocations and Actuals continue to operate unchanged at Demand level.
+- Work Packages continue to persist through the common WorkspaceRepository contract in Local and Remote/Mongo modes.
+- A Demand with child Work Packages must not be deletable in a way that would leave orphan Work Package records.
+- Existing legacy Demand-level Azure DevOps data may be tolerated when loading older workspaces, but it must not be surfaced, used as a relationship, or written back by current Demand editing.
+- Current sample data and documentation must model Azure DevOps linkage on Work Packages rather than Demand.

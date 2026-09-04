@@ -11,7 +11,6 @@
   "source": {"type": "SharePoint", "id": "FD-4032", "url": "https://sharepoint.example/frontdoor/4032"},
   "triage": {"architectureImpact": "Medium", "complexity": "Medium", "romDays": 12, "summary": "Assurance required against cloud guardrails.", "dependencies": ["Cloud Platform"]},
   "workPackage": {"objective": "Assure landing zone extension against enterprise cloud guardrails.", "scope": "Network, identity, policy, logging and operational controls.", "outOfScope": "Detailed Terraform review.", "architectureOwner": "USR-003", "targetStart": "2026-09-01", "targetEnd": "2026-10-15", "governance": "Cloud Governance Forum", "executionEstimateDays": 10, "requiredInputs": ["Landing zone design", "Control mapping"], "dependencies": ["Cloud Platform Team"]},
-  "azureDevOps": {"id": 18984, "type": "Feature", "url": "https://dev.azure.com/example/_workitems/edit/18984", "state": "Resolved"},
   "deliverables": [{"id": "DEL-0046-01", "type": "Assurance", "title": "Landing Zone Assurance", "status": "Governance", "libraryUrl": "https://sharepoint.example/architecture/Assurance/LandingZone"}],
   "version": 2,
   "modifiedAt": "2026-08-19T13:55:00+01:00",

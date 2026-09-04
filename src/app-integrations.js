@@ -1,4 +1,4 @@
-/* External process links, Demand link editing, backup inventory and README UX. */
+/* External process links, Demand source editing, backup inventory and README UX. */
 function integrationLink(url,title,kind){if(!url)return '<span class="muted">—</span>';return `<a href="${escHtml(url)}" target="_blank" rel="noopener noreferrer">${escHtml(title||linkFallback(url,kind))}</a>`}
 async function fetchRemotePageTitle(url){
   if(!validHttpUrl(url)||!url)return'';
@@ -17,14 +17,13 @@ async function populateSourceTitleIfBlank(record,onDone){
   record.source=record.source||{};record.source.title=title;onDone?.(title);
 }
 
-/* ----- Demand register: compact links in View, split URL/title fields in Edit -----
-   The canonical Demand column model lives in app-2.js. Integrations may add columns, but must not
-   duplicate the base model or reintroduce retired fields. */
+/* ----- Demand register: source provenance only -----
+   The canonical Demand column model lives in app-2.js. Azure DevOps linkage belongs to Work Packages. */
 const INTEGRATION_DEMAND_TAIL_KEYS=new Set(['triage.romDays','workPackage.targetStart','workPackage.targetEnd','health']);
 const baseDemandColumns=demandCols.filter(c=>!INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
 const demandTailColumns=demandCols.filter(c=>INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
-function integratedDemandCols(){return gridState.demand.editing?[...baseDemandColumns,{key:'source.url',label:'Source URL',type:'url',editable:true},{key:'source.title',label:'Source Title',type:'text',editable:true},{key:'azureDevOps.url',label:'Work URL',type:'url',editable:true},{key:'azureDevOps.title',label:'Work Title',type:'text',editable:true},...demandTailColumns]:[...baseDemandColumns,{key:'_source',label:'Source Demand',type:'text',editable:false},{key:'_work',label:'Work Item',type:'text',editable:false},...demandTailColumns]}
-function integratedDemandValue(row,col){if(col.key==='_source')return row.source?.title||linkFallback(row.source?.url||'','source')||'';if(col.key==='_work')return row.azureDevOps?.title||linkFallback(row.azureDevOps?.url||'','ado')||'';if(col.key==='workPackage.architectureOwner')return ownerName(row);return getPath(row,col.key)??''}
+function integratedDemandCols(){return gridState.demand.editing?[...baseDemandColumns,{key:'source.url',label:'Source URL',type:'url',editable:true},{key:'source.title',label:'Source Title',type:'text',editable:true},...demandTailColumns]:[...baseDemandColumns,{key:'_source',label:'Source Demand',type:'text',editable:false},...demandTailColumns]}
+function integratedDemandValue(row,col){if(col.key==='_source')return row.source?.title||linkFallback(row.source?.url||'','source')||'';if(col.key==='workPackage.architectureOwner')return ownerName(row);return getPath(row,col.key)??''}
 function integratedDemandCell(row,col){
   if(gridState.demand.editing){
     if(col.key==='initiative'){const opts=[{value:'',label:'—'},...initiativesForBusinessArea(row.businessArea).map(i=>({value:i.name,label:i.name}))];return `<select class="cell-input" data-edit-key="${col.key}" data-row-id="${row.id}">${opts.map(o=>`<option value="${escHtml(o.value)}" ${String(o.value)===String(row.initiative||'')?'selected':''}>${escHtml(o.label)}</option>`).join('')}</select>`}
@@ -34,7 +33,6 @@ function integratedDemandCell(row,col){
   }
   if(col.key==='title')return row.source?.url?`<a href="${escHtml(row.source.url)}" target="_blank" rel="noopener noreferrer"><strong>${escHtml(row.title)}</strong></a>`:`<strong>${escHtml(row.title)}</strong>`;
   if(col.key==='_source')return integrationLink(row.source?.url,row.source?.title,'source');
-  if(col.key==='_work')return integrationLink(row.azureDevOps?.url,row.azureDevOps?.title,'ado');
   return escHtml(integratedDemandValue(row,col));
 }
 function integratedDemandFilter(col){const value=gridState.demand.filters[col.key]||'',fk=`demand:${col.key}`;if(col.type==='select'){let options;if(col.key==='initiative')options=[...new Set(normalizeInitiatives(db.settings.initiatives||[]).map(i=>i.name))];else options=normalizeOptions(col).map(x=>x.label);return `<select data-filter-key="${fk}" data-grid="demand" data-key="${col.key}"><option value="">All</option>${options.map(v=>`<option value="${escHtml(v)}" ${String(value)===String(v)?'selected':''}>${escHtml(v)}</option>`).join('')}</select>`}return `<input data-filter-key="${fk}" data-grid="demand" data-key="${col.key}" value="${escHtml(value)}" placeholder="contains…">`}
@@ -45,7 +43,7 @@ function renderIntegratedDemandGrid(){
   const table=$('demandTable'),count=$('demandCount'),toolbar=$('demandToolbar');toolbar.innerHTML=s.editing?'<button class="btn primary" data-grid-new>New Demand</button><button class="btn success" data-grid-save>Save Changes</button><button class="btn" data-grid-cancel>Cancel</button><button class="btn" data-grid-clear>Clear Filters</button>':`<button class="btn primary" data-grid-new ${workspaceHandle?'':'disabled'}>New Demand</button><button class="btn" data-grid-edit ${workspaceHandle?'':'disabled'}>Edit List</button><button class="btn" data-grid-clear>Clear Filters</button>`;
   count.textContent=workspaceHandle?`Showing ${rows.length} of ${source.length-(s.editing?s.deleted.size:0)} records`:'No workspace loaded';
   table.innerHTML=`<thead><tr>${cols.map(c=>`<th><button class="sort-btn" data-sort="${c.key}">${c.label}${sortMark('demand',c.key)}</button></th>`).join('')}${s.editing?'<th>Delete</th>':''}</tr><tr class="filter-row">${cols.map(c=>`<th>${integratedDemandFilter(c)}</th>`).join('')}${s.editing?'<th></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr data-row="${r.id}" class="${dirtyRecords.demand.has(r.id)?'row-dirty':''}">${cols.map(c=>`<td>${integratedDemandCell(r,c)}</td>`).join('')}${s.editing?`<td><button class="btn danger" data-grid-delete="${r.id}">Delete</button></td>`:''}</tr>`).join('')}</tbody>`;
-  table.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>toggleSort('demand',b.dataset.sort));table.querySelectorAll('[data-filter-key]').forEach(el=>{el.oninput=e=>scheduleFilter('demand',e.target.dataset.key,e.target.value);el.onchange=e=>{s.filters[e.target.dataset.key]=e.target.value;renderGrid('demand')}});table.querySelectorAll('tbody tr[data-row]').forEach(tr=>{tr.onclick=e=>{if(e.target.closest('button,input,select,textarea,a'))return;selectedDemandId=tr.dataset.row;renderDemandDetail();window.WorkPackages?.renderDemandPanel?.()};tr.ondblclick=e=>{if(!e.target.closest('button,input,select,textarea,a'))openRecordModal('demand',tr.dataset.row,'view')}});
+  table.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>toggleSort('demand',b.dataset.sort));table.querySelectorAll('[data-filter-key]').forEach(el=>{el.oninput=e=>scheduleFilter('demand',e.target.dataset.key,e.target.value);el.onchange=e=>{s.filters[e.target.dataset.key]=e.target.value;renderGrid('demand')}});table.querySelectorAll('tbody tr[data-row]').forEach(tr=>{tr.ondblclick=e=>{if(!e.target.closest('button,input,select,textarea,a'))openRecordModal('demand',tr.dataset.row,'view')}});
   toolbar.querySelector('[data-grid-new]')?.addEventListener('click',()=>openRecordModal('demand',null,'edit'));toolbar.querySelector('[data-grid-edit]')?.addEventListener('click',()=>{s.editing=true;s.draft=clone(db.demand);s.deleted=new Set();renderGrid('demand')});toolbar.querySelector('[data-grid-cancel]')?.addEventListener('click',()=>{s.editing=false;s.draft=null;s.deleted=new Set();renderGrid('demand')});toolbar.querySelector('[data-grid-clear]')?.addEventListener('click',()=>{s.filters={};renderGrid('demand')});toolbar.querySelector('[data-grid-save]')?.addEventListener('click',()=>saveGrid('demand'));
   if(s.editing){table.querySelectorAll('[data-edit-key]').forEach(el=>{el.onchange=e=>{const r=s.draft.find(x=>x.id===e.target.dataset.rowId),key=e.target.dataset.editKey,col=cols.find(c=>c.key===key);let v=e.target.value;if(col?.type==='number')v=v===''?null:Number(v);setPath(r,key,v);if(key==='businessArea'&&r.initiative&&!initiativesForBusinessArea(v).some(i=>i.name===r.initiative)){r.initiative='';renderGrid('demand')}};if(el.dataset.editKey==='source.url')el.onblur=async e=>{const r=s.draft.find(x=>x.id===e.target.dataset.rowId);setPath(r,'source.url',e.target.value);await populateSourceTitleIfBlank(r,()=>renderGrid('demand'))}});table.querySelectorAll('[data-grid-delete]').forEach(b=>b.onclick=()=>{s.deleted.add(b.dataset.gridDelete);renderGrid('demand')})}
   restoreFocus(focus);
@@ -54,15 +52,6 @@ const baseRenderGridIntegration=renderGrid;renderGrid=function(name){return name
 
 /* Modal: best-effort source title lookup after URL blur. */
 const baseRenderRecordModalIntegration=renderRecordModal;renderRecordModal=function(){baseRenderRecordModalIntegration();if(recordModalState.type==='demand'&&recordModalState.mode==='edit'){const urlEl=$('recordModalBody').querySelector('[data-modal-field="source.url"]'),titleEl=$('recordModalBody').querySelector('[data-modal-field="source.title"]');if(urlEl)urlEl.addEventListener('blur',async()=>{if(titleEl?.value.trim()||!urlEl.value.trim())return;const title=await fetchRemotePageTitle(urlEl.value.trim());if(title&&titleEl){titleEl.value=title;recordModalState.draft=readModalDraft()}})}};
-
-/* ----- Allocation / Resource Plan / Roadmap Work Item links ----- */
-function demandWorkHtml(d){return d?integrationLink(d.azureDevOps?.url,d.azureDevOps?.title,'ado'):'<span class="muted">—</span>'}
-function enhanceAllocationWorkColumn(){const table=$('allocationTable');if(!table?.tHead)return;const rows=[...table.tHead.rows];rows[0]?.insertCell(1).replaceChildren(document.createTextNode('Work'));rows[1]?.insertCell(1);[...table.tBodies[0]?.rows||[]].forEach(tr=>{const d=demandById(tr.dataset.demand),cell=tr.insertCell(1);cell.innerHTML=demandWorkHtml(d)})}
-const baseRenderAllocationsIntegration=renderAllocations;renderAllocations=function(){baseRenderAllocationsIntegration();enhanceAllocationWorkColumn()};
-function enhanceResourceWorkColumn(){const table=$('resourceAllocationDetail');if(!table?.tHead)return;table.tHead.rows[0]?.insertCell(1).replaceChildren(document.createTextNode('Work'));const allocRows=[...db.allocations].sort((a,b)=>`${a.demandId}|${person(a.teamMemberId)?.name||a.teamMemberId}`.localeCompare(`${b.demandId}|${person(b.teamMemberId)?.name||b.teamMemberId}`));[...table.tBodies[0]?.rows||[]].forEach((tr,i)=>{const cell=tr.insertCell(1);cell.innerHTML=demandWorkHtml(demandById(allocRows[i]?.demandId))})}
-const baseRenderResourceIntegration=renderResource;renderResource=function(){baseRenderResourceIntegration();enhanceResourceWorkColumn()};
-function enhanceRoadmapWorkLinks(){document.querySelectorAll('[data-roadmap-track]').forEach(track=>{const d=demandById(track.dataset.roadmapTrack),strong=track.closest('.road-row')?.querySelector('strong');if(!strong||!d?.azureDevOps?.url||strong.closest('a'))return;const a=document.createElement('a');a.href=d.azureDevOps.url;a.target='_blank';a.rel='noopener noreferrer';a.title=d.azureDevOps.title||linkFallback(d.azureDevOps.url,'ado');strong.parentNode.insertBefore(a,strong);a.appendChild(strong)})}
-const baseRenderRoadmapIntegration=renderRoadmap;renderRoadmap=function(){baseRenderRoadmapIntegration();enhanceRoadmapWorkLinks()};
 
 /* ----- Workspace backup inventory ----- */
 let retainedBackupInventory=[];

@@ -12,7 +12,7 @@
     setWorkspaceRepository(repo);
     /* Temporary compatibility descriptor while older UI modules still use workspaceHandle as their connected flag. */
     workspaceHandle={name:workspace?.name||repo.name||'Remote Workspace',kind:'remote',remote:true};
-    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);selectedDemandId=null;resetEdits();
+    db={schemaVersion:CURRENT_SCHEMA_VERSION,workspace,settings:loadedSettings,demand,team,allocations,ideas,configFiles};clearDirty();applyMigrationDirtyState(prepared);resetEdits();
     if(typeof loadStatusReports==='function')await loadStatusReports(repo);
     if(!workspaceConnectionIsCurrent(connectionToken,'remote'))return false;
     if(typeof archiveStaleTerminalDemand==='function')await archiveStaleTerminalDemand(repo);

@@ -11,7 +11,6 @@
   "source": {"type": "SharePoint", "id": "FD-4011", "url": "https://sharepoint.example/frontdoor/4011"},
   "triage": {"architectureImpact": "High", "complexity": "Large", "romDays": 45, "summary": "Major target-platform and migration architecture engagement.", "dependencies": ["Digital Engagement", "Security", "Data"]},
   "workPackage": {"objective": "Define target platform architecture and migration approach.", "scope": "Target CMS/DXP architecture, integrations, migration and non-functional architecture.", "outOfScope": "Detailed UI design.", "architectureOwner": "USR-005", "targetStart": "2026-11-01", "targetEnd": "2027-02-28", "governance": "Architecture Review Board", "executionEstimateDays": 48, "requiredInputs": ["Digital strategy", "Content model", "Security requirements"], "dependencies": ["Digital Engagement", "Security", "Data Office"]},
-  "azureDevOps": {"id": 18933, "type": "Epic", "url": "https://dev.azure.com/example/_workitems/edit/18933", "state": "New"},
   "deliverables": [{"id": "DEL-0045-01", "type": "HLD", "title": "Digital Experience HLD", "status": "Not Started", "libraryUrl": "https://sharepoint.example/architecture/HLD/DigitalExperience"}, {"id": "DEL-0045-02", "type": "KDD", "title": "CMS Platform Selection", "status": "Not Started", "libraryUrl": "https://sharepoint.example/architecture/KDD/CMSPlatform"}],
   "version": 1,
   "modifiedAt": "2026-08-17T09:15:00+01:00",

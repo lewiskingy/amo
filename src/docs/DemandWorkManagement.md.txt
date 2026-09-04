@@ -35,6 +35,12 @@ For each Raw Demand item, first decide whether the work belongs to an existing D
 
 The relationship is therefore not one Front Door request = one AMO Demand. Several incoming requests can contribute Work Packages to the same managed Demand boundary.
 
+## Managing Work Packages in AMO
+
+Open a Defined Demand from the Demand Register to manage its child Work Packages in the same record view. Work Packages are not selected or edited through a separate bottom-of-page panel. This makes the parent/child relationship explicit and keeps Azure DevOps delivery references with the Work Package that owns them.
+
+Demand-level ROM, dates and scope remain independent fields at this stage. They may later be deliberately aggregated from Work Packages once the required semantics are agreed; do not assume or calculate that relationship yet.
+
 ## Planning and reporting boundaries
 
 Work Packages explain **what is being delivered**. Allocations explain **how much Person capacity is planned against the Defined Demand**. Actuals explain **how much effort was recorded against the Oracle Project Number associated with that Defined Demand**.
@@ -58,6 +64,16 @@ AMO stores only the Azure DevOps Work Item Reference on a Work Package. Organisa
 
 Blank child values mean inherit; inherited values should not be copied into child records.
 
-## Transition
+## Canonical relationship
 
-The legacy Demand-level Azure DevOps Work Item relationship remains temporarily during Step 2 of the Demand refactor. New delivery modelling should use Work Packages. The following roadmap step removes the legacy Demand-level relationship and makes Work Package the canonical Azure DevOps linkage point.
+Step 3 retires the legacy Demand-level Azure DevOps Work Item relationship. Work Package is the canonical Azure DevOps linkage point:
+
+```text
+Defined Demand
+      ↓
+Work Package
+      ↓
+Azure DevOps Work Item
+```
+
+Demand records saved through the current UI no longer preserve the obsolete Demand-level URL/title fields, and other views should not reconstruct that old relationship through compatibility or presentation layers.
