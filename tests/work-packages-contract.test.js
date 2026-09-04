@@ -31,6 +31,6 @@ assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocatio
 assert.ok(index.includes('app-work-packages.js?v=20260903-1'),'Work Package module is not loaded by the application shell.');
 assert.ok(index.includes('app-2.js?v=20260903-2'),'Demand Register cache key was not advanced with the Step 2 UI fix.');
 assert.ok(index.includes('app-5.js?v=20260903-2'),'Demand detail cache key was not advanced with the Step 2 UI fix.');
-assert.match(targetStage,/const APP_VERSION='1\.1\.4'/);
+assert.match(targetStage,/const APP_VERSION='1\.1\.5'/);
 
 console.log('Work Package domain and Azure DevOps inheritance contract tests passed');
