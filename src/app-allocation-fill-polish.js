@@ -1,5 +1,5 @@
 /* Polish allocation planning: directional fill arrows, reversible live range preview,
-   capacity colour bands, and Demand-header work item display text. */
+   and capacity colour bands. */
 (function initAllocationFillPolish(){
   let applyingDisplayPolish=false,displayPolishQueued=false;
   function currentAllocation(aid){return allocationState?.draft?.find(a=>a.id===aid)}
@@ -36,29 +36,12 @@
       const label=cell.querySelector('.alloc-pct-label');if(label)label.textContent=`${value}%`
     })
   }
-  function demandByHeaderId(id){
-    if(typeof demandById==='function')return demandById(id);
-    return (db?.demand||[]).find(d=>d.id===id)
-  }
-  function polishWorkLinks(){
-    document.querySelectorAll('#allocationTable .allocation-demand-header[data-demand-header]').forEach(header=>{
-      const copy=header.querySelector('.allocation-demand-copy');if(!copy)return;
-      const d=demandByHeaderId(header.dataset.demandHeader),rawUrl=String(d?.azureDevOps?.url||'').trim(),rawTitle=String(d?.azureDevOps?.title||'').trim();
-      let link=copy.querySelector('.allocation-work-link');
-      const valid=rawUrl&&(typeof validHttpUrl==='function'?validHttpUrl(rawUrl):/^https?:\/\//i.test(rawUrl));
-      if(!valid){link?.remove();return}
-      const display=rawTitle||(typeof linkFallback==='function'?linkFallback(rawUrl,'ado'):'')||rawUrl;
-      if(!link){link=document.createElement('a');link.className='allocation-work-link';copy.appendChild(link)}
-      link.href=rawUrl;link.target='_blank';link.rel='noopener noreferrer';link.title=display;link.textContent=`[${display}]`
-    })
-  }
   function applyDisplayPolish(){
     if(applyingDisplayPolish)return;applyingDisplayPolish=true;
     try{
       document.querySelectorAll('#allocationTable .alloc-month-cell[data-aid][data-month]').forEach(cell=>{
         const a=allocationForCell(cell);if(a)setCellState(cell,stateFor(a.teamMemberId,cell.dataset.month))
-      });
-      polishWorkLinks()
+      })
     }finally{applyingDisplayPolish=false}
   }
   function queueDisplayPolish(){
