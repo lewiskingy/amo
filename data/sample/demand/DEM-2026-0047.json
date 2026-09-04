@@ -11,7 +11,6 @@
   "source": {"type": "SharePoint", "id": "FD-4050", "url": "https://sharepoint.example/frontdoor/4050"},
   "triage": {"architectureImpact": "Low", "complexity": "Small", "romDays": 5, "summary": "Short consultancy engagement to rationalise integration options.", "dependencies": []},
   "workPackage": {"objective": "Review integration options and recommend rationalisation path.", "scope": "Current integration inventory, patterns and target recommendation.", "outOfScope": "Implementation.", "architectureOwner": null, "targetStart": "2027-01-01", "targetEnd": "2027-01-31", "governance": "N/A", "executionEstimateDays": null, "requiredInputs": ["Integration inventory"], "dependencies": []},
-  "azureDevOps": {"id": null, "type": null, "url": null, "state": null},
   "deliverables": [{"id": "DEL-0047-01", "type": "KDD", "title": "Integration Rationalisation Decision", "status": "Not Started", "libraryUrl": "https://sharepoint.example/architecture/KDD/CRMIntegration"}],
   "version": 1,
   "modifiedAt": "2026-08-18T11:00:00+01:00",
