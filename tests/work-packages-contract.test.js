@@ -1,4 +1,4 @@
-const fs=require('fs'),assert=require('assert');
+const fs=require('fs'),path=require('path'),assert=require('assert');
 const workPackages=fs.readFileSync('src/app-work-packages.js','utf8');
 const demandGrid=fs.readFileSync('src/app-2.js','utf8');
 const app5=fs.readFileSync('src/app-5.js','utf8');
@@ -11,6 +11,7 @@ const serverRepository=fs.readFileSync('server/repository.js','utf8');
 const mongoRepository=fs.readFileSync('server/mongo-repository.js','utf8');
 const targetStage=fs.readFileSync('src/app-target-stage.js','utf8');
 const index=fs.readFileSync('src/index.html','utf8');
+const acceptance=fs.readFileSync('src/docs/WorkPackagesAcceptance.md.txt','utf8');
 
 assert.match(workPackages,/const ENTITY_TYPE='workPackages'/);
 assert.match(workPackages,/demandId:trim\(record\?\.demandId\)/);
@@ -36,6 +37,8 @@ assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDema
 assert.doesNotMatch(app5,/demandDetail|function renderDemandDetail|renderDemandPanel/);
 assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click any row to open its record and manage its Work Packages/);
+assert.match(acceptance,/Demand record modal is the canonical parent\/child management surface/);
+assert.match(acceptance,/there is no selected-Demand card or Work Package panel appended beneath the Demand page/);
 
 // Work Package is the only Azure DevOps work-item relationship.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
@@ -43,6 +46,15 @@ assert.doesNotMatch(workflows,/Work Item — Azure DevOps|azureDevOps\.url|azure
 assert.doesNotMatch(integrations,/key:'_work'|key:'azureDevOps\.url'|key:'azureDevOps\.title'|demandWorkHtml|enhanceAllocationWorkColumn|enhanceResourceWorkColumn|enhanceRoadmapWorkLinks/);
 assert.match(recordModal,/delete next\.azureDevOps/);
 assert.match(demandGrid,/delete d\.azureDevOps/);
+for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWith('.json'))){
+  const sample=fs.readFileSync(path.join('data/sample/demand',file),'utf8');
+  assert.doesNotMatch(sample,/"azureDevOps"\s*:/,`${file} still models a Demand-level Azure DevOps relationship.`);
+}
+
+// A parent Demand cannot be deleted while child Work Packages still exist, preventing orphans.
+assert.match(demandGrid,/Cannot delete Demand with child Work Packages/);
+assert.match(demandGrid,/window\.WorkPackages\.forDemand\(id\)\.length/);
+assert.match(demandGrid,/Work Packages are not ready yet/);
 
 // Work Package persistence uses the repository contract rather than a parallel local-only path.
 assert.match(workPackages,/repo\.listRecords\(ENTITY_TYPE/);
