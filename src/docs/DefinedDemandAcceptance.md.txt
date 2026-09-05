@@ -46,20 +46,23 @@ On a Demand:
 
 Open an existing Defined Demand and add a Work Package.
 
-Confirm the Work Package owns:
+Confirm the Work Package owns only the AMO portfolio metadata needed to manage it:
 
+- Title;
 - Service;
-- Description / Scope;
-- Acceptance Criteria;
 - Estimated Effort (days);
 - Work Package Status;
 - Target Start;
 - Target End;
-- Azure DevOps Work Item Reference.
+- Azure DevOps Work Item Reference for the currently implemented backlog provider.
 
-Service and Work Package Status should be selected from their own configured lists. A Work Package cannot save without a Service and valid Status.
+Confirm **Description / Scope** and **Acceptance Criteria** are not presented or persisted by AMO. Those belong in the authoritative delivery backlog and should not be duplicated here.
+
+Service and Work Package Status should be selected from their own configured lists. A Work Package cannot save without a Title, Service and valid Status.
 
 Confirm the Demand itself does not expose Service, delivery Scope, delivery Start/End or refined effort fields.
+
+Provider-neutral backlog linkage is deferred: the future model may support Azure DevOps or Jira per Work Package, but never both. Step 4 should not introduce partial Jira fields or a second work-item relationship.
 
 ## 5. Estimate roll-up and Roadmap
 
