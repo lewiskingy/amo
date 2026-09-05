@@ -1,19 +1,20 @@
 {
   "type": "architecture-operations-hub",
-  "name": "Architecture Operations Hub Populated Test Workspace",
+  "name": "Architecture Management Office Populated Test Workspace",
   "workspaceId": "AOH-TEST-POPULATED-001",
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "department": {
     "id": "DEPT-ARCH",
     "name": "Architecture"
   },
   "created": "2026-08-19T22:21:00+01:00",
-  "description": "Populated sample database for Architecture Operations Hub MVP.",
+  "description": "Populated sample database for Architecture Management Office.",
   "entities": {
     "demand": {"path": "demand", "filePattern": "DEM-*.json"},
     "team": {"path": "team", "filePattern": "USR-*.json"},
     "allocations": {"path": "allocations", "filePattern": "ALLOC-*.json"},
     "ideas": {"path": "ideas", "filePattern": "IDEA-*.json"},
+    "workPackages": {"path": "work-packages", "filePattern": "WP-*.json"},
     "statusReports": {"path": "status-reports", "filePattern": "SR-*.json", "draft": "draft.json"}
   }
 }
