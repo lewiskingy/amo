@@ -14,17 +14,26 @@ function environmentConfig(env,url){
   }
 }
 
+function versionStaticAssets(html,buildId){
+  const version=encodeURIComponent(String(buildId||'local'));
+  const versioned=(attribute,extension)=>new RegExp(`${attribute}="((?!https?:\\/\\/)[^"?#]+\\.${extension})(?:\\?[^"#]*)?"`,'g');
+  return html
+    .replace(versioned('src','js'),(_match,path)=>`src="${path}?v=${version}"`)
+    .replace(versioned('href','css'),(_match,path)=>`href="${path}?v=${version}"`)
+}
+
 async function applicationShell(request,env,url,path){
   const assetUrl=new URL(path,url);
   const response=await env.ASSETS.fetch(new Request(assetUrl,request));
   if(!response.ok)return response;
   const config=environmentConfig(env,url);
-  const html=await response.text();
+  const html=versionStaticAssets(await response.text(),config.buildId);
   const script=`<script>window.AMO_CONFIG=Object.assign({},window.AMO_CONFIG||{},${JSON.stringify(config)});window.AMO_ASSET_VERSION=${JSON.stringify(config.buildId)};</script>`;
+  const headers=new Headers(response.headers);headers.set('Cache-Control','no-store');
   return new Response(html.replace('</head>',`${script}</head>`),{
     status:response.status,
     statusText:response.statusText,
-    headers:response.headers
+    headers
   })
 }
 
