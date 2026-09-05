@@ -17,7 +17,9 @@ const acceptance=fs.readFileSync('src/docs/WorkPackagesAcceptance.md.txt','utf8'
 
 assert.match(workPackages,/const ENTITY_TYPE='workPackages'/);
 assert.match(workPackages,/demandId:trim\(record\?\.demandId\)/);
-assert.match(workPackages,/acceptanceCriteria:trim\(record\?\.acceptanceCriteria\)/);
+assert.doesNotMatch(workPackages,/description:trim\(record\?\.description\)|acceptanceCriteria:trim\(record\?\.acceptanceCriteria\)/);
+assert.doesNotMatch(workPackages,/wpDescription|wpAcceptance|Description \/ Scope|Acceptance Criteria/);
+assert.match(workPackages,/detailed description and acceptance criteria belong in the delivery backlog/i);
 assert.match(workPackages,/azureDevOpsWorkItemId:trim\(record\?\.azureDevOpsWorkItemId\)/);
 assert.match(workPackages,/const organization=trim\(teamConfig\.organization\)\|\|trim\(departmentConfig\.organization\)\|\|trim\(system\.defaultOrganization\)/);
 assert.match(workPackages,/const project=trim\(teamConfig\.project\)\|\|trim\(departmentConfig\.project\)/);
@@ -42,7 +44,7 @@ assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click a row to open its single-record view/);
 assert.match(acceptance,/Demand record modal is the canonical parent\/child management surface/);
 
-// Work Package remains the only active Azure DevOps work-item relationship.
+// Work Package remains the only active Azure DevOps work-item relationship for now.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
 assert.doesNotMatch(workflows,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
 assert.doesNotMatch(integrations,/key:'_work'|key:'azureDevOps\.url'|key:'azureDevOps\.title'|demandWorkHtml|enhanceAllocationWorkColumn|enhanceResourceWorkColumn|enhanceRoadmapWorkLinks/);
@@ -52,6 +54,11 @@ assert.match(demandGrid,/delete d\.azureDevOps/);
 for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWith('.json'))){
   const sample=fs.readFileSync(path.join('data/sample/demand',file),'utf8');
   assert.doesNotMatch(sample,/"azureDevOps"\s*:/,`${file} still models a Demand-level Azure DevOps relationship.`);
+}
+for(const file of fs.readdirSync('data/sample/work-packages').filter(name=>name.endsWith('.json'))){
+  const wp=JSON.parse(fs.readFileSync(path.join('data/sample/work-packages',file),'utf8'));
+  assert.equal(Object.prototype.hasOwnProperty.call(wp,'description'),false,`${file} duplicates backlog description.`);
+  assert.equal(Object.prototype.hasOwnProperty.call(wp,'acceptanceCriteria'),false,`${file} duplicates backlog acceptance criteria.`);
 }
 
 // A parent Demand cannot be deleted while child Work Packages still exist, preventing orphans.
