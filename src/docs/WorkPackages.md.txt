@@ -93,11 +93,15 @@ Defined Demand
 
 AMO does not infer Work-Package-level Actuals from Project-level Actuals.
 
-## Demand record experience
+## Demand Register experience
 
-Work Packages are managed as children of their parent Defined Demand. Double-click a Demand in the Demand Register to open its record; the same record view contains the Work Packages section and the actions to add, edit or delete child packages.
+The Demand Register is the canonical parent/child management surface. Demand rows are the parent level and Work Packages render as indented child rows immediately beneath them. Existing children are expanded by default and can be collapsed with the disclosure control.
 
-The old selected-Demand/bottom-of-page Work Package interaction remains retired. While the parent Demand itself is being edited, child Work Packages remain visible but child write actions are suspended until the Demand edit is saved or cancelled.
+A compact **+ WP** action sits beside the Demand ID at the left of the row so it remains reachable on narrow/mobile screens without scrolling to a distant actions column. Saving a new Work Package immediately adds its child row. Existing Work Packages can be opened by double-clicking the child row or by using its **Edit** action; both use the same canonical Work Package editor. Delete is available inside that editor rather than as a permanent destructive row action.
+
+The parent Demand row shows the current aggregate Work Package estimate together with estimation completeness, so a partial roll-up is not mistaken for a complete estimate.
+
+The Defined Demand modal remains focused on parent portfolio metadata. Its Work Package section is read-only summary context only: child count, current Work Package estimate, delivery window and service mix. Add/edit/delete Work Package actions are deliberately not duplicated there.
 
 ## Backlog reference
 
