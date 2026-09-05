@@ -6,7 +6,6 @@ const integrations=fs.readFileSync('src/app-integrations.js','utf8');
 const workflows=fs.readFileSync('src/app-service-workflows.js','utf8');
 const actuals=fs.readFileSync('src/app-actuals.js','utf8');
 const actualsAdmin=fs.readFileSync('src/app-actuals-admin.js','utf8');
-const index=fs.readFileSync('src/index.html','utf8');
 const worker=fs.readFileSync('worker.js','utf8');
 
 assert.match(recordModal,/projectNumber:''/);
@@ -22,16 +21,13 @@ assert.match(demandGrid,/Project Number for \$\{d\.id\} must contain digits only
 assert.match(demandGrid,/seenProjects\.has\(d\.projectNumber\)/);
 assert.doesNotMatch(app5,/<strong>Cost Centre \/ Project Code:<\/strong>/);
 
-// Late-loaded layers consume the canonical Demand model and no longer recreate the old
-// bottom-of-page selection/Work Package route.
+// Late-loaded layers consume the canonical Defined Demand model rather than recreating old fields.
 assert.match(integrations,/const baseDemandColumns=demandCols\.filter/);
 assert.doesNotMatch(integrations,/key:'costCentreOrProjectCode'/);
 assert.doesNotMatch(integrations,/label:'Cost Centre \/ Project Code'/);
 assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
-assert.match(workflows,/modalField\('Project Number','projectNumber'/);
-assert.doesNotMatch(workflows,/Cost Centre \/ Project Code/);
-assert.doesNotMatch(workflows,/costCentreOrProjectCode/);
-assert.doesNotMatch(workflows,/Work Item — Azure DevOps/);
+assert.match(workflows,/Retired by Defined Demand model v2/);
+assert.doesNotMatch(workflows,/Cost Centre \/ Project Code|costCentreOrProjectCode|Work Item — Azure DevOps|modalField\(/);
 assert.match(worker,/window\.AMO_ASSET_VERSION=\$\{JSON\.stringify\(config\.buildId\)\}/);
 
 assert.match(actuals,/function projectNumber\(demand\)/);

@@ -1,13 +1,13 @@
 const CURRENT_YEAR=new Date().getFullYear();
-const CURRENT_SCHEMA_VERSION=2;
-const DEFAULT_SETTINGS={schemaVersion:CURRENT_SCHEMA_VERSION,planningWindow:{fromMonth:'',toMonth:''},statuses:[],services:[],businessAreas:[],initiatives:[],priorities:[],healthStates:[],ideaStatuses:['New','Under Review','Planned','Implemented','Closed']};
+const CURRENT_SCHEMA_VERSION=3;
+const DEFAULT_SETTINGS={schemaVersion:CURRENT_SCHEMA_VERSION,planningWindow:{fromMonth:'',toMonth:''},statuses:[],services:[],workPackageStatuses:['Planned','Ready','In Progress','Blocked','Complete','Cancelled'],demandSizeDays:{XS:2,S:5,M:10,L:20,XL:40},businessAreas:[],initiatives:[],priorities:[],healthStates:[],ideaStatuses:['New','Under Review','Planned','Implemented','Closed']};
 function emptyDb(){return{schemaVersion:CURRENT_SCHEMA_VERSION,workspace:null,settings:structuredClone(DEFAULT_SETTINGS),team:[],demand:[],allocations:[],ideas:[],configFiles:{}}}
 let db=emptyDb(),workspaceHandle=null,activity=[],configDirty=false;
 const dirtyRecords={demand:new Set(),team:new Set(),allocations:new Set(),ideas:new Set()},deletedDemand=new Set(),deletedTeam=new Set(),deletedAllocations=new Set(),deletedIdeas=new Set();
 const gridState={demand:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null},team:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null}};
 const allocationState={editing:false,draft:null,deleted:new Set(),filters:{demand:'',person:''},direction:'asc'};
 const configState={editing:false,draft:null};
-const $=id=>document.getElementById(id),clone=x=>structuredClone(x),person=id=>db.team.find(x=>x.id===id),demandById=id=>db.demand.find(x=>x.id===id),ownerName=d=>d.workPackage?.architectureOwner?(person(d.workPackage.architectureOwner)?.name||d.workPackage.architectureOwner):'Unallocated';
+const $=id=>document.getElementById(id),clone=x=>structuredClone(x),person=id=>db.team.find(x=>x.id===id),demandById=id=>db.demand.find(x=>x.id===id),ownerName=d=>{const id=d?.ownerId||d?.workPackage?.architectureOwner;return id?(person(id)?.name||id):'Unallocated'};
 function normalizeMonthStart(value){const v=String(value||'').trim();if(/^\d{4}-\d{2}$/.test(v))return `${v}-01`;if(/^\d{4}-\d{2}-01$/.test(v))return v;return''}
 function monthInputValue(value){const v=normalizeMonthStart(value);return v?v.slice(0,7):''}
 function addMonths(monthStart,count=1){const v=normalizeMonthStart(monthStart);if(!v)return'';const [y,m]=v.slice(0,7).split('-').map(Number),d=new Date(y,m-1+count,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`}
@@ -17,7 +17,7 @@ function planningPeriods(){const w=planningWindow();return monthsBetween(w.fromM
 /* Compatibility name retained while older view modules are migrated. It now returns canonical month-start dates. */
 const planningMonths=()=>planningPeriods();
 const monthLabel=m=>{const v=normalizeMonthStart(m);return v?new Date(`${v}T00:00:00`).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}):(m||'—')};
-const isOpenDemand=d=>!/^(complete|completed|closed|cancelled)$/i.test((d.status||'').trim());
+const isOpenDemand=d=>window.DefinedDemandModel?.isOpen?window.DefinedDemandModel.isOpen(d):!/^(complete|completed|closed|cancelled)$/i.test((d.status||'').trim());
 
 /* Browser/device preference for the last workspace connection. The local File System Access
    handle itself remains in IndexedDB; localStorage only records which mode should win at startup. */
@@ -59,7 +59,7 @@ function allocationForecastTotal(allocations){return(allocations||[]).reduce((su
 function migrateWorkspaceBundle(rawBundle){
   const bundle=clone(rawBundle),settings=bundle.configFiles?.['settings.json'];if(!settings)throw new Error('Required config/settings.json not found or invalid.');
   const sourceVersion=Number(bundle.workspace?.schemaVersion||settings.schemaVersion||1);if(sourceVersion>CURRENT_SCHEMA_VERSION)throw new Error(`Workspace schema v${sourceVersion} is newer than this application supports (v${CURRENT_SCHEMA_VERSION}).`);
-  const migratedAllocationIds=[];let migrated=false,migrationNote='';
+  const migratedAllocationIds=[],migratedDemandIds=[];let migrated=false,migrationNotes=[];
   if(sourceVersion<2){
     const legacy=[...new Set((settings.planningMonths||[]).map(String))].sort();if(!legacy.length||legacy.some(m=>!/^\d{4}-\d{2}$/.test(m)))throw new Error('Schema v1 workspace must define valid planningMonths using YYYY-MM.');
     settings.planningWindow={fromMonth:normalizeMonthStart(legacy[0]),toMonth:normalizeMonthStart(legacy[legacy.length-1])};delete settings.planningMonths;
@@ -67,21 +67,21 @@ function migrateWorkspaceBundle(rawBundle){
     for(const a of bundle.allocations||[]){const next={};for(const [rawKey,value] of Object.entries(a.forecast||{})){const key=normalizeMonthStart(rawKey);if(!key)throw new Error(`Allocation ${a.id} contains invalid forecast month ${rawKey}.`);if(Object.prototype.hasOwnProperty.call(next,key)&&Number(next[key])!==Number(value))throw new Error(`Allocation ${a.id} contains conflicting values for ${key}.`);next[key]=value}if(JSON.stringify(next)!==JSON.stringify(a.forecast||{})){a.forecast=next;migratedAllocationIds.push(a.id)}}
     const after=allocationForecastTotal(bundle.allocations);if(Math.abs(before-after)>.0000001)throw new Error('Planning-period migration failed integrity check: allocation totals changed.');
     const contiguous=monthsBetween(normalizeMonthStart(legacy[0]),normalizeMonthStart(legacy[legacy.length-1]));const gaps=contiguous.filter(m=>!legacy.includes(m.slice(0,7)));
-    migrationNote=`Schema v1 → v2: ${legacy.length} configured planning months became ${settings.planningWindow.fromMonth} → ${settings.planningWindow.toMonth}; ${migratedAllocationIds.length} allocation record(s) migrated.${gaps.length?` The new continuous window also includes ${gaps.map(monthLabel).join(', ')}.`:''}`;migrated=true
+    migrationNotes.push(`Schema v1 → v2: ${legacy.length} configured planning months became ${settings.planningWindow.fromMonth} → ${settings.planningWindow.toMonth}; ${migratedAllocationIds.length} allocation record(s) migrated.${gaps.length?` The new continuous window also includes ${gaps.map(monthLabel).join(', ')}.`:''}`);migrated=true
   }else{
     settings.planningWindow=settings.planningWindow||{};settings.planningWindow.fromMonth=normalizeMonthStart(settings.planningWindow.fromMonth);settings.planningWindow.toMonth=normalizeMonthStart(settings.planningWindow.toMonth)
   }
+  if(sourceVersion<3||Number(settings.demandModelVersion||0)<2){if(!window.DefinedDemandModel)throw new Error('Defined Demand model migration is unavailable.');const domain=window.DefinedDemandModel.migrateWorkspace(settings,bundle.demand||[]);if(domain.changed){migrated=true;migratedDemandIds.push(...domain.demandIds);if(domain.note)migrationNotes.push(domain.note)}}
   settings.schemaVersion=CURRENT_SCHEMA_VERSION;bundle.workspace={...bundle.workspace,schemaVersion:CURRENT_SCHEMA_VERSION};bundle.configFiles['settings.json']=settings;
-  return{bundle,migrated,migratedAllocationIds,migrationNote}
+  return{bundle,migrated,migratedAllocationIds,migratedDemandIds,migrationNote:migrationNotes.join(' ')}
 }
 function validateWorkspaceSettings(settings){
   if(!settings)throw new Error('Required config/settings.json not found or invalid.');
-  for(const key of ['statuses','services','businessAreas','priorities','healthStates'])if(!Array.isArray(settings[key])||!settings[key].length)throw new Error(`config/settings.json must define at least one ${key} value.`);
+  for(const key of ['statuses','services','workPackageStatuses','businessAreas','priorities','healthStates'])if(!Array.isArray(settings[key])||!settings[key].length)throw new Error(`config/settings.json must define at least one ${key} value.`);
   const from=normalizeMonthStart(settings.planningWindow?.fromMonth),to=normalizeMonthStart(settings.planningWindow?.toMonth);if(!from||!to||from>to)throw new Error('config/settings.json planningWindow must define valid fromMonth and toMonth month-start dates, with fromMonth <= toMonth.');
-  if(!settings.services.includes('Strategy'))throw new Error('config/settings.json services must include Strategy.')
 }
-function prepareLoadedWorkspace(rawBundle){const migration=migrateWorkspaceBundle(rawBundle),bundle=migration.bundle,{workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles['settings.json'];validateWorkspaceSettings(settings);const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.planningWindow={...settings.planningWindow};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);demand.forEach(d=>{d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.costCentreOrProjectCode=d.costCentreOrProjectCode||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||''});return{...migration,workspace,demand,team,allocations,ideas,configFiles,loadedSettings}}
-function applyMigrationDirtyState(prepared){if(!prepared.migrated)return;configDirty=true;for(const id of prepared.migratedAllocationIds)dirtyRecords.allocations.add(id);updateBanner();log(prepared.migrationNote)}
+function prepareLoadedWorkspace(rawBundle){const migration=migrateWorkspaceBundle(rawBundle),bundle=migration.bundle,{workspace,demand,team,allocations,ideas,configFiles}=bundle,settings=configFiles['settings.json'];validateWorkspaceSettings(settings);const loadedSettings={...clone(DEFAULT_SETTINGS),...settings};loadedSettings.planningWindow={...settings.planningWindow};loadedSettings.businessAreas=loadedSettings.businessAreas||[];loadedSettings.initiatives=migrateInitiatives(loadedSettings,demand);loadedSettings.ideaStatuses=Array.isArray(loadedSettings.ideaStatuses)&&loadedSettings.ideaStatuses.length?loadedSettings.ideaStatuses:clone(DEFAULT_SETTINGS.ideaStatuses);demand.forEach(d=>{window.DefinedDemandModel?.normalizeDemand?.(d,loadedSettings);d.businessArea=d.businessArea||'';d.initiative=d.initiative||'';d.source=d.source||{type:'SharePoint',id:'',url:'',title:''};d.source.url=d.source.url||'';d.source.title=d.source.title||''});return{...migration,workspace,demand,team,allocations,ideas,configFiles,loadedSettings}}
+function applyMigrationDirtyState(prepared){if(!prepared.migrated)return;configDirty=true;for(const id of prepared.migratedAllocationIds||[])dirtyRecords.allocations.add(id);for(const id of prepared.migratedDemandIds||[])dirtyRecords.demand.add(id);updateBanner();if(prepared.migrationNote)log(prepared.migrationNote)}
 async function openWorkspace(){
   if(!('showDirectoryPicker'in window)){alert('Folder access is not supported in this browser.');return}
   const connectionToken=workspaceConnectionIntent.mode==='local'?workspaceConnectionIntent.token:beginWorkspaceConnection('local');

@@ -17,7 +17,9 @@ const acceptance=fs.readFileSync('src/docs/WorkPackagesAcceptance.md.txt','utf8'
 
 assert.match(workPackages,/const ENTITY_TYPE='workPackages'/);
 assert.match(workPackages,/demandId:trim\(record\?\.demandId\)/);
-assert.match(workPackages,/acceptanceCriteria:trim\(record\?\.acceptanceCriteria\)/);
+assert.doesNotMatch(workPackages,/description:trim\(record\?\.description\)|acceptanceCriteria:trim\(record\?\.acceptanceCriteria\)/);
+assert.doesNotMatch(workPackages,/wpDescription|wpAcceptance|Description \/ Scope|Acceptance Criteria/);
+assert.match(workPackages,/detailed description and acceptance criteria belong in the delivery backlog/i);
 assert.match(workPackages,/azureDevOpsWorkItemId:trim\(record\?\.azureDevOpsWorkItemId\)/);
 assert.match(workPackages,/const organization=trim\(teamConfig\.organization\)\|\|trim\(departmentConfig\.organization\)\|\|trim\(system\.defaultOrganization\)/);
 assert.match(workPackages,/const project=trim\(teamConfig\.project\)\|\|trim\(departmentConfig\.project\)/);
@@ -26,8 +28,7 @@ assert.match(workPackages,/Azure DevOps Work Item Reference/);
 assert.doesNotMatch(workPackages,/azureDevOpsUrl\s*:/);
 assert.doesNotMatch(workPackages,/configuredDepartmentsSafe\(\)\[0\]/);
 
-// Step 3: Demand record is the canonical parent/child management surface and the former
-// selected-Demand/bottom-of-page state is removed from both local and remote startup paths.
+// Step 3 parent/child management remains the foundation for Step 4.
 assert.match(recordModal,/WorkPackages\?\.renderModalSection\?\.\(\$\('recordModalBody'\),r\.id\)/);
 assert.match(workPackages,/function renderModalSection\(host,demandId\)/);
 assert.match(workPackages,/section\.id='demandWorkPackagesSection'/);
@@ -40,12 +41,10 @@ assert.doesNotMatch(app5,/demandDetail|function renderDemandDetail|renderDemandP
 assert.doesNotMatch(app1,/selectedDemandId/);
 assert.doesNotMatch(remoteWorkspace,/selectedDemandId/);
 assert.doesNotMatch(index,/id="demandDetail"/);
-assert.match(index,/Double-click any row to open its record and manage its Work Packages/);
+assert.match(index,/Double-click a row to open its single-record view/);
 assert.match(acceptance,/Demand record modal is the canonical parent\/child management surface/);
-assert.match(acceptance,/there is no selected-Demand card or Work Package panel appended beneath the Demand page/);
 
-// Work Package is the only active Azure DevOps work-item relationship. The workspace loader no
-// longer manufactures a legacy Demand.azureDevOps object merely for compatibility.
+// Work Package remains the only active Azure DevOps work-item relationship for now.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
 assert.doesNotMatch(workflows,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
 assert.doesNotMatch(integrations,/key:'_work'|key:'azureDevOps\.url'|key:'azureDevOps\.title'|demandWorkHtml|enhanceAllocationWorkColumn|enhanceResourceWorkColumn|enhanceRoadmapWorkLinks/);
@@ -55,6 +54,11 @@ assert.match(demandGrid,/delete d\.azureDevOps/);
 for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWith('.json'))){
   const sample=fs.readFileSync(path.join('data/sample/demand',file),'utf8');
   assert.doesNotMatch(sample,/"azureDevOps"\s*:/,`${file} still models a Demand-level Azure DevOps relationship.`);
+}
+for(const file of fs.readdirSync('data/sample/work-packages').filter(name=>name.endsWith('.json'))){
+  const wp=JSON.parse(fs.readFileSync(path.join('data/sample/work-packages',file),'utf8'));
+  assert.equal(Object.prototype.hasOwnProperty.call(wp,'description'),false,`${file} duplicates backlog description.`);
+  assert.equal(Object.prototype.hasOwnProperty.call(wp,'acceptanceCriteria'),false,`${file} duplicates backlog acceptance criteria.`);
 }
 
 // A parent Demand cannot be deleted while child Work Packages still exist, preventing orphans.
@@ -73,22 +77,25 @@ assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 
-// Work Package writes participate in the same workspace edit lock and release only after the
-// direct repository write has completed.
+// Work Package writes participate in the workspace edit lock lifecycle.
 assert.match(lock,/\[data-wp-edit\],\[data-wp-delete\],#addWorkPackage/);
 assert.match(lock,/#wpCancel/);
 assert.doesNotMatch(lock,/#wpSave/);
 assert.match(workPackages,/await releaseEditLock\('Work Package edit completed'\)/);
 assert.match(workPackages,/finally\{await releaseEditLock\('Work Package delete completed'\)\}/);
 
-assert.match(index,/app-1\.js\?v=20260904-2/);
-assert.match(index,/app-2\.js\?v=20260904-2/);
-assert.match(index,/app-record-modal\.js\?v=20260904-2/);
-assert.match(index,/app-5\.js\?v=20260904-2/);
-assert.match(index,/app-integrations\.js\?v=20260904-2/);
-assert.match(index,/app-service-workflows\.js\?v=20260904-2/);
-assert.match(index,/app-lock\.js\?v=20260904-2/);
-assert.match(index,/app-work-packages\.js\?v=20260904-2/);
-assert.match(targetStage,/const APP_VERSION='1\.1\.6'/);
+// Step 4 static assets must not mix old cached Demand/Work Package implementations.
+assert.match(index,/app-demand-model\.js\?v=20260905-2/);
+assert.match(index,/app-1\.js\?v=20260905-2/);
+assert.match(index,/app-2\.js\?v=20260905-2/);
+assert.match(index,/app-config\.js\?v=20260905-2/);
+assert.match(index,/app-record-modal\.js\?v=20260905-2/);
+assert.match(index,/app-roadmap\.js\?v=20260905-2/);
+assert.match(index,/app-integrations\.js\?v=20260905-2/);
+assert.match(index,/app-work-packages\.js\?v=20260905-2/);
+assert.match(index,/app-defined-demand-ui\.js\?v=20260905-2/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.0'/);
 
 console.log('Work Package domain, Demand child UX and Azure DevOps relationship contract tests passed');
+require('./defined-demand-model.test.js');
+require('./defined-demand-contract.test.js');
