@@ -3,8 +3,6 @@
   "demandId": "DEM-2026-0042",
   "title": "Authentication migration options",
   "service": "Consultancy",
-  "description": "Assess migration sequencing and dependencies for authentication flows.",
-  "acceptanceCriteria": "Preferred migration option, dependencies and key decisions are documented for the parent Demand.",
   "status": "Planned",
   "estimatedEffortDays": 6,
   "targetStart": "2026-10-01",
