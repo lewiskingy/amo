@@ -1,32 +1,51 @@
-# Work Package Step 3 Acceptance
+# Work Package Acceptance
 
-Before merging the Step 3 candidate, verify the complete Defined Demand → Work Package → Azure DevOps experience in both Local and Remote workspaces.
+Verify the complete Defined Demand → Work Package → delivery-backlog experience in both Local and Remote workspaces, including a narrow/mobile browser.
 
-## Demand and Work Package UX
+## Demand Register hierarchy
 
-- Open Demand from the Demand Register by double-clicking a row.
-- The Demand record modal is the canonical parent/child management surface; there is no selected-Demand card or Work Package panel appended beneath the Demand page.
-- Existing Demand records show a clearly labelled **Work Packages** section with the child count.
-- From Demand view mode, **+ Add Work Package**, Edit and Delete operate directly on the selected Demand's children.
-- While the parent Demand itself is in edit mode, Work Packages remain visible but child editing is disabled until the Demand edit is saved or cancelled.
-- Creating, editing, cancelling and deleting a Work Package acquires/releases the normal workspace edit lock correctly and does not leave the workspace locked.
-- A new unsaved Demand does not offer Work Package creation until the parent Demand has first been saved.
+- Demand rows render as the parent level in the Demand Register.
+- Work Packages render as visibly indented child rows beneath their parent Demand.
+- Existing Work Packages are expanded by default and can be collapsed/expanded using the left-hand disclosure control.
+- The compact **+ WP** action is beside the Demand ID at the left of the row so it remains reachable without horizontally scrolling to a distant actions column.
+- A Demand row shows the aggregate **WP Estimate** plus estimation completeness, for example `18d · 2/3` rather than presenting a partial estimate as complete.
+- Creating a Work Package saves through WorkspaceRepository and immediately renders the new child beneath its parent Demand.
+- Double-clicking a Work Package child row opens the Work Package editor.
+- The visible **Edit** action on a Work Package child row opens the same editor.
+- Demand double-click continues to open the Defined Demand record rather than the Work Package editor.
+- List Edit mode edits Demand records only; nested Work Package management is not duplicated inside the Demand bulk-edit path.
+
+## Work Package editor
+
+- New and existing Work Packages use one canonical editor.
+- The editor contains Title, Service, Status, Estimated Effort, Target Start/End and the current Azure DevOps Work Item Reference.
+- **Description / Scope** and **Acceptance Criteria** are not presented or persisted by AMO; those belong in the authoritative delivery backlog.
+- Existing Work Packages expose **Delete Work Package** inside the editor rather than a permanent destructive action on every child row.
+- Save updates the nested row and parent aggregate estimate immediately.
+- Delete removes the child row and updates the parent aggregate immediately.
+- Create, edit, cancel and delete use the normal workspace edit lock and do not leave the workspace locked.
+
+## Demand modal
+
+- The Demand modal remains the canonical editor for Defined Demand metadata only.
+- The Work Packages section at the bottom is summary/read-only context: child count, current Work Package estimate, delivery window and service mix.
+- Work Package add/edit/delete actions are not duplicated in the Demand modal; the Demand Register is the management surface for children.
+- Existing Demand opens in view mode by default, with explicit **Edit** for Demand metadata.
 
 ## Azure DevOps relationship
 
-- Demand no longer exposes or persists an Azure DevOps Work Item field/link.
-- Work Package is the canonical Azure DevOps relationship boundary.
-- A Work Package stores only the numeric Azure DevOps Work Item Reference.
+- Demand does not expose or persist a delivery work-item field/link.
+- Work Package is the canonical delivery-backlog relationship boundary.
+- A Work Package currently stores only the numeric Azure DevOps Work Item Reference.
 - Azure DevOps Organisation resolves Team → Department → System.
 - Azure DevOps Project resolves Team → Department.
 - A complete effective Organisation + Project + Work Item Reference produces the expected Azure DevOps URL.
-- Missing Organisation/Project leaves the Work Item Reference intact and shows a clear configuration notice rather than manufacturing a URL.
-- Allocation, Resource Plan and Roadmap views no longer add Demand-level Work Item links.
+- Missing Organisation/Project leaves the reference intact rather than manufacturing a URL.
+- Future provider-neutral Azure DevOps/Jira linkage may replace this field, but AMO must not create simultaneous Azure DevOps and Jira relationships for one Work Package.
 
 ## Integrity and compatibility
 
 - Existing Demand, Allocations and Actuals continue to operate unchanged at Demand level.
-- Work Packages continue to persist through the common WorkspaceRepository contract in Local and Remote/Mongo modes.
-- A Demand with child Work Packages must not be deletable in a way that would leave orphan Work Package records.
-- Existing legacy Demand-level Azure DevOps data may be tolerated when loading older workspaces, but it must not be surfaced, used as a relationship, or written back by current Demand editing.
-- Current sample data and documentation must model Azure DevOps linkage on Work Packages rather than Demand.
+- Work Packages persist through the common WorkspaceRepository contract in Local and Remote/Mongo modes.
+- A Demand with child Work Packages cannot be deleted in a way that would leave orphan records.
+- Legacy Demand-level Azure DevOps data may be tolerated when loading older workspaces, but it is not surfaced, used as a relationship or written back by current Demand editing.

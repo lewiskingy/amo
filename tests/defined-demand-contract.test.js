@@ -19,7 +19,7 @@ const index=fs.readFileSync('src/index.html','utf8');
 assert.match(app1,/CURRENT_SCHEMA_VERSION=3/);
 assert.equal(schema.schemaVersion,3);
 assert.match(serverRepo,/schemaVersion:3/);
-assert.match(targetStage,/const APP_VERSION='1\.2\.0'/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.1'/);
 
 // Defined Demand is deliberately lightweight at creation.
 assert.match(modal,/Title and Business Area are mandatory at creation/);
@@ -37,9 +37,10 @@ assert.doesNotMatch(modal,/modalField\('Start','workPackage\.targetStart'/);
 assert.doesNotMatch(modal,/modalField\('End','workPackage\.targetEnd'/);
 assert.doesNotMatch(modal,/modalField\('Scope','workPackage\.scope'/);
 
-// Demand list is portfolio metadata only.
+// Demand list remains portfolio-oriented but may surface derived Work Package roll-ups.
 assert.match(app2,/key:'initialEstimate\.size',label:'Initial Size'/);
 assert.match(app2,/key:'ownerId',label:'Owner'/);
+assert.match(app2,/key:'_wpEstimate',label:'WP Estimate'/);
 assert.doesNotMatch(app2,/key:'service'/);
 assert.doesNotMatch(app2,/triage\.romDays|workPackage\.targetStart|workPackage\.targetEnd/);
 assert.doesNotMatch(integrations,/triage\.romDays|workPackage\.targetStart|workPackage\.targetEnd|workPackage\.architectureOwner/);
