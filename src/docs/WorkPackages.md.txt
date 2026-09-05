@@ -2,17 +2,17 @@
 
 AMO uses **Demand** as the persisted entity name for the recognised body of Architecture work under management. Conceptually this is **Defined Demand**: early portfolio visibility that can exist before detailed delivery scope, a Project Number, committed dates or even a final owning Team are known.
 
-A **Work Package** is a discrete delivery package beneath Defined Demand. It describes a tranche of work that can be classified by Architecture Service, estimated, given acceptance criteria, scheduled, tracked and linked to an Azure DevOps work item without changing the resource/accounting boundary of the parent Demand.
+A **Work Package** is a discrete delivery package beneath Defined Demand. AMO keeps only the metadata needed to manage that package at portfolio level: title, Architecture Service, delivery status, refined effort estimate, target dates and a backlog work-item reference. Detailed description, scope narrative and acceptance criteria belong in the authoritative delivery backlog and are deliberately not duplicated in AMO.
 
 ```text
 Raw Demand (SharePoint Front Door)
         ↓
-Triage (AMO + Azure DevOps)
+Triage (AMO + delivery backlog)
         ↓
 Defined Demand (AMO Demand)
         ├─ Initial T-shirt ROM
-        ├─ Work Package → Azure DevOps Work Item
-        ├─ Work Package → Azure DevOps Work Item
+        ├─ Work Package → backlog Work Item
+        ├─ Work Package → backlog Work Item
         ├─ Allocations
         └─ Actuals ← Oracle Project Number
 ```
@@ -36,15 +36,15 @@ Work Packages are first-class records stored separately from Demand. The current
 
 - `id` — stable Work Package ID;
 - `demandId` — required parent Defined Demand;
-- `title` — required;
+- `title` — required AMO-visible package title;
 - `service` — required Architecture Service classification;
-- `description` — delivery scope/description;
-- `acceptanceCriteria`;
 - `status` — configured Work Package delivery state;
 - `estimatedEffortDays` — refined package estimate;
 - `targetStart` and `targetEnd`;
-- `azureDevOpsWorkItemId` — optional numeric Azure DevOps Work Item Reference;
+- `azureDevOpsWorkItemId` — optional numeric Azure DevOps Work Item Reference for the currently implemented provider;
 - record version/modified metadata.
+
+AMO deliberately does **not** persist Work Package description or acceptance criteria. Those are delivery-backlog content and should remain in the authoritative backlog item rather than being copied and allowed to drift.
 
 Legacy Work Package `romDays` values are read as `estimatedEffortDays` when encountered. The current UI and saved record use **Estimated Effort (days)** because a defined package estimate is no longer the same concept as the early Demand ROM.
 
@@ -52,7 +52,7 @@ Local workspaces store one JSON document per Work Package under `work-packages/`
 
 ## Estimation model
 
-AMO now distinguishes successive levels of confidence rather than overwriting one estimate with another:
+AMO distinguishes successive levels of confidence rather than overwriting one estimate with another:
 
 ```text
 Defined Demand
@@ -99,11 +99,13 @@ Work Packages are managed as children of their parent Defined Demand. Double-cli
 
 The old selected-Demand/bottom-of-page Work Package interaction remains retired. While the parent Demand itself is being edited, child Work Packages remain visible but child write actions are suspended until the Demand edit is saved or cancelled.
 
-## Azure DevOps reference and inheritance
+## Backlog reference
 
-A Work Package stores only the Azure DevOps **Work Item Reference** (numeric work item ID). AMO derives the URL from inherited organisational configuration.
+The current implementation stores an Azure DevOps **Work Item Reference** (numeric work item ID) and derives the URL from inherited organisational configuration.
 
-Organisation resolution:
+The long-term domain requirement is provider-neutral: a Work Package may be linked to **Azure DevOps or Jira, but not both**. That provider model is deliberately deferred rather than introducing a half-finished abstraction in Step 4. The important boundary is established now: AMO owns package-management metadata; the delivery backlog owns detailed description and acceptance criteria.
+
+Current Azure DevOps Organisation resolution:
 
 ```text
 Team Organisation override
@@ -113,7 +115,7 @@ Department Organisation override
 System Default Organisation
 ```
 
-Project resolution:
+Current Project resolution:
 
 ```text
 Team Project override
@@ -133,12 +135,13 @@ Step 4 deliberately does not manufacture new delivery relationships from ambiguo
 - old Demand ROM becomes the snapshotted Initial Estimate;
 - old Demand target dates are retained only as legacy history and are not used as the current Roadmap delivery window;
 - old Demand deliverables are retained as legacy history rather than being converted into Work Packages;
-- legacy Cost Centre / Project Code is never promoted to Project Number.
+- legacy Cost Centre / Project Code is never promoted to Project Number;
+- legacy Work Package description/acceptance criteria are ignored by the current normalised model rather than carried forward as active duplicate backlog fields.
 
 ## Process responsibility
 
 - **SharePoint Front Door** — authoritative intake/source for Raw Demand;
-- **Azure DevOps** — triage/backlog and delivery work-item tracking;
-- **AMO** — Defined Demand, Work Package context, portfolio/resource planning and Actuals reconciliation.
+- **Azure DevOps / Jira** — authoritative delivery backlog and work-item detail;
+- **AMO** — Defined Demand, lightweight Work Package metadata, portfolio/resource planning and Actuals reconciliation.
 
 During triage, a request may be recognised as a genuinely new body of work and a Defined Demand can be created with minimal information. If a new request belongs to existing Defined Demand, it should normally become or amend a Work Package beneath that Demand instead of creating duplicate Demand.
