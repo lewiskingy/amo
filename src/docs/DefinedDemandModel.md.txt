@@ -1,0 +1,83 @@
+# Defined Demand model reference
+
+## Defined Demand (persisted entity: Demand)
+
+### Required at initial creation
+
+- `id` — generated stable AMO identifier;
+- `title` — concise description of the managed body of Architecture demand;
+- `businessArea` — business context;
+- `status` — Demand State, defaulted by AMO (normally Assessing).
+
+Only Title and Business Area require user input to create the record.
+
+### Optional / progressively enriched
+
+- `initiative` — portfolio grouping;
+- `teamId` — Owning Team; may remain unassigned during early visibility;
+- `priority` — portfolio priority;
+- `ownerId` — Architecture Owner accountable for the Defined Demand;
+- `initialEstimate.size` — XS/S/M/L/XL;
+- `initialEstimate.estimatedDays` — snapshotted default ROM for the chosen size;
+- `projectNumber` — optional Oracle Project Number for Actuals reconciliation;
+- `health` — portfolio delivery health once meaningful;
+- `context` — Summary / Context for why the Defined Demand exists;
+- `source` — Front Door provenance/reference;
+- funding/planning metadata owned by the existing Demand planning capability.
+
+### Derived, not authored on Demand
+
+- Work Package count;
+- current refined estimated effort = sum of child `estimatedEffortDays` values that exist;
+- delivery start = earliest child `targetStart`;
+- delivery end = latest child `targetEnd`;
+- Work Package Service mix.
+
+### Removed from the current Demand model
+
+- `service` — now Work Package Service;
+- `triage.romDays` / complexity — replaced by Initial Size + snapshotted ROM;
+- nested `workPackage.scope` — delivery scope belongs to Work Package; useful parent text migrates to `context`;
+- nested `workPackage.architectureOwner` — becomes parent `ownerId`;
+- nested `workPackage.targetStart` / `targetEnd` — Work Package dates only;
+- nested Demand work-package governance/delivery metadata — retired from current Demand;
+- `deliverables[]` — not converted into Work Packages automatically;
+- Demand-level Azure DevOps linkage — retired in Step 3;
+- Cost Centre / Project Code — never promoted to Project Number.
+
+Removed legacy values may be retained under `legacy` for audit/history but do not drive current planning or reporting.
+
+## Work Package
+
+### Required
+
+- `id` — generated stable Work Package identifier;
+- `demandId` — parent Defined Demand;
+- `title`;
+- `service` — Architecture Service;
+- `status` — Work Package delivery state.
+
+### Optional delivery detail
+
+- `description` — delivery scope;
+- `acceptanceCriteria`;
+- `estimatedEffortDays` — refined package estimate;
+- `targetStart`;
+- `targetEnd`;
+- `azureDevOpsWorkItemId`.
+
+Work Package does not own Allocation or Actuals in this model.
+
+## Measurement progression
+
+```text
+Initial Demand Size / ROM
+        ↓
+Work Package Estimated Effort
+        ↓
+Allocation Forecast
+        ↓
+Actual Effort
+```
+
+Each measure represents a different level of confidence and should remain separately reportable rather than overwriting the previous one.
