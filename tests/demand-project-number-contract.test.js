@@ -29,6 +29,9 @@ assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDema
 assert.match(workflows,/Retired by Defined Demand model v2/);
 assert.doesNotMatch(workflows,/Cost Centre \/ Project Code|costCentreOrProjectCode|Work Item — Azure DevOps|modalField\(/);
 assert.match(worker,/window\.AMO_ASSET_VERSION=\$\{JSON\.stringify\(config\.buildId\)\}/);
+assert.match(worker,/function versionStaticAssets\(html,buildId\)/);
+assert.match(worker,/html=versionStaticAssets\(await response\.text\(\),config\.buildId\)/);
+assert.match(worker,/headers\.set\('Cache-Control','no-store'\)/);
 
 assert.match(actuals,/function projectNumber\(demand\)/);
 assert.match(actuals,/demand\?\.projectNumber/);
