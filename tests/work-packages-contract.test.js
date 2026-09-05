@@ -51,9 +51,26 @@ assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click a row to open its single-record view/);
 assert.match(acceptance,/Demand Register/);
 
-// Work Package tree module must exist before app-2 performs the initial Demand grid render.
-// Otherwise app-2's optional WorkPackages hook is skipped and an already-open remote workspace
-// can show the parent Demand without its child rows or + WP action until another render occurs.
+// Remote startup deliberately fires the workspace-connected lifecycle before refreshAll. Work Package
+// loading must therefore be safe while the first Demand render happens during an in-flight remote read.
+assert.match(remoteWorkspace,/notifyWorkspaceConnected\('remote'\);\s*refreshAll\(\)/);
+assert.match(workPackages,/loadPromise:null/);
+assert.match(workPackages,/treeRefreshScheduled:false/);
+assert.match(workPackages,/if\(state\.loading&&state\.loadPromise\)return state\.loadPromise/);
+assert.match(workPackages,/function scheduleTreeRefresh\(\)/);
+assert.match(workPackages,/if\(!loaded\)scheduleTreeRefresh\(\)/);
+assert.match(workPackages,/load\(\{force:true\}\)\.then\(\(\)=>\{decorateConfig\(\);rerenderDemandGrid\(\)\}\)/);
+assert.doesNotMatch(workPackages,/if\(!state\.loaded\)\{if\(!state\.loading\)load\(\)\.then/);
+
+// Parent controls are rendered even before child records finish loading. This means + WP cannot
+// disappear merely because a remote listRecords call is in flight; children are added on refresh.
+const renderTreeStart=workPackages.indexOf('function renderDemandTreeRows(table,demands)');
+const addControl=workPackages.indexOf('data-wp-add=',renderTreeStart);
+const scheduleRefresh=workPackages.indexOf('if(!loaded)scheduleTreeRefresh()',renderTreeStart);
+assert(renderTreeStart>=0&&addControl>renderTreeStart&&scheduleRefresh>addControl,'Demand parent controls must render before asynchronous tree refresh is scheduled.');
+
+// Work Package tree module must exist before app-2 performs the initial Demand grid render as an
+// additional static ordering guarantee. Runtime correctness must not depend on this alone.
 const wpScript=index.indexOf('app-work-packages.js?v=20260905-4');
 const demandGridScript=index.indexOf('app-2.js?v=20260905-4');
 assert(wpScript>=0&&demandGridScript>=0&&wpScript<demandGridScript,'Work Package module must load before Demand grid module.');
@@ -103,11 +120,12 @@ assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 
-// Static assets for the changed Demand/Work Package UI use the same candidate cache key.
+// Existing asset keys/client version are still checked; release metadata is bumped separately when
+// this runtime fix is promoted as a new client candidate.
 assert.match(index,/app-2\.js\?v=20260905-4/);
 assert.match(index,/app-work-packages\.js\?v=20260905-4/);
 assert.match(targetStage,/const APP_VERSION='1\.2\.2'/);
 
-console.log('Work Package domain, nested Demand UX and backlog relationship contract tests passed');
+console.log('Work Package domain, deterministic nested Demand UX and backlog relationship contract tests passed');
 require('./defined-demand-model.test.js');
 require('./defined-demand-contract.test.js');
