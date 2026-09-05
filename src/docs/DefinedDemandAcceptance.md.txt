@@ -1,0 +1,123 @@
+# Defined Demand Step 4 Acceptance
+
+Validate this candidate against both Local and Remote/Test workspaces before promotion.
+
+## 1. Workspace migration
+
+Open a schema 2 workspace containing legacy Demand fields (`service`, `triage`, nested `workPackage`, legacy Deliverables and old statuses).
+
+Confirm:
+
+- the workspace opens and migrates to schema 3 without losing Demand, Allocation or Actuals records;
+- Demand State is mapped to the canonical portfolio lifecycle;
+- legacy triage ROM becomes Initial Size + snapshotted Initial ROM days;
+- legacy owner becomes Architecture Owner;
+- meaningful triage/scope text appears in Summary / Context;
+- Project Number is not populated from Cost Centre / Project Code;
+- old Demand Service, dates and delivery scope are no longer editable/current fields;
+- historical removed delivery metadata is retained under the Demand `legacy` history where applicable;
+- current Roadmap dates do not fall back to those legacy Demand dates.
+
+## 2. Minimal Defined Demand creation
+
+Create a new Defined Demand with only:
+
+- Title;
+- Business Area.
+
+Confirm it saves successfully, with State defaulted (normally Assessing). Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health, Context and Front Door source must all be optional at this point.
+
+Create another Demand while the global Team View is scoped to a specific Team and confirm that Team is offered as the natural default. In Whole Department / organisation scope, confirm AMO does not silently assign the first configured Team.
+
+## 3. Initial sizing
+
+In Config, inspect Initial Demand Sizing and note the current XS/S/M/L/XL day values.
+
+On a Demand:
+
+1. choose a T-shirt size;
+2. confirm Initial ROM days are populated from the configured default and are read-only as the size-derived snapshot;
+3. save the Demand;
+4. change the Config default for that size;
+5. reopen the existing Demand and confirm its stored Initial ROM has not silently changed;
+6. change the Demand to a different size and confirm the new size snapshots the new configured value.
+
+## 4. Work Package delivery model
+
+Open an existing Defined Demand and add a Work Package.
+
+Confirm the Work Package owns:
+
+- Service;
+- Description / Scope;
+- Acceptance Criteria;
+- Estimated Effort (days);
+- Work Package Status;
+- Target Start;
+- Target End;
+- Azure DevOps Work Item Reference.
+
+Service and Work Package Status should be selected from their own configured lists. A Work Package cannot save without a Service and valid Status.
+
+Confirm the Demand itself does not expose Service, delivery Scope, delivery Start/End or refined effort fields.
+
+## 5. Estimate roll-up and Roadmap
+
+Create at least two Work Packages with estimates and dates under one Defined Demand.
+
+Confirm:
+
+- the Demand Work Package section shows Initial Demand ROM separately from current Work Package estimated effort;
+- Work Package estimated effort is the sum of defined package estimates;
+- the displayed delivery window uses earliest Work Package start and latest Work Package end;
+- Roadmap uses that Work Package-derived delivery window;
+- a Demand with no dated Work Packages shows no committed delivery window, even if migrated legacy Demand dates exist;
+- the Roadmap resource line still comes from Demand-level Allocations.
+
+## 6. Allocations and Resource Plan regression
+
+For a Demand with existing Allocation records:
+
+- confirm Allocations remain keyed by Demand ID and Person, not Work Package;
+- edit and save Allocation Forecast as before;
+- confirm Resource Plan still shows capacity, allocation and utilisation correctly;
+- confirm imported Actuals continue to replace Forecast for imported periods and Forecast remains for future/non-imported periods;
+- confirm no Work-Package-level Actuals are inferred.
+
+## 7. Actuals / Project Number regression
+
+Confirm:
+
+- Project Number remains optional on Demand;
+- digits-only and uniqueness validation remain in place;
+- imported Oracle Actuals continue reconciling through `Demand.projectNumber`;
+- a Demand without Project Number can still be created, allocated and reported normally;
+- legacy Cost Centre / Project Code does not reappear or participate in matching.
+
+## 8. Status Reporting regression
+
+Open the Status Report authoring page.
+
+Confirm:
+
+- the old Demand-level Service column is not presented as though Service still belongs to Demand;
+- report preview/publish still works for Defined Demand entries;
+- immutable report snapshots can carry the derived list of child Work Package services for reader context;
+- existing Actual-vs-plan reporting prompts still render.
+
+## 9. Configuration integrity
+
+Confirm Config distinguishes:
+
+- Demand States;
+- Work Package Statuses;
+- Work Package Services;
+- Initial Demand Sizing.
+
+Renaming/removing a Work Package Service that is still used by Work Packages must be rejected rather than checking Demand records. Demand State references continue to be validated against Demand.
+
+## 10. No duplicate Step 4 implementation
+
+Inspect the active browser path and confirm the canonical Defined Demand field model/editor lives in `app-demand-model.js`, `app-record-modal.js` and `app-2.js`.
+
+`app-defined-demand-ui.js` is only a narrow compatibility bridge preventing older Department-era wrappers from making Owning Team mandatory. It must not contain a second Demand modal, validation function or list-save implementation. `app-team-scope-clarity.js` must remain terminology/scope presentation only and must not implement another Demand save path.
