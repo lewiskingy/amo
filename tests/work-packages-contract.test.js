@@ -20,7 +20,7 @@ assert.match(workPackages,/const ENTITY_TYPE='workPackages'/);
 assert.match(workPackages,/demandId:trim\(record\?\.demandId\)/);
 assert.doesNotMatch(workPackages,/description:trim\(record\?\.description\)|acceptanceCriteria:trim\(record\?\.acceptanceCriteria\)/);
 assert.doesNotMatch(workPackages,/wpDescription|wpAcceptance|Description \/ Scope|Acceptance Criteria/);
-assert.match(workPackages,/detailed description and acceptance criteria belong in the delivery backlog/i);
+assert.match(workPackages,/Detailed description and acceptance criteria belong in the delivery backlog/i);
 assert.match(workPackages,/azureDevOpsWorkItemId:trim\(record\?\.azureDevOpsWorkItemId\)/);
 assert.match(workPackages,/const organization=trim\(teamConfig\.organization\)\|\|trim\(departmentConfig\.organization\)\|\|trim\(system\.defaultOrganization\)/);
 assert.match(workPackages,/const project=trim\(teamConfig\.project\)\|\|trim\(departmentConfig\.project\)/);
@@ -29,12 +29,18 @@ assert.match(workPackages,/Azure DevOps Work Item Reference/);
 assert.doesNotMatch(workPackages,/azureDevOpsUrl\s*:/);
 assert.doesNotMatch(workPackages,/configuredDepartmentsSafe\(\)\[0\]/);
 
-// Step 3 parent/child management remains the foundation for Step 4.
-assert.match(recordModal,/WorkPackages\?\.renderModalSection\?\.\(\$\('recordModalBody'\),r\.id\)/);
-assert.match(workPackages,/function renderModalSection\(host,demandId\)/);
-assert.match(workPackages,/section\.id='demandWorkPackagesSection'/);
-assert.match(workPackages,/\+ Add Work Package/);
-assert.match(workPackages,/Save or cancel the Demand edit before changing its child Work Packages/);
+// Demand Register is the canonical parent/child Work Package management surface.
+assert.match(demandGrid,/key:'_wpEstimate',label:'WP Estimate'/);
+assert.match(demandGrid,/window\.WorkPackages\?\.renderDemandTreeRows\?\.\(table,rows\)/);
+assert.match(workPackages,/function renderDemandTreeRows\(table,demands\)/);
+assert.match(workPackages,/class=\"wp-child-row\"/);
+assert.match(workPackages,/data-wp-add=/);
+assert.match(workPackages,/data-wp-edit=/);
+assert.match(workPackages,/data-wp-row=/);
+assert.match(workPackages,/\+ WP/);
+assert.match(workPackages,/Delete Work Package/);
+assert.match(workPackages,/Work Packages are managed from the nested rows in the Demand Register/);
+assert.doesNotMatch(workPackages,/Save or cancel the Demand edit before changing its child Work Packages/);
 assert.doesNotMatch(workPackages,/renderDemandPanel|selectedDemandId/);
 assert.doesNotMatch(demandGrid,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
 assert.doesNotMatch(integrations,/selectedDemandId|renderDemandDetail|renderDemandPanel/);
@@ -43,14 +49,19 @@ assert.doesNotMatch(app1,/selectedDemandId/);
 assert.doesNotMatch(remoteWorkspace,/selectedDemandId/);
 assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click a row to open its single-record view/);
-assert.match(acceptance,/Demand record modal is the canonical parent\/child management surface/);
+assert.match(acceptance,/Demand Register/);
 
-// Existing Demand records must really open in view mode so child Work Package actions are reachable,
-// including on mobile. The modal UX layer must preserve the canonical requested/default mode rather
-// than forcing a late edit-mode override; explicit Edit is separately guarded by app-lock.js.
+// Existing Demand records open in view mode; explicit Edit remains separate and lock guarded.
 assert.match(modalUx,/baseOpenRecordModal\.call\(this,type,id,mode,extra\)/);
 assert.doesNotMatch(modalUx,/baseOpenRecordModal\.call\(this,type,id,'edit',extra\)/);
 assert.match(lock,/\[data-modal-edit\]/);
+
+// Work Package editor owns create/edit/delete and acquires the lock regardless of entry path.
+assert.match(workPackages,/async function ensureEditorLock/);
+assert.match(workPackages,/if\(!await ensureEditorLock\(\)\)return/);
+assert.match(workPackages,/id=\"wpDelete\" data-wp-delete/);
+assert.match(workPackages,/await releaseEditLock\('Work Package edit completed'\)/);
+assert.match(workPackages,/releaseEditLock\('Work Package delete completed'\)/);
 
 // Work Package remains the only active Azure DevOps work-item relationship for now.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
@@ -85,25 +96,11 @@ assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 
-// Work Package writes participate in the workspace edit lock lifecycle.
-assert.match(lock,/\[data-wp-edit\],\[data-wp-delete\],#addWorkPackage/);
-assert.match(lock,/#wpCancel/);
-assert.doesNotMatch(lock,/#wpSave/);
-assert.match(workPackages,/await releaseEditLock\('Work Package edit completed'\)/);
-assert.match(workPackages,/finally\{await releaseEditLock\('Work Package delete completed'\)\}/);
+// Static assets for the changed Demand/Work Package UI use the same candidate cache key.
+assert.match(index,/app-2\.js\?v=20260905-3/);
+assert.match(index,/app-work-packages\.js\?v=20260905-3/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.1'/);
 
-// Step 4 static assets must not mix old cached Demand/Work Package implementations.
-assert.match(index,/app-demand-model\.js\?v=20260905-2/);
-assert.match(index,/app-1\.js\?v=20260905-2/);
-assert.match(index,/app-2\.js\?v=20260905-2/);
-assert.match(index,/app-config\.js\?v=20260905-2/);
-assert.match(index,/app-record-modal\.js\?v=20260905-2/);
-assert.match(index,/app-roadmap\.js\?v=20260905-2/);
-assert.match(index,/app-integrations\.js\?v=20260905-2/);
-assert.match(index,/app-work-packages\.js\?v=20260905-2/);
-assert.match(index,/app-defined-demand-ui\.js\?v=20260905-2/);
-assert.match(targetStage,/const APP_VERSION='1\.2\.0'/);
-
-console.log('Work Package domain, Demand child UX and Azure DevOps relationship contract tests passed');
+console.log('Work Package domain, nested Demand UX and backlog relationship contract tests passed');
 require('./defined-demand-model.test.js');
 require('./defined-demand-contract.test.js');
