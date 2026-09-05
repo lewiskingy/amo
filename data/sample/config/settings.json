@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 1,
-  "applicationName": "Architecture Operations Hub",
+  "schemaVersion": 3,
+  "demandModelVersion": 2,
+  "applicationName": "Architecture Management Office",
   "appearance": "light",
-  "planningMonths": ["2026-09", "2026-10", "2026-11", "2026-12", "2027-01", "2027-02"],
+  "planningWindow": {"fromMonth": "2026-09-01", "toMonth": "2027-02-01"},
   "departments": [
     {"id": "DEPT-ARCH", "name": "Architecture"},
     {"id": "DEPT-DATA", "name": "Data & AI"}
@@ -13,15 +14,10 @@
     {"id": "TEAM-DOM", "name": "Domain Architecture", "departmentId": "DEPT-ARCH"},
     {"id": "TEAM-DATA", "name": "Data Architecture", "departmentId": "DEPT-DATA"}
   ],
-  "services": ["Triage", "Consultancy", "Assurance", "Design", "Strategy"],
-  "serviceWorkflows": {
-    "Triage": ["Triage", "Prioritisation", "Accepted", "Rejected", "Closed"],
-    "Consultancy": ["Assessment", "Prioritisation", "Mobilisation", "In Progress", "Review", "Complete", "On Hold", "Cancelled"],
-    "Assurance": ["Assessment", "Prioritisation", "Mobilisation", "Assurance Review", "Findings / Remediation", "Governance / Approval", "Complete", "On Hold", "Cancelled"],
-    "Design": ["Assessment", "Prioritisation", "Mobilisation", "Discovery", "Analysis / Design", "Socialisation / Review", "Approval", "Governance", "Complete", "On Hold", "Cancelled"],
-    "Strategy": ["Assessment", "Prioritisation", "Mobilisation", "Discovery", "Analysis", "Strategy Development", "Socialisation / Review", "Approval", "Governance", "Complete", "On Hold", "Cancelled"]
-  },
-  "statuses": ["Triage", "Prioritisation", "Accepted", "Rejected", "Closed", "Assessment", "Mobilisation", "In Progress", "Review", "Complete", "On Hold", "Cancelled", "Assurance Review", "Findings / Remediation", "Governance / Approval", "Discovery", "Analysis / Design", "Socialisation / Review", "Approval", "Governance", "Analysis", "Strategy Development"],
+  "services": ["Consultancy", "Assurance", "Design", "Strategy"],
+  "statuses": ["Assessing", "Defined", "Planned", "In Progress", "On Hold", "Complete", "Cancelled"],
+  "workPackageStatuses": ["Planned", "Ready", "In Progress", "Blocked", "Complete", "Cancelled"],
+  "demandSizeDays": {"XS": 2, "S": 5, "M": 10, "L": 20, "XL": 40},
   "businessAreas": ["Customer", "Payments", "Sales", "Digital", "Enterprise", "Technology Platforms", "Data & Analytics", "Operations"],
   "initiatives": [
     {"name": "Customer Modernisation Programme", "businessArea": "Customer"},
@@ -30,7 +26,7 @@
     {"name": "Data Transformation Programme", "businessArea": "Data & Analytics"}
   ],
   "priorities": ["Critical", "High", "Medium", "Low"],
-  "healthStates": ["Green", "Amber", "Red"],
+  "healthStates": ["On Track", "At Risk", "Off Track"],
   "ideaStatuses": ["New", "Under Review", "Planned", "Implemented", "Closed"],
   "defaultFteWarningThreshold": 0.85,
   "defaultFteOverallocationThreshold": 1.0
