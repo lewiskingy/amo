@@ -13,7 +13,7 @@ const defaultWorkspace=()=>{
     type:'architecture-operations-hub',
     name:'Architecture Management Office Workspace',
     workspaceId:`AMO-${randomUUID()}`,
-    schemaVersion:2,
+    schemaVersion:3,
     department:{id:'DEPT-ARCH',name:'Architecture'},
     created:now,
     modifiedAt:now,
@@ -35,19 +35,15 @@ const defaultPlanningWindow=(count=6)=>{const now=new Date(Date.UTC(new Date().g
 const defaultPlanningMonths=(count=6)=>{const w=defaultPlanningWindow(count),out=[];let d=new Date(`${w.fromMonth}T00:00:00Z`),end=new Date(`${w.toMonth}T00:00:00Z`);while(d<=end){out.push(monthStart(d).slice(0,7));d=addUtcMonths(d,1)}return out};
 
 const defaultSettings=()=>({
-  schemaVersion:2,
+  schemaVersion:3,
+  demandModelVersion:2,
   appearance:'light',
   planningWindow:defaultPlanningWindow(),
   teams:[],
-  services:['Triage','Consultancy','Assurance','Design','Strategy'],
-  serviceWorkflows:{
-    Triage:['Triage','Prioritisation','Accepted','Rejected','Closed'],
-    Consultancy:['Assessment','Prioritisation','Mobilisation','In Progress','Review','Complete','On Hold','Cancelled'],
-    Assurance:['Assessment','Prioritisation','Mobilisation','Assurance Review','Findings / Remediation','Governance / Approval','Complete','On Hold','Cancelled'],
-    Design:['Assessment','Prioritisation','Mobilisation','Discovery','Analysis / Design','Socialisation / Review','Approval','Governance','Complete','On Hold','Cancelled'],
-    Strategy:['Assessment','Prioritisation','Mobilisation','Discovery','Analysis','Strategy Development','Socialisation / Review','Approval','Governance','Complete','On Hold','Cancelled']
-  },
-  statuses:['Triage','Prioritisation','Accepted','Rejected','Closed','Assessment','Mobilisation','In Progress','Review','Complete','On Hold','Cancelled','Assurance Review','Findings / Remediation','Governance / Approval','Discovery','Analysis / Design','Socialisation / Review','Approval','Governance','Analysis','Strategy Development'],
+  services:['Consultancy','Assurance','Design','Strategy'],
+  statuses:['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled'],
+  workPackageStatuses:['Planned','Ready','In Progress','Blocked','Complete','Cancelled'],
+  demandSizeDays:{XS:2,S:5,M:10,L:20,XL:40},
   businessAreas:['Group'],
   initiatives:[],
   priorities:['Critical','High','Medium','Low'],
@@ -63,8 +59,8 @@ const repairRequiredSettings=settings=>{
   if(version>=2){
     const w=repaired.planningWindow;if(!w?.fromMonth||!w?.toMonth){repaired.planningWindow=defaults.planningWindow;changed=true}
   }else if(!Array.isArray(repaired.planningMonths)||!repaired.planningMonths.length){repaired.planningMonths=defaultPlanningMonths();changed=true}
-  for(const key of ['statuses','services','businessAreas','priorities','healthStates'])if(!Array.isArray(repaired[key])||repaired[key].length===0){repaired[key]=defaults[key];changed=true}
-  if(!repaired.services.includes('Strategy')){repaired.services=[...repaired.services,'Strategy'];changed=true}
+  for(const key of ['statuses','services','workPackageStatuses','businessAreas','priorities','healthStates'])if(!Array.isArray(repaired[key])||repaired[key].length===0){repaired[key]=defaults[key];changed=true}
+  if(!repaired.demandSizeDays||typeof repaired.demandSizeDays!=='object'){repaired.demandSizeDays=defaults.demandSizeDays;changed=true}
   return {settings:repaired,changed};
 };
 
