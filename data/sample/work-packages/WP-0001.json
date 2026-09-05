@@ -2,12 +2,13 @@
   "id": "WP-0001",
   "demandId": "DEM-2026-0042",
   "title": "Customer identity target design",
+  "service": "Design",
   "description": "Define the target identity architecture and migration approach for the first delivery tranche.",
   "acceptanceCriteria": "Target design agreed with Security and Digital Platform stakeholders and ready for governance review.",
-  "status": "Planned",
-  "romDays": 12,
+  "status": "In Progress",
+  "estimatedEffortDays": 12,
   "targetStart": "2026-09-01",
   "targetEnd": "2026-10-15",
   "azureDevOpsWorkItemId": "18742",
-  "version": 1
+  "version": 2
 }
