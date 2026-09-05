@@ -1,4 +1,4 @@
-/* Standard modal behaviour: edit-on-open, top positioning, fixed actions, and Escape/Cancel consistency. */
+/* Standard modal behaviour: top positioning, fixed actions, and Escape/Cancel consistency. */
 (function initModalUx(){
   const backdrop=()=>document.getElementById('recordModalBackdrop');
   const body=()=>document.getElementById('recordModalBody');
@@ -12,25 +12,26 @@
     })
   }
 
+  /* Preserve the mode requested by the canonical record modal. Existing records therefore
+     open in view mode by default, while explicit Edit actions acquire the workspace lock via
+     app-lock.js before switching the modal into edit mode. This is important for Defined Demand:
+     child Work Package actions are available in view mode and should not be hidden by a late UX override. */
+  if(typeof openRecordModal==='function'){
+    const baseOpenRecordModal=openRecordModal;
+    openRecordModal=function(type,id=null,mode=null,extra={}){
+      const result=baseOpenRecordModal.call(this,type,id,mode,extra);
+      resetModalScroll();
+      return result
+    }
+  }
+
+  /* Ideas retain their established edit-on-open behaviour. */
   async function ensureEditLockForExisting(id){
     if(!id||!workspaceHandle)return true;
     if(typeof lockOwnedByUs==='function'&&lockOwnedByUs())return true;
     if(typeof acquireWorkspaceLock!=='function')return true;
     return await acquireWorkspaceLock()
   }
-
-  /* Existing records always open directly in edit mode. If another session owns the
-     workspace lock, the normal lock warning is shown and the modal is not opened. */
-  if(typeof openRecordModal==='function'){
-    const baseOpenRecordModal=openRecordModal;
-    openRecordModal=async function(type,id=null,mode=null,extra={}){
-      if(id&&!await ensureEditLockForExisting(id))return;
-      const result=baseOpenRecordModal.call(this,type,id,'edit',extra);
-      resetModalScroll();
-      return result
-    }
-  }
-
   if(typeof openIdeaModal==='function'){
     const baseOpenIdeaModal=openIdeaModal;
     openIdeaModal=async function(id=null,mode=null){
