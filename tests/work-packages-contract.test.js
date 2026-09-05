@@ -51,6 +51,13 @@ assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click a row to open its single-record view/);
 assert.match(acceptance,/Demand Register/);
 
+// Work Package tree module must exist before app-2 performs the initial Demand grid render.
+// Otherwise app-2's optional WorkPackages hook is skipped and an already-open remote workspace
+// can show the parent Demand without its child rows or + WP action until another render occurs.
+const wpScript=index.indexOf('app-work-packages.js?v=20260905-4');
+const demandGridScript=index.indexOf('app-2.js?v=20260905-4');
+assert(wpScript>=0&&demandGridScript>=0&&wpScript<demandGridScript,'Work Package module must load before Demand grid module.');
+
 // Existing Demand records open in view mode; explicit Edit remains separate and lock guarded.
 assert.match(modalUx,/baseOpenRecordModal\.call\(this,type,id,mode,extra\)/);
 assert.doesNotMatch(modalUx,/baseOpenRecordModal\.call\(this,type,id,'edit',extra\)/);
@@ -97,9 +104,9 @@ assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 
 // Static assets for the changed Demand/Work Package UI use the same candidate cache key.
-assert.match(index,/app-2\.js\?v=20260905-3/);
-assert.match(index,/app-work-packages\.js\?v=20260905-3/);
-assert.match(targetStage,/const APP_VERSION='1\.2\.1'/);
+assert.match(index,/app-2\.js\?v=20260905-4/);
+assert.match(index,/app-work-packages\.js\?v=20260905-4/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.2'/);
 
 console.log('Work Package domain, nested Demand UX and backlog relationship contract tests passed');
 require('./defined-demand-model.test.js');
