@@ -4,6 +4,7 @@ const workPackages=fs.readFileSync('src/app-work-packages.js','utf8');
 const demandGrid=fs.readFileSync('src/app-2.js','utf8');
 const app5=fs.readFileSync('src/app-5.js','utf8');
 const recordModal=fs.readFileSync('src/app-record-modal.js','utf8');
+const modalUx=fs.readFileSync('src/app-modal-ux.js','utf8');
 const integrations=fs.readFileSync('src/app-integrations.js','utf8');
 const workflows=fs.readFileSync('src/app-service-workflows.js','utf8');
 const remoteWorkspace=fs.readFileSync('src/app-remote-workspace.js','utf8');
@@ -43,6 +44,13 @@ assert.doesNotMatch(remoteWorkspace,/selectedDemandId/);
 assert.doesNotMatch(index,/id="demandDetail"/);
 assert.match(index,/Double-click a row to open its single-record view/);
 assert.match(acceptance,/Demand record modal is the canonical parent\/child management surface/);
+
+// Existing Demand records must really open in view mode so child Work Package actions are reachable,
+// including on mobile. The modal UX layer must preserve the canonical requested/default mode rather
+// than forcing a late edit-mode override; explicit Edit is separately guarded by app-lock.js.
+assert.match(modalUx,/baseOpenRecordModal\.call\(this,type,id,mode,extra\)/);
+assert.doesNotMatch(modalUx,/baseOpenRecordModal\.call\(this,type,id,'edit',extra\)/);
+assert.match(lock,/\[data-modal-edit\]/);
 
 // Work Package remains the only active Azure DevOps work-item relationship for now.
 assert.doesNotMatch(recordModal,/Work Item — Azure DevOps|azureDevOps\.url|azureDevOps\.title/);
