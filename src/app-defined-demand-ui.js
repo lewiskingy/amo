@@ -30,5 +30,20 @@
   const canonicalDefaultDemand=defaultDemandRecord;
   defaultDemandRecord=function(){const r=canonicalDefaultDemand();if(typeof departmentScope!=='undefined'&&departmentScope!=='department')r.teamId=departmentScope;return r};
 
+  /* The older Team-configuration decorator assumes every Demand already has a Team. During its
+     validation only, represent genuinely unassigned Demand with a surviving configured Team so they
+     do not block unrelated Team-name/configuration changes. Explicit unknown Team references remain
+     untouched and therefore still fail validation. No Demand record is mutated. */
+  if(typeof saveConfigChanges==='function'){
+    const legacyDepartmentSaveConfig=saveConfigChanges;
+    saveConfigChanges=function(){
+      if(!configState.editing)return legacyDepartmentSaveConfig();
+      const configured=normalizeTeams(configState.draft?.teams),fallback=configured[0]?.id||'',original=db.demand;
+      if(!fallback)return legacyDepartmentSaveConfig();
+      db.demand=original.map(d=>d.teamId?d:{...d,teamId:fallback});
+      try{return legacyDepartmentSaveConfig()}finally{db.demand=original}
+    }
+  }
+
   window.DefinedDemandUi={compatibilityOnly:true};
 })();
