@@ -19,7 +19,7 @@ const index=fs.readFileSync('src/index.html','utf8');
 assert.match(app1,/CURRENT_SCHEMA_VERSION=3/);
 assert.equal(schema.schemaVersion,3);
 assert.match(serverRepo,/schemaVersion:3/);
-assert.match(targetStage,/const APP_VERSION='1\.2\.2'/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.3'/);
 
 // Defined Demand is deliberately lightweight at creation.
 assert.match(modal,/Title and Business Area are mandatory at creation/);
