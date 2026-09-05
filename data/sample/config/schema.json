@@ -14,15 +14,16 @@
         "semantics": "The configured T-shirt-size day value is snapshotted onto the Demand when the size is selected. This is the early ROM, not the refined delivery estimate."
       },
       "projectNumberSemantics": "Optional Oracle Project Number used only to reconcile Actuals to Defined Demand. Legacy Cost Centre / Project Code values are never promoted automatically.",
-      "deliverySemantics": "Service, detailed scope, acceptance criteria, delivery dates, refined estimate and Azure DevOps work-item linkage belong to child Work Packages, not Defined Demand.",
+      "deliverySemantics": "Delivery service, status, dates, refined estimate and backlog linkage belong to child Work Packages. Detailed backlog description and acceptance criteria remain in the delivery backlog rather than being duplicated in AMO.",
       "legacySemantics": "Removed legacy Demand delivery metadata may be retained under legacy for audit/history during migration but is not used as current operational data."
     },
     "workPackage": {
       "idPrefix": "WP-",
       "required": ["id", "demandId", "title", "service", "status"],
-      "optional": ["description", "acceptanceCriteria", "estimatedEffortDays", "targetStart", "targetEnd", "azureDevOpsWorkItemId", "modifiedAt"],
+      "optional": ["estimatedEffortDays", "targetStart", "targetEnd", "azureDevOpsWorkItemId", "modifiedAt"],
       "estimateSemantics": "estimatedEffortDays is the refined delivery estimate for the package. Legacy Work Package romDays is read as estimatedEffortDays when encountered.",
       "serviceSemantics": "Architecture Service is classified per Work Package so one Defined Demand can contain different forms of Architecture work.",
+      "backlogSemantics": "AMO stores enough metadata to identify and manage the Work Package but does not duplicate backlog description or acceptance criteria. Azure DevOps is the currently implemented work-item provider; provider-neutral Azure DevOps/Jira linkage is deferred.",
       "dateSemantics": "Demand delivery windows are derived from the earliest Work Package targetStart and latest Work Package targetEnd; dates are not authored on Demand."
     },
     "team": {
