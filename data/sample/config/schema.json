@@ -1,25 +1,40 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "demandModelVersion": 2,
   "recordTypes": {
     "demand": {
       "idPrefix": "DEM-",
-      "required": ["id", "teamId", "title", "businessArea", "status", "priority", "service", "source", "triage", "workPackage", "deliverables"],
-      "optional": ["forecast", "funding"],
-      "departmentSemantics": "Department is derived from the Owning Team referenced by teamId.",
-      "forecastSemantics": {
-        "rom": ["triage.romDays", "triage.romAmount"],
-        "estimate": ["workPackage.executionEstimateDays", "workPackage.executionEstimateAmount"],
-        "allocationStatus": "forecast.allocationStatus",
-        "allocationStatusValues": ["Not Planned", "Partial", "Complete"],
-        "currentForecastRule": "Complete allocations supersede Estimate amount; Estimate amount supersedes ROM amount"
-      }
+      "concept": "Defined Demand",
+      "required": ["id", "title", "businessArea", "status"],
+      "optional": ["initiative", "teamId", "priority", "ownerId", "initialEstimate", "projectNumber", "health", "context", "source", "funding", "fundingHistory", "legacy"],
+      "creationSemantics": "Only Title and Business Area are user-mandatory at initial creation; Demand State is defaulted. Owning Team, priority, initial size, owner, Project Number, health and context may be added as the demand matures.",
+      "initialEstimate": {
+        "fields": ["size", "estimatedDays"],
+        "sizes": ["XS", "S", "M", "L", "XL"],
+        "semantics": "The configured T-shirt-size day value is snapshotted onto the Demand when the size is selected. This is the early ROM, not the refined delivery estimate."
+      },
+      "projectNumberSemantics": "Optional Oracle Project Number used only to reconcile Actuals to Defined Demand. Legacy Cost Centre / Project Code values are never promoted automatically.",
+      "deliverySemantics": "Service, detailed scope, acceptance criteria, delivery dates, refined estimate and Azure DevOps work-item linkage belong to child Work Packages, not Defined Demand.",
+      "legacySemantics": "Removed legacy Demand delivery metadata may be retained under legacy for audit/history during migration but is not used as current operational data."
+    },
+    "workPackage": {
+      "idPrefix": "WP-",
+      "required": ["id", "demandId", "title", "service", "status"],
+      "optional": ["description", "acceptanceCriteria", "estimatedEffortDays", "targetStart", "targetEnd", "azureDevOpsWorkItemId", "modifiedAt"],
+      "estimateSemantics": "estimatedEffortDays is the refined delivery estimate for the package. Legacy Work Package romDays is read as estimatedEffortDays when encountered.",
+      "serviceSemantics": "Architecture Service is classified per Work Package so one Defined Demand can contain different forms of Architecture work.",
+      "dateSemantics": "Demand delivery windows are derived from the earliest Work Package targetStart and latest Work Package targetEnd; dates are not authored on Demand."
     },
     "team": {
       "idPrefix": "USR-",
       "required": ["id", "teamId", "name", "roleId", "fte", "active"],
       "departmentSemantics": "A Person belongs to one Home Team; Department is derived from that Team."
     },
-    "allocation": {"idPrefix": "ALLOC-", "required": ["id", "demandId", "teamMemberId", "forecast"]},
+    "allocation": {
+      "idPrefix": "ALLOC-",
+      "required": ["id", "demandId", "teamMemberId", "forecast"],
+      "semantics": "Allocation remains Person × Defined Demand × Month; Step 4 does not move resource planning to Work Package."
+    },
     "idea": {"idPrefix": "IDEA-", "required": ["id", "raisedBy", "raisedDate", "title", "description", "status"]},
     "statusReport": {
       "idPrefix": "SR-",
@@ -32,14 +47,24 @@
       "draftConcurrency": "Optimistic three-way merge at status-report entry field level; conflicting edits to the same field require user reconciliation."
     }
   },
+  "reportingInvariants": {
+    "allocations": "Person × Defined Demand × Month",
+    "actuals": "Person × Project Number × Month reconciled through Demand.projectNumber",
+    "reportedEffort": "Actuals for imported periods; Allocation Forecast elsewhere/future",
+    "workPackageActuals": "No Work Package Actuals are inferred from Project-level Actuals."
+  },
   "workspace": {
     "legacyOptional": ["department"],
     "note": "workspace.department is retained only as a migration seed for pre-hierarchy workspaces."
   },
   "config": {
-    "required": ["departments", "teams", "roles"],
+    "required": ["departments", "teams", "roles", "statuses", "workPackageStatuses", "services", "demandSizeDays"],
     "department": {"required": ["id", "name"]},
     "team": {"required": ["id", "name", "departmentId"]},
-    "role": {"required": ["id", "name", "dayRate"]}
+    "role": {"required": ["id", "name", "dayRate"]},
+    "statusesSemantics": "Portfolio lifecycle states for Defined Demand.",
+    "workPackageStatusesSemantics": "Delivery states for Work Packages.",
+    "servicesSemantics": "Architecture service classifications used by Work Packages.",
+    "demandSizeDaysSemantics": "Default day values for XS/S/M/L/XL initial Demand sizing; selected values are snapshotted on Demand."
   }
 }
