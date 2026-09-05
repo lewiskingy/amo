@@ -120,11 +120,11 @@ assert.match(serverRepository,/workPackages:'work-packages'/);
 assert.match(serverRepository,/REQUIRED_FOLDERS=.*'work-packages'/);
 assert.match(mongoRepository,/ENTITY_TYPES=new Set\(\['demand','team','allocations','ideas','workPackages'\]\)/);
 
-// Existing asset keys/client version are still checked; release metadata is bumped separately when
-// this runtime fix is promoted as a new client candidate.
+// Source ordering remains checked, while the deployed Worker now versions static assets by exact
+// build identity so a changed Work Package module cannot be served from an older browser/CDN cache.
 assert.match(index,/app-2\.js\?v=20260905-4/);
 assert.match(index,/app-work-packages\.js\?v=20260905-4/);
-assert.match(targetStage,/const APP_VERSION='1\.2\.2'/);
+assert.match(targetStage,/const APP_VERSION='1\.2\.3'/);
 
 console.log('Work Package domain, deterministic nested Demand UX and backlog relationship contract tests passed');
 require('./defined-demand-model.test.js');
