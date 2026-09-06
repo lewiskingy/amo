@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Status Reporting is the collaborative management-reporting layer for active Architecture Demand. It is not a replacement for Azure DevOps work-item workflow. The Status Report page is the authoring and lifecycle surface for the current reporting cycle; the report artefact itself is rendered consistently wherever it is viewed.
+Status Reporting is the collaborative management-reporting layer for active Architecture Demand. It is a narrative/Health control surface, not a replacement for Azure DevOps work-item workflow and not a second Dashboard.
+
+The Status Report page is the authoring/lifecycle surface for the current reporting cycle. Preview, Published and Final report artefacts use the canonical report renderer and immutable snapshot data.
 
 ## Reporting-cycle lifecycle
-
-AMO uses one active reporting cycle plus historical report snapshots.
 
 ```text
 Draft
@@ -23,54 +23,67 @@ Final
   +-----------------> next Draft
 ```
 
-### Draft
+`status-reports/draft.json` is the active cycle. Publish creates/updates the corresponding `SR-*.json` immutable report snapshot. Unpublish reopens the active cycle. New Draft finalises the current Published report and starts the next cycle.
 
-`status-reports/draft.json` is the active working cycle. Multiple contributors may edit it. Draft narrative does not change Demand Health until the report is published.
+## Authoring surface
 
-### Published
+The live Status Report page is intentionally focused on producing the report. It contains lifecycle actions, reporting progress and the active-Demand authoring table with strong Health cues.
 
-Publish uses the latest committed Draft. The active cycle remains in `draft.json`, but becomes read-only and records `publishedReportId`, `publishedAt`, `publishedBy` and `revision`. A corresponding `SR-*.json` snapshot is written with state `Published`.
+Dashboard-style portfolio metrics are not rendered above the authoring table. The authoring surface should make it easy to identify At Risk/Off Track Demand and supply narrative without duplicating resource-management views.
 
-Published is intentionally reversible. **Unpublish** reopens the active cycle as Draft. Republishing updates the same report ID and increments its revision.
+## Canonical report semantics
 
-### Final
+Published/Preview reporting must use the same reporting semantics as Dashboard, Resource Plan and Defined Demand. Calculations belong to `ReportingModel`; report views must not introduce their own competing effort/cost formulas.
 
-**New Draft** is the finalisation boundary. It changes the current Published snapshot to `Final` and creates the next `draft.json`. Final reports are historical and read-only.
+The important measures are:
 
-## Status Report authoring page
+- **Initial ROM** — original Defined Demand assessment baseline; indicative £ uses the configured blended/default day rate.
+- **Work Package Estimate** — current sum of populated WP estimates plus estimate coverage; indicative £ uses the blended/default rate.
+- **Allocation Forecast** — named resource plan, where FTE = allocation fraction × Person FTE and forecast £ uses the Person Role day rate/fallback rate.
+- **Actual effort/cost** — imported Oracle hours and Cost in GBP; Actual cost is authoritative and is never recalculated from AMO Role rates.
+- **Projected effort/cost** — Actual to date + remaining Allocation Forecast.
 
-The live **Status Report** page is deliberately focused on producing and managing the report rather than duplicating the Dashboard. It contains:
+Where a reporting period has imported Actuals, Actuals are the reported measure for that period. Allocation remains the planning baseline for variance comparison.
 
-- report lifecycle actions such as Edit Draft, Save Draft, Preview, Publish, Unpublish and New Draft;
-- reporting progress and current-cycle state;
-- the active-Demand authoring table with prominent Health semantics;
-- a compact **Latest Report** card showing the latest Published/Final report, its publication date, reporting date, revision and reported-item count, with **View** and **Open Report ↗** actions.
+AMO never infers Work-Package-level Actuals from Project/Demand Actuals.
 
-The Latest Report card is intentionally separate from Draft Preview. Preview answers “what would be published now?” while Latest Report answers “what was most recently published?”. Full history remains available under Status Report History.
+## Work Package delivery context
 
-Dashboard-style Demand highlights, Capacity outlook, Portfolio forecast and Allocation outlook are **not rendered above the authoring table**. They are still captured into the report snapshot and appear when Previewing or viewing the report artefact.
+Service, delivery status, refined estimate and target dates are Work Package concerns. Defined Demand does not regain a current `service` field for reporting.
 
-The authoring table keeps strong Health cues because it is the working control surface for identifying items that are At Risk or Off Track and ensuring narrative is supplied.
+A report snapshot may carry the derived list of child Work Package services and other derived delivery context so readers can understand the Demand. This is immutable snapshot context, not an authored Demand Service.
+
+Detailed Work Package scope and acceptance criteria remain in the authoritative delivery backlog and are not copied into status reports by AMO.
+
+## Capacity and recovery context
+
+Portfolio snapshots can include concise resource-owner context using the canonical model:
+
+- available capacity in FTE/days/value;
+- forecast recovery on Project-backed Demand;
+- Actual recovery from imported Oracle cost;
+- utilisation/variance attention signals.
+
+Project Number is the current cross-charge/reconciliation indicator; reporting does not invent a separate recoverable flag.
+
+The same imported monetary fact may be labelled **Actual cost** in a Demand view and **Actual recovery** in a resource-owner view.
 
 ## Report composition
 
-The report artefact can include:
+A report artefact can contain:
 
-1. **Demand highlights** — headline Demand metrics captured for the reporting cycle;
-2. **Capacity outlook** — FTE capacity and allocation position;
-3. **Portfolio forecast** — best available total forecast;
-4. **Allocation outlook** — phased allocation values;
-5. **Architecture Status Report** — Demand-level Health and narrative.
+1. concise portfolio/Demand highlights;
+2. capacity/recovery snapshot where useful;
+3. Architecture Status Report narrative and Health;
+4. Work Package-derived service/delivery context for each Demand where captured.
 
-Historical reports use the values persisted at publication time. Viewing or changing scope never recalculates a historical report from today's live workspace.
+Historical reports use values persisted at publication time. Changing today's workspace or scope does not recalculate an older report.
 
 ## One report renderer
 
-`app-report-renderer.js` is the authoritative report presentation implementation. It owns report structure, report-level presentation, Health semantics, report Health overview, scope projection, Dashboard snapshot sections and Demand narrative rendering.
+`app-report-renderer.js` is the authoritative report presentation implementation. It owns report structure, report-level presentation, Health semantics, scope projection, immutable snapshot sections and Demand narrative rendering.
 
-Both in-application Preview/View and the lightweight `/reports` reader delegate to this renderer. The modal and standalone page are hosts only; they do not maintain competing report HTML implementations.
-
-Legacy presentation compatibility assets must not reintroduce wrappers around `reportNarrativeHtml()`, `dashboardSnapshotHtml()` or `renderStatusReporting()` to create another report format.
+Both in-application Preview/View and the lightweight `/reports` reader delegate to this renderer. Hosts must not maintain competing report HTML implementations or reimplement reporting calculations.
 
 ## Health semantics and accessibility
 
@@ -80,110 +93,34 @@ Status Reporting uses the same controlled Health model as Demand:
 - **At Risk**
 - **Off Track**
 
-Health is never communicated by colour alone. The report renderer presents visible Health text, a semantic dot, a strong coloured rail and corresponding header treatment for each reported Demand item. A Health overview summarises the count in each state without inventing an overall report Health.
-
-The Status Report authoring table uses its own compact Health-cell treatment appropriate to a working table.
+Health is never communicated by colour alone. The renderer presents visible text and semantic visual treatment. The authoring table retains a compact Health treatment appropriate to working data entry.
 
 ## Scope model
 
-Report viewing follows the organisation hierarchy:
+Report viewing follows the organisation hierarchy: Organisation/Department and optional Team scope. Preview/View maintains its own report scope state and does not alter the surrounding AMO page scope.
 
-```text
-Department
-  Organisation-wide
-  or a specific Department
-
-Team
-  All teams / Whole department
-  or a specific Team within the selected Department
-```
-
-Organisation-wide view always means all Teams. Selecting a specific Department enables the Team selector.
-
-The Preview/View modal owns its **own report scope state**. It always opens Organisation-wide / All teams, regardless of the page-level Department/Team filter. Changing modal Department or Team scope rerenders only the report in the modal and does not change the surrounding AMO page scope.
-
-**Open Report ↗** carries the currently selected report scope to the standalone viewer. Persisted report URLs use `department` and `team` query parameters only when a narrower scope is selected.
-
-New report snapshots persist `departmentId`, `departmentName`, `teamId` and `teamName` on report entries so the lightweight viewer can scope an immutable report without loading current organisation configuration. Historical reports without all hierarchy metadata remain viewable; available filtering is limited to metadata that was persisted at the time.
-
-Dashboard snapshots are persisted for organisation, Department and Team scopes where available. Scope projection chooses the matching persisted snapshot and filters report entries; it never reads the live Demand register.
+New snapshots persist Department/Team identifiers and names on entries so immutable historical reports can be scoped without reading today's organisation configuration. Historical reports remain viewable even where older snapshots contain less hierarchy metadata.
 
 ## Preview, View and Open Report
 
-AMO intentionally uses three user concepts:
+- **Preview** — view the current Draft as it would be published.
+- **View** — view a Published or Final report inside AMO.
+- **Open Report** — open the same canonical presentation in the lightweight reader.
 
-- **Preview** — view the current Draft as a report inside AMO;
-- **View** — view a Published or Final report inside AMO;
-- **Open Report** — open the same report presentation in the canonical lightweight reader.
-
-Preview and View use the same in-application modal host and the same `AmoReportRenderer` output. Both expose **Open Report ↗**.
-
-For Published/Final reports, Open Report navigates to the persisted report route. A Draft has no persisted report identity, so Draft Open Report creates a **temporary one-time browser preview snapshot** of the exact composed Draft Preview and opens `/reports/preview`. The snapshot is held only in same-origin browser storage, expires after a short period and is removed when the standalone viewer consumes it. It is never written to Status Report History or the workspace repository.
-
-The application does not provide dedicated **Copy Link**, **Copy Local Link**, **Print / Save PDF** or **Maximize** report actions. Browser-native address copying and printing remain available where appropriate.
-
-## Canonical report routes
-
-Published and Final reports use:
-
-```text
-/reports/{reportId}
-```
-
-For example:
-
-```text
-/reports/SR-20260828-153012
-```
-
-A scoped persisted view can carry the report-only projection:
-
-```text
-/reports/SR-20260828-153012?department=DEPT-ARCH&team=TEAM-DATA
-```
-
-Draft Preview opens through:
-
-```text
-/reports/preview?preview={temporary-token}
-```
-
-The lightweight route does **not** call the AMO workspace `loadWorkspace()` path and therefore does not run workspace migrations, safety backups, archive maintenance, autosave or normal workspace startup. Persisted routes resolve exactly one report through `WorkspaceRepository.getStatusReport(id)`; temporary Draft routes consume the staged preview snapshot. Both render with `AmoReportRenderer`.
-
-### Remote workspace
-
-A normal `/reports/{id}` route resolves through `RemoteWorkspaceRepository`. It uses the remembered Remote Workspace URL when available, otherwise the configured AMO API default.
-
-### Local workspace
-
-A persisted Local Workspace report opens as:
-
-```text
-/reports/{reportId}?source=local
-```
-
-The URL does not encode a filesystem path. The report viewer reuses the remembered File System Access directory handle in browser IndexedDB. If permission is no longer active, the viewer offers **Reconnect Remembered** or **Choose Workspace** and still loads only the requested report.
+Published/Final routes use `/reports/{reportId}` with optional `department` and `team` query parameters. Draft standalone preview uses the existing temporary one-time browser preview snapshot and `/reports/preview` route; it is not persisted to report history.
 
 ## Status Report History
 
-History exposes one primary action per report: **View**. This opens the shared in-application viewer. From there the reader can choose **Open Report ↗** when a standalone report page is needed.
+History exposes Published/Final snapshots. Latest Report is the shortcut to the most recent published artefact; History remains the catalogue for earlier reports.
 
-Latest Report provides the direct shortcut to the most recent Published/Final report from the authoring page; History remains the catalogue for earlier reports.
+## Collaboration and persistence
 
-## Collaborative draft saves
+Draft saves continue to use optimistic entry/field-level merge and the status-report draft lock. Publish, Unpublish and New Draft retain their existing lifecycle locking behaviour.
 
-Editing remains optimistic. Save Draft acquires the short-lived `status-report--draft` commit lock, rereads the latest shared draft, performs the existing entry/field-level three-way merge and writes only when there is no conflicting concurrent edit.
-
-Publish, Unpublish and New Draft continue to use the same lifecycle locking behaviour.
-
-## Persistence model
-
-Typical status-report storage:
+Typical storage remains:
 
 ```text
 status-reports/
-  draft.json                 active cycle: Draft or Published
-  SR-YYYYMMDD-HHMMSS.json   Published or Final snapshot
+  draft.json
+  SR-YYYYMMDD-HHMMSS.json
 ```
-
-During Unpublish, the corresponding snapshot is temporarily marked `Unpublished` while `draft.json` returns to Draft. It is not shown as normal report history. Republishing updates that same snapshot back to Published. New Draft changes it to Final.
