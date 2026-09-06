@@ -1,4 +1,4 @@
-name: Deployed AMO acceptance
+name: AMO · Post-Deploy Acceptance · Test
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
       - '.github/workflows/acceptance.yml'
   workflow_run:
     workflows:
-      - Validate and release AMO
+      - AMO · Validate & Deploy
     types:
       - completed
   workflow_dispatch:

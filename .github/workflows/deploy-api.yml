@@ -1,4 +1,4 @@
-name: Validate and release AMO
+name: AMO · Validate & Deploy
 
 on:
   pull_request:
