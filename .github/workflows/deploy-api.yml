@@ -68,25 +68,99 @@ jobs:
           node tests/actuals-import.test.js
           node tests/reporting-model.test.js
 
-  deploy-api:
-    name: Deploy API · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
+  changes:
+    name: Resolve deployment changes
     if: github.event_name != 'pull_request'
-    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      release_sha: ${{ steps.detect.outputs.release_sha }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      api: ${{ steps.detect.outputs.api }}
+      infra: ${{ steps.detect.outputs.infra }}
+    steps:
+      - name: Checkout release history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
+          fetch-depth: 0
+
+      - name: Detect changed deployment components
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch --force --tags origin
+          RELEASE_SHA=$(git rev-parse HEAD)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BASE_TAG=prod-current
+            TARGET=Production
+          else
+            BASE_TAG=test-current
+            TARGET=Test
+          fi
+
+          frontend=false
+          api=false
+          infra=false
+
+          if BASE_SHA=$(git rev-parse -q --verify "refs/tags/$BASE_TAG^{commit}" 2>/dev/null); then
+            echo "Comparing $TARGET release $RELEASE_SHA with $BASE_TAG at $BASE_SHA"
+            CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$RELEASE_SHA")
+          else
+            echo "$BASE_TAG does not exist yet; performing a full first deployment to $TARGET."
+            CHANGED_FILES=''
+            frontend=true
+            api=true
+            infra=true
+          fi
+
+          if [ -n "$CHANGED_FILES" ]; then
+            echo 'Changed files since last successful release marker:'
+            printf '%s\n' "$CHANGED_FILES"
+            while IFS= read -r file; do
+              case "$file" in
+                infra/*)
+                  infra=true
+                  # Bicep owns the Container App template and can restore the bootstrap image,
+                  # so every infrastructure change must be followed by an API image deployment.
+                  api=true
+                  ;;
+                server/*)
+                  api=true
+                  ;;
+                src/*|worker.js|wrangler.jsonc)
+                  frontend=true
+                  ;;
+                .github/workflows/deploy-api.yml)
+                  # Pipeline behaviour changed. Exercise application deployment paths without
+                  # unnecessarily reconciling Azure infrastructure.
+                  frontend=true
+                  api=true
+                  ;;
+              esac
+            done <<< "$CHANGED_FILES"
+          fi
+
+          echo "release_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "infra=$infra" >> "$GITHUB_OUTPUT"
+          echo "Deployment plan: frontend=$frontend api=$api infra=$infra"
+
+  deploy-infra:
+    name: Deploy infrastructure · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
+    if: github.event_name != 'pull_request' && needs.changes.outputs.infra == 'true'
+    needs:
+      - validate
+      - changes
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && 'prod-amo' || 'test-amo' }}
     steps:
       - name: Checkout release revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
-
-      - name: Resolve release SHA
-        id: release
-        shell: bash
-        run: |
-          SHA=$(git rev-parse HEAD)
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Deploying $SHA to ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}"
+          ref: ${{ needs.changes.outputs.release_sha }}
 
       - name: Azure login using OIDC
         uses: azure/login@v2
@@ -111,7 +185,7 @@ jobs:
           done
 
       - name: Ensure Container Apps CLI extension
-        run: az extension add --name containerapp --upgrade --yes
+        run: az extension add --name containerapp --yes
 
       - name: Deploy/update Azure infrastructure
         id: infra
@@ -131,8 +205,6 @@ jobs:
           echo "acr_name=$(echo "$OUTPUT" | jq -r '.acrName.value')" >> "$GITHUB_OUTPUT"
           echo "acr_server=$(echo "$OUTPUT" | jq -r '.acrLoginServer.value')" >> "$GITHUB_OUTPUT"
           echo "container_app=$(echo "$OUTPUT" | jq -r '.containerAppName.value')" >> "$GITHUB_OUTPUT"
-          echo "container_app_fqdn=$(echo "$OUTPUT" | jq -r '.containerAppFqdn.value')" >> "$GITHUB_OUTPUT"
-          echo "repository_mode=$(echo "$OUTPUT" | jq -r '.repositoryMode.value')" >> "$GITHUB_OUTPUT"
 
       - name: Wait for Container App after infrastructure deployment
         shell: bash
@@ -149,18 +221,6 @@ jobs:
           done
           exit 1
 
-      - name: Login to Azure Container Registry
-        run: az acr login --name "${{ steps.infra.outputs.acr_name }}"
-
-      - name: Build and push versioned API image
-        shell: bash
-        run: |
-          set -euo pipefail
-          IMAGE="${{ steps.infra.outputs.acr_server }}/${IMAGE_NAME}:${{ steps.release.outputs.sha }}"
-          docker build -f server/Dockerfile -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
-
       - name: Configure Container App registry identity
         shell: bash
         run: |
@@ -172,44 +232,6 @@ jobs:
           if [ "$configured" = "0" ]; then
             az containerapp registry set --name "$APP" --resource-group "$RG" --server "$SERVER" --identity system
           fi
-
-      - name: Wait for Container App after registry configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          APP="${{ steps.infra.outputs.container_app }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
-          for attempt in {1..60}; do
-            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
-            echo "Container App provisioning state: ${state:-unknown}"
-            if [ "$state" = "Succeeded" ]; then exit 0; fi
-            if [ "$state" = "Failed" ]; then exit 1; fi
-            sleep 10
-          done
-          exit 1
-
-      - name: Deploy AMO API image
-        run: |
-          az containerapp update \
-            --name "${{ steps.infra.outputs.container_app }}" \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --image "$IMAGE" \
-            --set-env-vars "AMO_TARGET_STAGE=${{ vars.AMO_TARGET_STAGE }}"
-
-      - name: Wait for Container App after image deployment
-        shell: bash
-        run: |
-          set -euo pipefail
-          APP="${{ steps.infra.outputs.container_app }}"
-          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
-          for attempt in {1..60}; do
-            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
-            echo "Container App provisioning state: ${state:-unknown}"
-            if [ "$state" = "Succeeded" ]; then exit 0; fi
-            if [ "$state" = "Failed" ]; then exit 1; fi
-            sleep 10
-          done
-          exit 1
 
       - name: Ensure custom API hostname and managed certificate
         shell: bash
@@ -227,14 +249,94 @@ jobs:
             --environment "$ENVIRONMENT" \
             --validation-method CNAME
 
+  deploy-api:
+    name: Deploy API · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
+    if: always() && github.event_name != 'pull_request' && needs.validate.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.api == 'true' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped')
+    needs:
+      - validate
+      - changes
+      - deploy-infra
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'workflow_dispatch' && 'prod-amo' || 'test-amo' }}
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.changes.outputs.release_sha }}
+
+      - name: Azure login using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure Container Apps CLI extension
+        run: az extension add --name containerapp --yes
+
+      - name: Resolve existing Azure application resources
+        id: azure
+        shell: bash
+        run: |
+          set -euo pipefail
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          APP="${{ vars.AMO_AZURE_NAME_PREFIX }}-api"
+          COMPACT_PREFIX=$(printf '%s' "${{ vars.AMO_AZURE_NAME_PREFIX }}" | tr -d '-')
+          ACR_NAME=$(az acr list --resource-group "$RG" --query "[?starts_with(name, '${COMPACT_PREFIX}acr')].name | [0]" -o tsv)
+          [ -n "$ACR_NAME" ] || { echo '::error::Could not resolve the AMO Azure Container Registry.'; exit 1; }
+          ACR_SERVER=$(az acr show --name "$ACR_NAME" --query loginServer -o tsv)
+          FQDN=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          REPOSITORY_MODE=$(az containerapp show --name "$APP" --resource-group "$RG" --query "properties.template.containers[0].env[?name=='AMO_REPOSITORY'].value | [0]" -o tsv)
+          [ -n "$FQDN" ] || { echo '::error::Could not resolve the AMO Container App FQDN.'; exit 1; }
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+          echo "acr_name=$ACR_NAME" >> "$GITHUB_OUTPUT"
+          echo "acr_server=$ACR_SERVER" >> "$GITHUB_OUTPUT"
+          echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
+          echo "repository_mode=$REPOSITORY_MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name "${{ steps.azure.outputs.acr_name }}"
+
+      - name: Build and push versioned API image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="${{ steps.azure.outputs.acr_server }}/${IMAGE_NAME}:${{ needs.changes.outputs.release_sha }}"
+          docker build -f server/Dockerfile -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+
+      - name: Deploy AMO API image
+        run: |
+          az containerapp update \
+            --name "${{ steps.azure.outputs.app }}" \
+            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --image "$IMAGE" \
+            --set-env-vars "AMO_TARGET_STAGE=${{ vars.AMO_TARGET_STAGE }}"
+
+      - name: Wait for Container App after image deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="${{ steps.azure.outputs.app }}"
+          RG="${{ vars.AZURE_RESOURCE_GROUP }}"
+          for attempt in {1..60}; do
+            state=$(az containerapp show --name "$APP" --resource-group "$RG" --query properties.provisioningState -o tsv 2>/dev/null || true)
+            echo "Container App provisioning state: ${state:-unknown}"
+            if [ "$state" = "Succeeded" ]; then exit 0; fi
+            if [ "$state" = "Failed" ]; then exit 1; fi
+            sleep 10
+          done
+          exit 1
+
       - name: Smoke test generated API hostname
         shell: bash
         run: |
           set -euo pipefail
-          URL="https://${{ steps.infra.outputs.container_app_fqdn }}/api/info"
+          URL="https://${{ steps.azure.outputs.fqdn }}/api/info"
           for attempt in {1..18}; do
             if BODY=$(curl --fail --silent --show-error "$URL"); then
-              echo "$BODY" | jq -e --arg mode "${{ steps.infra.outputs.repository_mode }}" '(.product == "AMO") and (($mode != "mongo") or (.storage == "mongodb" and .capabilities.recovery == true and .capabilities.databaseTransactions == true))' > /dev/null
+              echo "$BODY" | jq -e --arg mode "${{ steps.azure.outputs.repository_mode }}" '(.product == "AMO") and (($mode != "mongo") or (.storage == "mongodb" and .capabilities.recovery == true and .capabilities.databaseTransactions == true))' > /dev/null
               exit 0
             fi
             sleep 10
@@ -254,19 +356,17 @@ jobs:
 
   deploy-frontend:
     name: Deploy frontend · ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}
-    if: github.event_name != 'pull_request'
-    needs: validate
+    if: github.event_name != 'pull_request' && needs.changes.outputs.frontend == 'true'
+    needs:
+      - validate
+      - changes
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && 'prod-amo' || 'test-amo' }}
     steps:
       - name: Checkout release revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || 'test-current') || github.sha }}
-
-      - name: Resolve release SHA
-        shell: bash
-        run: echo "Deploying $(git rev-parse HEAD) to ${{ github.event_name == 'workflow_dispatch' && 'Production' || 'Test' }}"
+          ref: ${{ needs.changes.outputs.release_sha }}
 
       - name: Deploy Cloudflare Worker
         shell: bash
@@ -286,26 +386,29 @@ jobs:
           done
           exit 1
 
-  mark-test-release:
-    name: Record current Test release
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  record-prod-release:
+    name: Record current Production release
+    if: always() && github.event_name == 'workflow_dispatch' && needs.validate.result == 'success' && needs.changes.result == 'success' && (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') && (needs.deploy-api.result == 'success' || needs.deploy-api.result == 'skipped') && (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped')
     needs:
+      - validate
+      - changes
+      - deploy-infra
       - deploy-api
       - deploy-frontend
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout tested revision
+      - name: Checkout promoted revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.changes.outputs.release_sha }}
           fetch-depth: 0
 
-      - name: Move durable Test marker
+      - name: Move durable Production marker
         shell: bash
         run: |
           set -euo pipefail
-          git tag -f test-current "${{ github.sha }}"
-          git push origin refs/tags/test-current --force
-          echo "Test release recorded at ${{ github.sha }}"
+          git tag -f prod-current "${{ needs.changes.outputs.release_sha }}"
+          git push origin refs/tags/prod-current --force
+          echo "Production release recorded at ${{ needs.changes.outputs.release_sha }}"

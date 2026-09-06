@@ -99,3 +99,25 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
           retention-days: 14
+
+  record-test-release:
+    name: Record accepted Test release
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    needs: acceptance
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout accepted revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Move durable Test marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          git tag -f test-current "${{ github.event.workflow_run.head_sha }}"
+          git push origin refs/tags/test-current --force
+          echo "Accepted Test release recorded at ${{ github.event.workflow_run.head_sha }}"

@@ -4,14 +4,25 @@ These tests run against the deployed **Test** application rather than a local bu
 
 ## Where they run
 
-On a push to `main`, the normal GitHub Actions workflow deploys the API and frontend to the `test-amo` environment. After both deployments succeed, an `Acceptance · Test` job runs on GitHub-hosted Ubuntu runners in two browser profiles:
+On a push to `main`, `AMO · Validate & Deploy` compares the candidate revision with the durable `test-current` marker and deploys only the components that changed:
+
+- `src/**`, `worker.js` or `wrangler.jsonc` → deploy the Cloudflare frontend
+- `server/**` → build/push and deploy the API image using the existing Azure resources
+- `infra/**` → reconcile Azure infrastructure with Bicep, then redeploy the API image because the Bicep Container App template declares a bootstrap image
+- test-only/package changes → validate without redeploying unchanged application or infrastructure components
+
+The full Azure infrastructure deployment, resource-provider checks and infrastructure configuration therefore run only when `infra/**` has changed (or when no prior release marker exists and a safe first full deployment is required).
+
+After the Test deployment workflow succeeds, `AMO · Post-Deploy Acceptance · Test` runs on GitHub-hosted Ubuntu runners in two browser profiles:
 
 - `desktop` — Chromium at 1440×1000
 - `mobile` — Chromium at 390×844 with touch/mobile emulation
 
-The durable `test-current` release marker moves only after both acceptance profiles pass. Manual Production promotion therefore continues to promote the last Test release that passed deployed acceptance tests.
+The durable `test-current` release marker moves only after both acceptance profiles pass. Manual Production promotion therefore defaults to the last Test release that passed deployed acceptance tests.
 
-The deployed acceptance workflow checks out the exact `head_sha` of the completed Validate and release workflow that triggered it. When several merges are validating or deploying close together, check the acceptance job's checkout SHA before attributing a failure to the newest merge.
+Production promotion uses the same change-aware model, comparing the selected Test release with `prod-current`. After a successful Production promotion, `prod-current` moves to the promoted revision. This allows frontend-only Production promotions to avoid Azure completely and API-only promotions to avoid Bicep while still preserving a safe full deployment when infrastructure changed.
+
+The deployed acceptance workflow checks out the exact `head_sha` of the completed `AMO · Validate & Deploy` workflow that triggered it. When several merges are validating or deploying close together, check the acceptance job's checkout SHA before attributing a failure to the newest merge.
 
 ## Acceptance tests are part of the change
 
