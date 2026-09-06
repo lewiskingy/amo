@@ -2,31 +2,82 @@
 
 AMO keeps planning and observed effort as separate facts.
 
-- **Allocations** are the planning / forecast source of truth and are held against AMO Demand.
-- **Actuals** are imported observed effort from Oracle.
-- Reporting composes them month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation forecast.
-- The calendar date does not move the cut-over. If Actuals currently end in June, July onward remains Forecast even if the current month is September.
-- A loaded Actuals month is authoritative for the period. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
+- **Allocations** are the planning/forecast source of truth at Person × Defined Demand × Month.
+- **Actuals** are imported observed effort/cost from Oracle.
+- Reporting composes them month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation Forecast.
+- The calendar date does not move the cut-over. A future/non-imported month remains Forecast until an Actuals period exists.
+- A loaded Actuals month is authoritative. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
+- Imported Oracle `Cost in GBP` is authoritative Actual cost/recovery; AMO never recalculates it using Role rates.
 
 ## Defined Demand and Project Number
 
-AMO Demand represents the recognised body of Architecture work being managed (Defined Demand). It does not have to be a formal Project and it may exist before a Project Number is known.
+Defined Demand does not have to be a formal Project and may exist before a Project Number is known.
 
-Where work is charged through Oracle, Demand can hold an optional **Project Number**. This is the sole accounting reference used to reconcile Oracle Project Actuals to Demand:
+Where work is charged through Oracle, Demand can hold an optional **Project Number**. This is the accounting/reconciliation reference used to attach Oracle Project Actuals to Defined Demand:
 
 ```text
 Oracle Project Number -> Demand.projectNumber -> Defined Demand
 ```
 
-Project Number is stored as a string so source identifiers are preserved exactly, but the current UI accepts digits only. A Project Number must not be assigned to more than one Demand. Existing legacy Cost Centre / Project Code values are not an Actuals mapping source and are not migrated into Project Number.
+Project Number is also the current indicator used by reporting to identify Project-backed/cross-charge Demand. AMO does not maintain a second `recoverable` flag.
 
-If Oracle Actuals contain a Project Number that is not mapped to Demand, facts for known AMO People are retained without Demand attribution so Person-level recorded effort remains factual. If an existing workspace contains duplicate Demand Project Numbers, AMO also retains those facts without Demand attribution rather than arbitrarily selecting one Demand; the duplicate mapping is surfaced as a reconciliation issue.
+Project Number is stored as a string so source identifiers are preserved exactly, while the current UI accepts digits only. It must not be assigned to more than one Demand. Legacy Cost Centre / Project Code values are not an Actuals mapping source and are not migrated into Project Number.
+
+If Oracle Actuals contain a Project Number that is not mapped to Demand, facts for known AMO People are retained without Demand attribution so Person-level effort remains factual. Duplicate Demand Project Numbers are treated the same way: AMO surfaces the reconciliation problem rather than arbitrarily selecting one Demand.
 
 ## Identity and effort conversion
 
-Oracle `People #` (or `Person #` in older exports) matches the AMO Person `staffNumber` field. Name matching is not used. Rows for a Person identifier that cannot be matched are excluded from the curated People Actuals and surfaced as reconciliation information during import.
+Oracle `People #` (or `Person #` in older exports) matches AMO Person `staffNumber`. Name matching is not used. Rows for an unmatched Person identifier are excluded from curated People Actuals and surfaced as reconciliation information.
 
-Actual hours are converted to FTE using the System setting **Standard working hours per day** (7.5 by default) and Monday-Friday working days in each month. Person utilisation then compares reported FTE with the Person's configured available FTE.
+Actual hours are converted using **Standard working hours per day** under Reporting assumptions (7.5 by default):
+
+```text
+Actual days = Actual hours / standard hours per day
+Actual FTE = Actual hours / full-time working hours for the month
+```
+
+Person utilisation compares reported FTE with the Person's configured available FTE.
+
+## Forecast effort and cost
+
+Allocation values are fractions/percentages of the Person's available FTE, not absolute FTE values:
+
+```text
+Forecast FTE = allocation fraction × Person FTE
+Forecast days = Forecast FTE × working days in month
+Forecast cost = Forecast days × Person Role day rate
+```
+
+Where the Person's Role has no configured rate, the configured **Default / blended day rate** is used as the fallback.
+
+The same blended/default rate values Initial ROM and Work Package estimates because those estimates do not yet identify a named Role/person mix. Their £ values are therefore indicative.
+
+## Demand estimate progression
+
+Reporting deliberately keeps the stages of knowledge distinct:
+
+```text
+Initial ROM
+    ↓
+Work Package Estimate
+    ↓
+Allocation Forecast
+    ↓
+Actual Effort / Cost
+```
+
+- **Initial ROM** preserves the early assessment expectation.
+- **Work Package Estimate** is the sum of populated child package estimates; reporting retains estimate coverage.
+- **Allocation Forecast** is the current named resource plan and can exceed the WP estimate where decomposition is incomplete.
+- **Actuals** are observed Oracle facts.
+
+Across a reporting horizon:
+
+```text
+Actual to date + remaining Allocation Forecast = Projected effort / cost
+```
+
+Projected resource effort is not the same measure as Work Package Estimate.
 
 ## Management classifications
 
@@ -43,37 +94,45 @@ Initial materiality thresholds are:
 
 The classifications are:
 
-- **No Actuals against plan** — the Person had material planned allocation in an Actuals month but recorded effectively no Actual effort overall.
-- **Low overall effort** — the Person recorded materially less effort overall than planned. This is distinct from moving effort between Demand.
-- **Effort redirected** — the Person's total Actual effort is broadly consistent with plan, but material shortfall on one Demand is offset by increased effort on other Demand.
-- **Unplanned Demand effort** — Actual effort was recorded against a known Demand where that Person had no corresponding allocation for the period.
+- **No Actuals against plan** — material planned allocation but effectively no Actual effort overall.
+- **Low overall effort** — materially less total effort recorded than planned.
+- **Effort redirected** — total effort broadly matches plan but material shortfall on one Demand is offset by increased effort elsewhere.
+- **Unplanned Demand effort** — Actual effort recorded against known Demand without a corresponding Person allocation for the period.
 - **Over capacity** — total Actual effort exceeds the configured capacity threshold.
-- **Unmapped project facts** — Actuals for a known Person cannot be mapped unambiguously to AMO Demand. This includes missing Demand Project Number mappings and duplicate mappings. It is a data/reconciliation signal, not a delivery judgement.
+- **Unmapped project facts** — known-Person Actuals cannot be mapped unambiguously to AMO Demand.
 
-AMO deliberately does not infer why effort moved. A redirected-effort message states that a planned shortfall coincides with the same People recording effort on other Demand. Status commentary is where the business reason, such as a priority change, should be explained.
+AMO does not infer why effort moved. Status commentary is where the business reason is recorded.
 
 ## Views
 
 ### Resource Plan
 
-Resource Plan is the detailed People view. Historical Actuals periods show observed effort and plan variance; periods without Actuals show Forecast. Capacity signals summarise the latest Actuals period. Individual utilisation and allocation detail distinguish no Actuals, low overall effort, redirected effort, unplanned effort and over-capacity conditions.
+Resource Plan is the detailed capacity/resource-owner view. It presents available and reported capacity in FTE with days/£ context, Person utilisation, Actual-versus-plan variance, allocation detail, and capacity/recovery information. Forecast allocation displays both the allocation percentage and its FTE-scaled equivalent.
 
 ### Dashboard
 
-Capacity Outlook uses Actual effort for loaded periods and Forecast elsewhere. Attention Required aggregates material People and Demand signals, while reconciliation items are visibly identified as data issues. Organisational Team/Department scopes use the same Actual/Forecast semantics.
+Capacity Outlook uses Actual effort for loaded periods and Forecast elsewhere. Organisational scope uses the same canonical FTE-scaled allocation calculations as Resource Plan rather than summing raw allocation percentages.
 
-### Demand
+### Defined Demand
 
-Demand effort outlook shows Actual effort to date, historical plan for the same Actuals periods, forecast remaining, projected total effort, Actual hours/cost and variance. It also explains material over/under-plan, unplanned effort and planned shortfall that coincides with the same People recording effort elsewhere.
+The Demand effort and cost outlook shows the management progression directly:
+
+- Initial ROM — days + indicative £;
+- Work Package Estimate — days + indicative £ + estimate coverage;
+- Actual to date — effort days + imported Oracle £;
+- Remaining Allocation Forecast — effort days + forecast £;
+- Projected total — Actual + remaining plan.
+
+Actual-versus-plan management signals remain available alongside this progression.
 
 ### Status Report
 
-The live Status Report remains an authoring surface, not another Dashboard. Each Demand row can show a compact current Actual-versus-plan prompt to support meaningful commentary.
+The live Status Report remains a narrative/Health authoring surface rather than another Dashboard. Published/Preview snapshots preserve report-time portfolio context and Work Package-derived service context.
 
-Preview and Publish capture both the Dashboard snapshot and each reported Demand's effort context into the report artefact. Published and Final reports therefore retain the evidence available at publication time instead of recalculating against newer Actuals later.
+Service is not read from `Demand.service`. Current snapshots carry a `services` list derived from child Work Packages; the report renderer continues to understand older immutable snapshots that contain the legacy singular `service` field.
 
-`app-report-renderer.js` is the canonical report renderer. It renders only persisted report snapshot data and never reads live workspace Actuals.
+`app-report-renderer.js` is the canonical report renderer. It renders persisted report snapshot data and never reads live workspace Actuals.
 
 ## Forecast preservation
 
-Actuals do not overwrite Allocations. Allocation forecast remains available as the planning baseline so AMO can compare what was expected with what actually happened. The Allocation Outlook section in a Status Report remains forecast-only by design; Actuals are represented in Capacity Outlook and Demand effort context.
+Actuals do not overwrite Allocations. Allocation Forecast remains available as the planning baseline for variance analysis even where the reported value for a period is Actual.
