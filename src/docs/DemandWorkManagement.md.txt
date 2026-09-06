@@ -1,6 +1,6 @@
 # Demand Work Management
 
-This guidance defines how the Architecture team should use the Front Door, Azure DevOps and AMO together.
+This guidance defines how SharePoint Front Door, Azure DevOps and AMO work together.
 
 ## Working model
 
@@ -15,16 +15,19 @@ Defined Demand
 AMO portfolio boundary
       ↓
 Work Packages
-Architecture delivery packages / Azure DevOps work items
+AMO delivery metadata + Azure DevOps work items
+      ↓
+Allocations / Actuals
+AMO resource plan + Oracle reconciliation
 ```
 
 **Raw Demand** is an incoming request that has not yet been qualified into a managed body of Architecture work.
 
 **Triage** assesses whether Architecture involvement is required, whether the request belongs to existing managed work, likely priority, approximate size and capacity implications. AMO can support this assessment alongside Azure DevOps; it does not replace the Front Door or create another intake backlog.
 
-**Defined Demand** is the recognised portfolio boundary represented by an AMO Demand record. It exists to make work visible and manageable early. It does not mean detailed scope is finished and it does not require a Project Number, final Owning Team, committed dates or a fully decomposed delivery plan.
+**Defined Demand** is the recognised portfolio boundary represented by an AMO Demand record. It can exist before a Project Number, final Owning Team, committed dates or complete delivery decomposition are known.
 
-**Work Package** is a discrete delivery tranche beneath Defined Demand. Work Packages carry Architecture Service, delivery scope, acceptance criteria, refined estimate, dates/status and the Azure DevOps Work Item Reference.
+**Work Package** is a discrete delivery tranche beneath Defined Demand. AMO stores only the portfolio metadata needed for visibility and reporting: title, Architecture Service, status, estimated effort, target dates and the Azure DevOps Work Item Reference. Detailed description/scope and acceptance criteria remain in the authoritative delivery backlog and are not duplicated in AMO.
 
 ## Creating Defined Demand
 
@@ -33,86 +36,93 @@ The initial record is deliberately lightweight. The user must provide only:
 - **Title**;
 - **Business Area**.
 
-Demand State defaults to the configured initial state (normally **Assessing**). The following are optional and can be added as the demand matures:
-
-- Initiative;
-- Owning Team;
-- Priority;
-- Initial Size (XS/S/M/L/XL);
-- Architecture Owner;
-- Project Number;
-- Health;
-- Summary / Context;
-- Front Door source/reference.
-
-This allows AMO to provide early portfolio visibility without pretending that triage has already produced a committed delivery plan.
-
-## Triage decision
+Demand State defaults to the configured initial state, normally **Assessing**. Initiative, Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health, Summary/Context and Front Door source/reference may be added as the Demand matures.
 
 For each Raw Demand item, first decide whether the work belongs to an existing Defined Demand.
 
 - If **yes**, add or amend the appropriate Work Package beneath that Demand rather than creating duplicate Demand.
-- If **no**, create a new Defined Demand and then define the Work Package(s) needed to deliver it when sufficient information exists.
+- If **no**, create a new Defined Demand and add Work Packages when sufficient delivery information exists.
 
-The relationship is not one Front Door request = one AMO Demand. Several requests can contribute Work Packages to the same Defined Demand.
+Several Front Door requests can therefore contribute Work Packages to the same Defined Demand.
 
-## Initial ROM versus refined estimate
+## Estimation and reporting progression
 
-Defined Demand uses deliberately coarse **T-shirt sizing** for the initial ROM. Configuration supplies default day values for XS/S/M/L/XL. When a size is selected, AMO snapshots the corresponding day estimate onto that Demand. This preserves the assumption made at the time of assessment even if the sizing defaults change later.
+Defined Demand uses coarse T-shirt sizing for the initial assessment. Configuration supplies default day values for XS/S/M/L/XL and AMO snapshots the selected value as the Initial ROM.
 
-Work Packages use **Estimated Effort (days)**. Those estimates are the refined delivery view and can be rolled up to show current estimated effort for the Defined Demand.
+Work Packages use **Estimated Effort (days)** for the refined delivery estimate. Reporting retains estimate coverage so a partially decomposed Demand is not presented as though the WP estimate is complete.
 
-The measures therefore represent different levels of confidence:
+Allocation Forecast is a different measure again: it is the current resource plan and does not require all future Work Packages to have been decomposed.
+
+Actuals are observed effort/cost imported from Oracle.
 
 ```text
 Initial Demand ROM
         ↓
-Work Package Estimated Effort
+Work Package Estimate
         ↓
 Allocation Forecast
         ↓
-Actual Effort
+Actual Effort / Cost
 ```
 
-Do not overwrite the initial ROM with the later Work Package estimate; the difference is useful management information.
+These are complementary measures and must not overwrite one another.
+
+### Financial valuation
+
+- Initial ROM and Work Package Estimate use the configured default/blended day rate because no named resource mix is known.
+- Named Allocation Forecast uses the Person's Role day rate, falling back to the configured blended/default rate when the Role has no rate.
+- Imported Oracle Actual cost is authoritative and is never recalculated from AMO rates.
+
+### Allocation FTE semantics
+
+Allocation values are percentages/fractions of a Person's available FTE, not absolute FTE values.
+
+```text
+Forecast FTE = allocation fraction × Person FTE
+```
+
+A 100% allocation for a 0.8 FTE Person therefore contributes 0.8 FTE.
+
+### Reported and projected effort
+
+For an individual month, imported Actuals win when the Actuals period exists; Allocation Forecast is used otherwise.
+
+Across a horizon:
+
+```text
+Actual to date + remaining Allocation Forecast = Projected effort / cost
+```
+
+Projected resource effort is not the same as the current Work Package Estimate.
 
 ## Service, status and dates
 
-Architecture **Service** is a Work Package attribute, not a Defined Demand attribute. A single Defined Demand can contain Strategy, Design, Consultancy and Assurance packages, so a single Demand-level Service would be misleading.
+Architecture **Service** is a Work Package attribute, not a Defined Demand attribute. A single Defined Demand can contain Strategy, Design, Consultancy and Assurance packages.
 
-Defined Demand **State** describes the portfolio lifecycle. The canonical states are:
+Defined Demand **State** describes the portfolio lifecycle: Assessing, Defined, Planned, In Progress, On Hold, Complete or Cancelled.
 
-- Assessing;
-- Defined;
-- Planned;
-- In Progress;
-- On Hold;
-- Complete;
-- Cancelled.
+Work Package **Status** describes delivery progress and is configured separately.
 
-Work Package **Status** describes delivery progress and is configured separately (for example Planned, Ready, In Progress, Blocked, Complete, Cancelled).
-
-Target Start and Target End are authored on Work Packages. The Demand-level Roadmap delivery window is derived from the earliest child start and latest child end. Defined Demand does not own committed delivery dates.
+Target Start and Target End are authored on Work Packages. The Demand Roadmap delivery window is derived from the earliest child start and latest child end. Defined Demand does not own current delivery dates.
 
 ## Managing Work Packages in AMO
 
-Open a Defined Demand from the Demand Register to manage its child Work Packages in the same record view. Work Packages are not selected or edited through a separate bottom-of-page panel.
+The canonical Work Package management surface is the nested Work Package row under Defined Demand in the Demand Register.
 
-The Work Package is the place for:
+AMO stores:
 
+- Title;
 - Architecture Service;
-- Description / delivery scope;
-- Acceptance Criteria;
 - Estimated Effort (days);
 - delivery Status;
 - Target Start / Target End;
 - Azure DevOps Work Item Reference.
 
-## Planning and reporting boundaries
+AMO does **not** persist Work Package description/scope or acceptance criteria. Those stay in the delivery backlog.
 
-Work Packages explain **what is being delivered**. Allocations explain **how much Person capacity is planned against the Defined Demand**. Actuals explain **how much effort was recorded against the Oracle Project Number associated with that Defined Demand**.
+## Planning and Actuals boundaries
 
-Allocations and Actuals remain at Defined Demand level. Step 4 does not alter their record keys or Plan-vs-Actual semantics:
+Work Packages explain **what is being delivered**. Allocations explain **how much Person capacity is planned against Defined Demand**. Actuals explain **how much effort/cost was recorded against the Oracle Project Number associated with that Defined Demand**.
 
 ```text
 Allocation Forecast
@@ -126,26 +136,38 @@ Demand.projectNumber
 Defined Demand
 ```
 
-Where an Actuals period exists it remains authoritative; allocation forecast remains the measure for periods without Actuals/future periods. AMO does not manufacture Work-Package-level Actuals.
+Allocations and Actuals remain at Defined Demand level. AMO does not manufacture Work-Package-level Actuals.
+
+A Defined Demand can be planned and allocated without a Project Number; it simply cannot reconcile Oracle Actuals directly until a unique Project Number is present.
+
+## Recovery semantics
+
+Project Number is the current cross-charge/reconciliation indicator. AMO does not maintain a second Demand-level `recoverable` flag.
+
+- **Capacity value** — theoretical value of available People capacity.
+- **Forecast recovery** — value of named allocations to Project-backed Defined Demand.
+- **Actual recovery** — imported Oracle cost against Project-backed Defined Demand.
+
+At Demand level the same imported £ fact may be described as Actual cost; at team/resource-owner level it may be described as Actual recovery.
 
 ## Migration from the older Demand model
 
-Existing workspaces are migrated to schema 3 when opened by a compatible client. Migration preserves information without inventing relationships:
+Schema migration preserves useful history without inventing relationships:
 
-- legacy Demand Service is retained as history but is not copied to Work Packages;
-- legacy triage ROM is retained as the Initial Estimate and mapped to the nearest T-shirt size where needed;
-- legacy triage summary and Demand scope/objective are consolidated into Summary / Context;
+- legacy Demand Service is retained only as history and is not copied to Work Packages;
+- legacy triage ROM becomes the Initial Estimate where meaningful;
+- legacy triage/scope text is consolidated into Summary / Context;
 - legacy `workPackage.architectureOwner` becomes Demand `ownerId`;
-- legacy Demand dates are retained only as history; they do not drive the current Roadmap;
-- legacy Deliverables are retained as history and are not silently converted into Work Packages;
+- legacy Demand dates remain history and do not drive the current Roadmap;
+- legacy Deliverables are not silently converted into Work Packages;
 - legacy Cost Centre / Project Code is not migrated into Project Number.
 
-Current saves remove the retired operational fields from the current Demand representation; historical source values are kept under `legacy` only where they are worth retaining.
+Current saves remove retired operational fields from the active Demand representation.
 
 ## System responsibilities
 
 - **SharePoint Front Door** owns intake and the authoritative Raw Demand source record.
-- **Azure DevOps** owns backlog/triage and delivery work-item tracking.
-- **AMO** owns Defined Demand, Work Package context, resource allocations, portfolio reporting and Actuals reconciliation.
+- **Azure DevOps** owns triage/backlog execution, detailed Work Package scope, acceptance criteria and work tracking.
+- **AMO** owns Defined Demand, Work Package portfolio metadata, resource allocations, portfolio/resource reporting and Actuals reconciliation.
 
-AMO stores only the Azure DevOps Work Item Reference on a Work Package. Organisation and Project are inherited from System, Department and Team configuration; if the Defined Demand has no Owning Team, AMO does not guess that context.
+AMO stores only the Azure DevOps Work Item Reference on a Work Package. Organisation and Project are inherited from System, Department and Team configuration; AMO does not guess them when Owning Team is absent.
