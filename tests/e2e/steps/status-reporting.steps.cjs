@@ -177,7 +177,7 @@ Then('the Status Report authoring page should not contain dashboard portfolio me
   const view=this.page.locator('#status-report.view.active');
   assert.equal(await view.locator('#statusDashboardSnapshot').count(),0,'Dashboard portfolio snapshot is still rendered on Status Report.');
   const headings=(await view.locator('h2,h3').allTextContents()).map(x=>x.trim());
-  for(const dashboardHeading of ['Portfolio Snapshot','Demand highlights','Capacity outlook','Portfolio forecast','Allocation outlook']){
+  for(const dashboardHeading of ['Portfolio Snapshot','Portfolio position','Demand highlights','Capacity outlook','Portfolio forecast','Allocation outlook']){
     assert.ok(!headings.includes(dashboardHeading),`Status Report still contains dashboard section ${dashboardHeading}.`);
   }
 });
@@ -189,8 +189,11 @@ Then('the Status Report modal should use the shared report renderer', async func
 Then('the report should show portfolio sections and strong Health semantics', async function(){
   const report=await sharedRenderer(this.page,'#statusModalReportContent');
   const headings=(await report.locator('h2').allTextContents()).map(x=>x.trim());
-  for(const expected of ['Demand highlights','Capacity outlook','Portfolio forecast','Allocation outlook','Architecture Status Report']){
+  for(const expected of ['Portfolio position','Capacity outlook','Architecture Status Report']){
     assert.ok(headings.includes(expected),`Rendered report is missing ${expected}.`);
+  }
+  for(const removed of ['Demand highlights','Portfolio forecast','Allocation outlook']){
+    assert.ok(!headings.includes(removed),`Rendered report still contains superseded dashboard section ${removed}.`);
   }
   assert.equal(await report.locator('.report-health-summary').count(),1,'Health overview is missing.');
   assert.equal(await report.locator('.report-entry.report-health-amber[data-health="At Risk"]').count(),1,'At Risk report entry does not have strong Health semantics.');
