@@ -1,0 +1,266 @@
+# Reporting semantics and refinement plan
+
+Status: design baseline for Issue #121 Step 5. This document records the reporting semantics to preserve while implementation is refined. It should be updated with any deliberate semantic change before or with code changes.
+
+## Goal
+
+Reporting should let a user answer useful management questions without creating multiple competing reporting models or dashboards. Prefer a small set of canonical measures reused by existing views, with natural drill-down from portfolio/initiative to Defined Demand and Work Package and a Team/Person resource lens.
+
+Primary stakeholder viewpoints:
+
+- Budget holder / resource owner — capacity, planned deployment, expected recovery, actual recovery, variance and where effort is being consumed.
+- Initiative sponsor / Demand sponsor — initial expectation, refined delivery estimate, planned resource commitment, actual effort/cost, projected total and delivery status.
+- Team resource planner / capacity manager — available capacity, commitments, gaps/over-allocation, future demand and when additional work could be scheduled.
+
+## Canonical progression of evidence
+
+These measures are deliberately different and must not be collapsed into one generic estimate:
+
+    Initial Demand ROM
+            ↓
+    Work Package Estimate
+            ↓
+    Allocation Forecast
+            ↓
+    Actual Effort
+
+### Initial Demand ROM
+
+The assessment-time baseline for Defined Demand, expressed in days using the configured size mapping. It answers: "What did we initially think this Demand would require?"
+
+Initial ROM is immutable once captured as the initial assessment baseline. A future explicit re-baselining concept would require its own history/reason; it must not silently overwrite Initial ROM.
+
+### Current Work Package Estimate
+
+Sum of Estimated Effort across child Work Packages for which an estimate is present. It answers: "What does the currently decomposed delivery scope say the work requires?"
+
+It may be incomplete when not all delivery has been decomposed into Work Packages. Reporting must therefore retain estimated-count/total-count context where completeness matters and must not present the sum as a guaranteed total when decomposition is incomplete.
+
+### Allocation Forecast
+
+Person × Defined Demand × Month planned allocation. It answers: "How do we currently expect to deploy people/capacity?"
+
+Allocation Forecast does not require complete Work Package decomposition. This is intentional: a large Demand can be resource-planned before every Work Package is known.
+
+### Actuals
+
+Person × Project Number × Month observed effort, reconciled to Defined Demand through Demand.projectNumber. It answers: "What effort was actually recorded?"
+
+Actuals are never inferred at Work Package level.
+
+### Reported Effort
+
+For a reporting period:
+
+- imported Actuals period → observed Actual effort;
+- otherwise/future → Allocation Forecast.
+
+This is the canonical period-by-period management view. Allocation remains the planning baseline even after Actuals replace it in the reported series.
+
+### Projected / expected resource consumption
+
+Across a horizon, Actual effort for actualised periods plus Allocation Forecast for remaining periods. This is an estimate based on the current resource plan, not the same thing as the Work Package Estimate.
+
+The difference between Work Package Estimate and projected resource consumption can be useful management information: delivery decomposition and resource planning may legitimately be at different levels of maturity.
+
+## Effort, FTE and cost
+
+Effort is the fundamental measure. Reporting should expose effort in the form most useful to the question: days for estimates/totals and effective FTE/FTE-month for capacity and monthly resource planning.
+
+Cost is the financial valuation of effort, not a replacement for effort.
+
+### Named people
+
+For Allocation Forecast and Actuals associated with a known Person, value effort using Person → Role → configured Role.dayRate.
+
+### Unnamed estimates and rate fallback
+
+Initial ROM and Work Package estimates do not identify the people who will deliver the work. Their financial value therefore uses a configurable default/blended day rate.
+
+A configurable default/blended day rate is also the fallback when a Person's Role has no usable configured day rate. The implementation must make fallback use visible/diagnosable rather than silently valuing effort at £0.
+
+Current Role configuration already carries dayRate. The existing role model currently normalises a missing/non-numeric rate to zero and removed the old financialPlanning.defaultDayRate during migration. Step 5 therefore needs a deliberate canonical default/blended-rate setting rather than reusing the retired legacy field accidentally.
+
+Indicative estimate cost should be visually distinguishable where useful from cost based on the known role mix.
+
+## Capacity and recovery
+
+Recovery is based on recorded Actuals against billable Project Numbers. It is not a separate Demand property.
+
+At team/portfolio level distinguish:
+
+- Billable capacity — theoretical available capacity valued using applicable Role day rates.
+- Forecast recovery — Allocation Forecast to billable/project-backed Defined Demand, valued using the allocated Person's Role day rate.
+- Actual recovery — Actuals recorded/reconciled against billable Project Numbers, valued using the applicable Actuals/Role cost semantics.
+
+A useful management funnel is therefore:
+
+    Billable capacity
+          ↓
+    Forecast recovery
+          ↓
+    Actual recovery
+
+Percentages should have an explicit denominator, normally available billable capacity for the relevant team/period.
+
+"Actual cost" and "Actual recovery" may have the same numeric valuation in the current model but are different business viewpoints: Demand/sponsor reporting describes consumed effort/cost; resource-owner reporting describes recovered capacity/cost. Prefer contextual labels over duplicate calculations.
+
+### Billable Project Number rule to confirm in implementation
+
+The business rule is "Actuals recorded against billable projects". Before implementing forecast-recovery percentages, confirm how AMO can authoritatively identify a Project Number as billable. Do not assume merely having Demand.projectNumber is sufficient unless that is explicitly the configured rule.
+
+## Variance semantics
+
+Avoid a generic unlabeled "variance" because there are several useful comparisons:
+
+- Actual vs Forecast to date — observed effort/cost minus the allocation plan for periods that have Actuals. Answers whether consumption/recovery differed from plan.
+- Current WP Estimate vs Initial ROM — refined delivery understanding minus the initial assessment baseline. Answers how scope/understanding changed.
+- Projected resource consumption vs Current WP Estimate — current Actual + remaining Allocation plan versus the decomposed delivery estimate. Highlights mismatch between resource plan and delivery estimate.
+- Capacity gap — available capacity minus reported/forecast effort for the period.
+
+Each view should show only the comparisons that help its stakeholder question and label them explicitly.
+
+## Stakeholder questions
+
+### Budget holder / resource owner
+
+Reporting should make it easy to answer:
+
+- What is our available/billable capacity in FTE, days and £?
+- How much capacity have we forecast to bill/recover?
+- How much have we actually recovered?
+- How far are Actuals from Forecast?
+- Where is effort going by Initiative, Defined Demand, Service, Team or Person?
+- Are Actuals aligned with planned priorities?
+
+### Initiative / Demand sponsor
+
+Reporting should make it easy to answer:
+
+- What was the Initial ROM?
+- What does the currently decomposed Work Package scope estimate?
+- How complete is that Work Package estimate?
+- How much effort/cost has been consumed to date?
+- What is still forecast through Allocations?
+- What does Actual + remaining Forecast imply for total resource consumption?
+- How does that compare with Initial ROM and current WP Estimate?
+- What are the Work Packages, their status and delivery window?
+
+### Team resource planner / capacity manager
+
+Reporting should make it easy to answer:
+
+- What capacity is available by month and Person/Role?
+- What is already allocated?
+- Where are gaps or over-allocations?
+- Where did Actual effort differ from the allocation plan?
+- Which Defined Demand has no allocation?
+- Can we accommodate new Demand, and approximately when?
+
+The Allocation model remains the primary forward capacity-planning mechanism; complete Work Package decomposition is not a prerequisite for resource planning.
+
+## Current implementation inventory
+
+### Dashboard
+
+Current Dashboard is allocation-only for capacity. It shows Active Demand, Unallocated, In Governance and capacity conflicts, then monthly Allocation / Team FTE. It does not use the canonical Actuals/Forecast period basis used by Resource Plan.
+
+Refinement direction: keep Dashboard concise. Reuse canonical reporting calculations rather than adding another calculation layer. Its purpose should be portfolio attention and a small number of management headlines, not detailed analysis.
+
+### Resource Plan
+
+Resource Plan is currently the strongest implementation of the intended Actuals/Forecast semantics. It already uses ReportingModel so imported periods show Actuals and other periods show Allocation Forecast, while retaining plan/variance context. It exposes capacity, reported effort, remaining/over capacity, utilisation, person-level plan vs Actual and management signals.
+
+Refinement direction: treat ReportingModel as the canonical home for shared reporting calculations. Extend it for days/cost/recovery and reusable Demand/portfolio summaries rather than reproducing formulas in individual views.
+
+### Allocations
+
+Allocations is the planning input surface: Person × Defined Demand × Month percentage. Keep it focused on planning/editing rather than turning it into a report. Reporting should consume these facts.
+
+### Defined Demand / Work Package
+
+The Demand Register and Demand modal already expose Initial ROM and Current WP Estimate separately, and Work Package summary provides count, estimated count, estimated days, delivery window and service mix.
+
+Refinement direction: preserve that distinction. Add reporting value through canonical summaries/drill-down rather than adding another mutable Demand forecast field.
+
+### Roadmap
+
+The canonical intended semantics are Demand-level delivery window derived from child Work Package Target Start/End, with resource information from Demand-level Allocations. Legacy authored Demand dates must not become a fallback delivery truth.
+
+Refinement direction: verify the active runtime renderer continues to use the Work Package-derived window and remove any remaining stale/legacy rendering path rather than layering another override.
+
+### Status Report
+
+The authoring view is intentionally a focused narrative/health control surface. Dashboard-style Demand highlights, Capacity outlook, Portfolio forecast and Allocation outlook are excluded from the authoring page but captured in Preview/published report snapshots. Work Package service context is currently bridged into the existing immutable report contract while richer Step 5 treatment is pending.
+
+Refinement direction: do not clutter authoring. Decide the minimum Work Package and effort/forecast context that materially helps a sponsor/management reader in Preview/published reports. Prefer a concise Demand-level summary with drill-down/context over reproducing Resource Plan.
+
+## Implementation principles
+
+1. Less is more: refine existing surfaces before adding new dashboards or report types.
+2. Stakeholder viewpoints define questions, not necessarily separate screens.
+3. Put shared calculations in one canonical reporting model; views format/present them.
+4. Never conflate Initial ROM, WP Estimate, Allocation Forecast and Actuals.
+5. Never infer Work Package Actuals.
+6. Never hide estimate incompleteness.
+7. Use explicit variance labels and denominators.
+8. Preserve Allocation as the forward planning baseline even when Actuals replace it in the reported series.
+9. Prefer drill-down Portfolio/Initiative → Defined Demand → Work Package, with Team/Person as the resource lens.
+10. Avoid a new Demand-level revised forecast for now. Allocation Forecast already expresses the resource plan before full WP decomposition.
+11. Implementation must update code, regression tests, user-facing documentation and project/domain documentation together.
+12. Remove stale/parallel reporting calculations when a canonical equivalent is introduced; do not leave compatibility renderers that can drift semantically.
+
+## Proposed staged implementation
+
+### A. Canonical measure layer
+
+- Extend ReportingModel with reusable days/cost valuation and portfolio/Demand summaries.
+- Introduce an explicit configurable default/blended day rate for unnamed estimates and missing Role rates.
+- Define/confirm the authoritative billable Project Number rule before implementing recovery metrics.
+- Preserve existing Actuals-vs-Forecast period selection and management signals.
+- Add contract/unit coverage for all measure semantics and fallbacks.
+
+### B. Resource owner / capacity view
+
+- Refine Resource Plan around capacity, Forecast, Actuals/recovery and variance in FTE plus £ where useful.
+- Keep monthly capacity planning prominent.
+- Make forecast recovery and actual recovery visible only once billable classification is authoritative.
+- Preserve person-level drill-down and management signals.
+
+### C. Sponsor / Demand view
+
+- Provide a concise Demand effort story: Initial ROM; current WP Estimate and completeness; Actual to date; remaining Allocation Forecast; projected resource consumption; explicitly labelled variances where useful.
+- Value estimates with the blended/default rate and named plans/Actuals with Role rates.
+- Surface Work Package delivery context without pretending Actuals can be attributed to individual WPs.
+
+### D. Portfolio / Dashboard and Initiative lens
+
+- Keep Dashboard as a concise management summary.
+- Reuse canonical capacity/effort/recovery measures.
+- Add Initiative/Demand aggregation only where it directly answers "where is our time/cost going?" and "is it aligned with priorities?"
+- Avoid duplicating Resource Plan detail.
+
+### E. Status Report / Roadmap consistency
+
+- Keep Status Report authoring focused on health/narrative.
+- Refine Preview/published snapshot with only the sponsor/management measures that add decision value.
+- Verify Roadmap consumes canonical Work Package delivery windows and Allocation resource semantics.
+- Remove stale pre-refactor fields/copy.
+
+### F. Documentation and acceptance
+
+For every implemented semantic change:
+
+- update user-facing AMO documentation explaining what the measure means and how to interpret it;
+- update project/domain documentation and schema/config examples;
+- update Issue #121 roadmap/checklist;
+- add regression tests preventing duplicate/legacy calculations from returning;
+- validate the three stakeholder viewpoints against representative scenarios before closing Step 5.
+
+## Explicit non-goals for Step 5
+
+- No Work Package Actuals attribution.
+- No new mutable Demand-level revised forecast unless evidence shows Allocation Forecast cannot answer the planning need.
+- No separate dashboard per stakeholder persona.
+- No invented £ values when rate configuration is missing; use the explicit fallback and make fallback use diagnosable.
+- No attempt to manage another sponsor's project budget: AMO reports Architecture effort, valued cost/recovery and capacity.
