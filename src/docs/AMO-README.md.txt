@@ -1,373 +1,263 @@
 # Architecture Management Office (AMO)
 
-Architecture Management Office is a browser-based workspace for managing Architecture demand, teams, capacity, allocations, roadmap planning, status reporting and improvement ideas. It is designed as a lightweight departmental operating tool: active data is stored as JSON records in a user-selected workspace folder and the application runs entirely in the browser.
+Architecture Management Office is a browser-based workspace for managing Architecture Defined Demand, Work Packages, People, capacity, allocations, imported Actuals, roadmap planning, status reporting and improvement ideas. Active data is stored as folder-backed JSON and can be used through Local or Remote workspaces.
 
-This document is both the user guide and the technical overview for the current tactical implementation. Start with **Getting started** if you are using AMO for the first time. The later **Data model and storage** sections explain how the workspace works on disk.
+This is the general user guide. More detailed guidance is maintained in:
 
-## Architecture operating model
-
-The end-to-end Architecture operating model, including Triage, Prioritisation, Mobilisation, Engaged delivery, Governance and Exit, is documented in the [Process Overview](ArchitectureProcess.html). The same page is available from the top-level **Process Overview** link in AMO navigation.
+- `DemandWorkManagement.md.txt` — Raw Demand → Triage → Defined Demand → Work Packages → Allocations/Actuals;
+- `ActualsReporting.md.txt` — Oracle Actuals, FTE/cost and reporting semantics;
+- `StatusReporting.md.txt` — Draft/Published/Final reporting lifecycle;
+- `ReportingRefinementPlan.md.txt` — implemented reporting semantics;
+- `ArchitectureProcess.html` — wider Architecture operating process.
 
 ## What AMO manages
 
-AMO brings together the operational information needed to manage Architecture work without making every source system duplicate every field.
+AMO deliberately avoids duplicating the source systems around it.
 
-The main concepts are:
+- **SharePoint Front Door** owns the originating Raw Demand/intake record.
+- **Azure DevOps** owns triage/backlog execution, detailed Work Package scope, acceptance criteria and delivery work tracking.
+- **AMO** owns Defined Demand, Work Package portfolio metadata, People/capacity, Allocations, portfolio/resource reporting and Actuals reconciliation.
+- **Architecture repositories** own formal Architecture knowledge and approved artefacts.
 
-- **Department** — the Architecture department represented by the workspace.
-- **Teams** — organisational teams within Architecture, such as Enterprise Architecture, Business Architecture or Domain teams.
-- **People** — Architecture team members. Each person has a stable User ID and a Home Team.
-- **Demand** — an Architecture engagement or work package. Demand has an Owning Team and can reference its originating SharePoint demand and its Azure DevOps work item.
-- **Allocations** — the planned percentage of a person's capacity assigned to a Demand item for each configured planning month.
-- **Configuration** — controlled reference data such as Business Areas, Initiatives, Teams, Services, workflows, priorities, Health and planning months.
-- **Status Reports** — a working draft plus immutable published reporting snapshots.
+The central AMO concepts are:
+
+- **Department / Teams** — the organisation hierarchy used for portfolio scope.
+- **People** — Architecture team members with Home Team, Role, Staff Number, FTE and active state.
+- **Defined Demand** — a recognised body of Architecture work managed as the portfolio boundary. The persisted entity remains `Demand`.
+- **Work Package** — a delivery tranche beneath Defined Demand containing the AMO metadata needed for delivery visibility.
+- **Allocation** — planned Person capacity against Defined Demand by month.
+- **Actuals** — observed Oracle effort/cost reconciled to Defined Demand through Project Number and to People through Staff Number.
+- **Status Reports** — one collaborative working cycle plus immutable Published/Final snapshots.
 - **Ideas** — an improvement backlog for AMO itself.
 
-The important distinction in the team model is that **People have a Home Team while Demand has an Owning Team**. An architect can therefore contribute to Demand owned by another Team without moving either the person or the Demand between teams.
+A Person has a **Home Team** while Defined Demand has an **Owning Team**. A Person can therefore contribute to Demand owned by another Team without moving either record organisationally.
 
-## User interface overview
+## Defined Demand
 
-The left navigation provides the main working views:
+A new Defined Demand is intentionally lightweight. Only **Title** and **Business Area** are user-mandatory at creation; Demand State defaults to the configured initial state, normally Assessing.
 
-- **Dashboard** — department or team-level headline demand, capacity and attention information.
-- **Demand** — the active Demand Register.
-- **Allocations** — editable person-to-Demand monthly resource allocations.
-- **Resource Plan** — reporting over capacity, allocation, utilisation and unmet demand.
-- **Roadmap** — planned Demand dates compared with periods that have resource allocated.
-- **Status Report** — the current reporting draft and latest published report.
-- **Status Report History** — previous immutable published reports, loaded on demand when viewed.
-- **People** — team members, Home Team and capacity metadata.
-- **Ideas** — AMO improvement suggestions.
-- **Config** — controlled reference data and planning configuration.
-- **Workspace** — workspace, backup, autosave and edit-lock information.
-- **README** — this guide rendered inside AMO.
-- **Process Overview** — the Architecture operating-model process page, linked at top level below the collapsible navigation groups.
+As understanding matures, Demand can also carry:
 
-A **Team View** selector at the top of the application changes the organisational scope. **Department View** shows the complete Architecture portfolio. Selecting a Team changes relevant operational views to that Team's portfolio.
+- Initiative;
+- Owning Team;
+- Priority;
+- Initial Size and snapshotted Initial ROM days;
+- Architecture Owner;
+- optional Oracle Project Number;
+- Health;
+- Summary / Context;
+- Front Door source/reference.
 
-The global command menu contains workspace and page-specific creation actions. Page-level workflow controls such as **Edit List**, **Edit Roadmap**, **Edit Draft**, **Clear Filters**, Save and Cancel remain close to the content they affect.
+Defined Demand does **not** own current Architecture Service, detailed delivery scope, delivery dates, refined delivery estimate or Azure DevOps work-item relationship. Those delivery concerns belong to child Work Packages.
 
-Double-clicking an existing editable record opens its single-record modal in **View** state. Use **Edit** to change it. New-record commands open the same modal directly in Edit state.
+Project Number is optional. It is the Oracle accounting/reconciliation reference where work is charged through a Project. Legacy Cost Centre / Project Code is retired and is not used for Actuals reconciliation.
 
-## Getting started
+## Work Packages
 
-### 1. Open the application and workspace
+Work Packages are managed as nested child rows beneath Defined Demand in the Demand Register.
 
-Open AMO in a supported Chromium-based browser and choose **Open Workspace Folder**. Select the root data folder containing `workspace.json` and the entity folders described later in this guide.
+AMO stores:
 
-AMO requests read/write access because it is a folder-backed application. Opening a valid workspace loads the active working data, creates a safety backup and performs archive maintenance. The selected directory handle can be remembered by the browser so the application can offer the previous workspace again on later use; browser permission may still need to be reconfirmed.
+- Title;
+- Architecture Service;
+- Work Package Status;
+- Estimated Effort (days);
+- Target Start / Target End;
+- Azure DevOps Work Item Reference.
 
-The workspace banner shows the current workspace, autosave state and edit-lock state.
+Detailed Work Package description/scope and acceptance criteria remain in Azure DevOps or the authoritative delivery backlog and are not duplicated in AMO.
 
-### 2. Configure the department before entering Demand
+A single Defined Demand can contain Work Packages for different Architecture Services, so AMO does not manufacture a single Demand-level Service.
 
-For a new workspace, go to **Config** first. Configuration supplies the controlled values used by Demand, Allocations, Roadmap and reporting.
+## Initial ROM, estimate, forecast and Actuals
 
-#### Planning Months
-
-Planning Months define the planning horizon used consistently by Allocations, Resource Plan, Dashboard and Roadmap. Values use `YYYY-MM`, for example `2026-08`.
-
-Keep the list focused on the period the department genuinely forecasts. Allocation percentage columns are generated from these values.
-
-#### Teams
-
-Teams represent the Architecture teams inside the Department. Each Team has a stable Team ID and a display name.
-
-Team IDs are references used by People, Demand and reporting. Once records reference a Team, treat its ID as stable. Rename the Team display name if necessary rather than casually replacing its ID.
-
-#### Business Areas
-
-Business Areas represent the business departments or functions that originate Architecture demand. Business Area is mandatory on Demand.
-
-Examples might be Finance, Operations or Customer Services, but use the organisational names appropriate to your department.
-
-#### Initiatives
-
-Initiatives represent major programmes or initiatives and are optional on Demand. Every Initiative must have one owning **Business Area**.
-
-When creating an Initiative, first select its Business Area and then give it a name. When a user later creates or edits Demand, selecting a Business Area restricts the Initiative choices to Initiatives owned by that Business Area. AMO will not allow Demand to reference an Initiative belonging to another Business Area.
-
-#### Services and Demand workflows
-
-Architecture Service identifies the type of engagement. The operating model includes **Triage**, **Consultancy**, **Assurance**, **Design** and **Strategy**. Triage is the holding service before the engagement type is agreed.
-
-Demand Status is constrained by the workflow for the selected Service. Triage can remain unassigned while work is being assessed. Once an official Architecture service is selected, Demand should have an Owning Team and progress through the lifecycle appropriate to that service.
-
-#### Priorities and Health
-
-Priorities provide the controlled priority choices used on Demand.
-
-Health has three fixed business meanings:
-
-- **On Track** — the target is expected to be met with the current plan.
-- **At Risk** — the target is at risk without action, but recovery is expected to remain possible.
-- **Off Track** — without action the target will not be met and recovery may be difficult or no longer possible.
-
-These meanings should be applied consistently in Demand, Dashboard and Status Reporting.
-
-### 3. Add People
-
-Use **People** to create the Architecture team members who can own or be allocated to work.
-
-Each person has a stable User ID, a **Home Team**, name, role, FTE and Active state. Home Team represents where the person organisationally belongs; it does not limit that person to work owned by the same Team.
-
-FTE is used by Resource Plan to calculate available capacity. Keep it aligned with the person's effective capacity for the planning model.
-
-### 4. Enter Demand manually
-
-Go to **Demand** and choose **New Demand** from the command menu.
-
-At minimum, capture the Business Area, Title and the other fields required by the current workflow. Initiative is optional and is filtered by Business Area. Cost Centre / Project Code is optional.
-
-Demand has an **Owning Team**. This determines which Team portfolio the Demand belongs to when Team View is selected. Demand Owner is a person responsible for the engagement; changing the owner's Home Team does not automatically move the Demand to another Owning Team.
-
-Demand can link to two external process records:
-
-- **Demand Source** — normally the SharePoint Front Door/list item that originated the engagement.
-- **Work Item** — normally the corresponding Azure DevOps Epic or Feature used to manage delivery work.
-
-Both links allow a URL and display title. AMO may attempt to obtain a title from URL metadata, but authenticated SharePoint commonly prevents browser cross-origin metadata reads, so the display title remains manually editable.
-
-The model deliberately permits more than one AMO Demand item to refer to the same source Demand. For example, an initial Consultancy engagement can later lead to a separate Design engagement while retaining the common source reference.
-
-### 5. Plan dates on the Roadmap
-
-The **Roadmap** shows two different planning concepts:
-
-- a thin line from the Demand planned start date to planned end date, with a circle at the start and diamond at the end;
-- a thicker line showing the period for which resource is actually allocated.
-
-Choose **Edit Roadmap** to adjust planned Demand dates directly by dragging the start or end point. Roadmap editing changes Demand dates only. Resource allocation cannot be edited from Roadmap because allocation belongs to individual people and is maintained in the Allocations view.
-
-Roadmap has a compact set of filters for Demand search, Initiative, Service and Health. Team filtering is intentionally not duplicated there because Team View already supplies the organisational scope. Roadmap rows are grouped by **Owning Team** and then **Initiative**.
-
-### 6. Enter resource allocations
-
-Use **Allocations** to plan which people will work on each unresolved Demand item.
-
-An allocation is the combination of a Demand item and a Person, with a percentage for each configured Planning Month. The month columns therefore change when `planningMonths` changes in Config.
-
-If Demand has an assigned owner but no committed allocation, AMO presents an owner row with zero allocation ready to edit. Additional resource rows remain inactive until a person is selected. Selecting a person activates the monthly values, initially at zero, so percentages can be entered quickly.
-
-Additional people can be allocated to Demand owned by another Team. Allocation views follow the **Owning Team of the Demand**, while the person's Home Team remains their organisational home.
-
-Use **Resource Plan** to inspect the result rather than editing the same information twice. Resource Plan derives capacity and utilisation from People and Allocations. It highlights total capacity, allocated resource, unmet Demand, individual utilisation and over-capacity periods.
-
-### 7. Switch between Department and Team views
-
-Use **Team View** at the top of AMO to switch between **Whole Department** and a specific Architecture Team.
-
-The scope has deliberate semantics:
-
-- Demand is filtered by **Demand Owning Team**.
-- People are filtered by **Person Home Team**.
-- Allocations and delivery reporting follow the Owning Team of the related Demand.
-- Resource Plan compares home-team capacity with work owned by the selected Team and can therefore expose borrowed resources.
-- Roadmap, Dashboard and Status Reporting use Team-owned Demand.
-
-This means changing a person's Home Team does not move Demand they happen to own or contribute to. Change the Demand's Owning Team when portfolio accountability genuinely moves.
-
-### 8. Maintain status reporting
-
-The **Status Report** page is the working draft for unresolved Demand. Capture narrative only where there is something useful to report: Status Update, Achievements and Issues / Escalations, plus Health where appropriate.
-
-Draft Health starts from the current Demand Health. A user can propose a different Health in the draft, but **Save Draft does not change Demand Health**. The proposed change is indicated in the UI. When the report is **Published**, the Health override is applied to the corresponding Demand and the immutable published report snapshots the resulting Demand Health. Latest published report Health and underlying Demand Health therefore agree at publication time.
-
-Preview presents the report as a management narrative and includes the same portfolio headline snapshot as Dashboard: Active Demand, Unallocated, In Socialisation, In Governance, Capacity Conflicts, Capacity Outlook and Attention Required. Off Track active Demand is included in Attention Required.
-
-Preview is clearly marked DRAFT. A report can be opened as a fully styled standalone window or sent to the browser Print dialog for printing / Save as PDF.
-
-Published reports appear in **Status Report History**. Their report bodies are loaded from disk only when the user chooses View; AMO does not read every historical report JSON during normal workspace startup.
-
-## AMO Assistant
-
-**AMO Assistant** is an optional agentic companion to the application. When its URL is configured in Config, AMO displays an **AMO Assistant** launch item at the top of the navigation. The Assistant opens in a separate window so users can work with it alongside the AMO application. If no URL is configured, the navigation item is hidden.
-
-The Assistant is intended to provide conversational help around both **the tool** and **the Architecture work stack**. Depending on the knowledge and integrations made available to the configured assistant, useful interactions include:
-
-- explaining how to use AMO views, fields, filters, Team View, Roadmap, Allocations and Status Reporting;
-- helping a user understand the AMO operating model, terminology, service workflows and Health semantics;
-- answering questions about how Demand, People, Teams, Initiatives, Allocations and reports relate to one another;
-- helping interpret portfolio information such as unallocated Demand, capacity conflicts, Off Track items, upcoming work or the purpose of a particular status-report field;
-- supporting triage and planning conversations by explaining what information should be captured and where it should be maintained;
-- helping users find or understand information about the wider Architecture work stack when that information has been supplied to the Assistant, for example process guidance, Front Door material, Azure DevOps working practices or Architecture repository guidance;
-- providing support and troubleshooting guidance for common AMO usage questions.
-
-The Assistant should be treated as a **supporting interaction layer**, not as a replacement system of record. AMO remains the source for the portfolio records it manages; SharePoint, Azure DevOps and Architecture repositories remain authoritative for the external process records and deliverables that they own. Users should verify material changes in the appropriate system rather than treating an Assistant answer as a committed AMO transaction.
-
-The current AMO client only stores and launches the configured Assistant URL. It does not automatically transmit the open workspace, selected Demand, Team View or other browser state to the Assistant. Any deeper agent integration — for example securely querying AMO through a future backend API, opening a specific Demand context, or performing authorised actions — would be a separate application-integration capability.
-
-## Data model
-
-AMO uses small JSON documents rather than one monolithic database file. Stable IDs are used to relate records.
-
-Conceptually:
+Reporting deliberately preserves different stages of knowledge:
 
 ```text
-Department
-  ├─ Teams
-  │    └─ People (Home Team)
-  │
-  └─ Demand (Owning Team)
-        ├─ Business Area
-        ├─ optional Initiative → owned by Business Area
-        ├─ optional Demand Source URL
-        ├─ optional Azure DevOps Work Item URL
-        ├─ planned start/end dates
-        ├─ Health / Service / Status / Priority
-        └─ Allocations
-              └─ Person + monthly percentage forecast
-
-Status Report Draft
-  └─ references active Demand
-
-Published Status Reports
-  └─ immutable snapshots of reporting content and portfolio state
+Initial Demand ROM
+        ↓
+Work Package Estimate
+        ↓
+Allocation Forecast
+        ↓
+Actual Effort / Cost
 ```
 
-### Department, Teams and People
+They are not interchangeable.
 
-The workspace represents one Architecture Department. Config defines multiple Teams within it. People reference a Team ID as their Home Team.
+- **Initial ROM** preserves the early assessment expectation. T-shirt-size defaults are snapshotted onto the Demand so later Config changes do not silently rewrite existing ROMs.
+- **Work Package Estimate** is the sum of populated child package estimates. Reporting also shows estimate coverage so partial decomposition is visible.
+- **Allocation Forecast** is the named resource plan and can be created before every Work Package has been decomposed.
+- **Actuals** are observed Oracle facts.
 
-### Demand
+Across a reporting horizon:
 
-Each Demand item is its own JSON record. It references controlled configuration values and an Owning Team. Demand is the central operational entity: Roadmap dates, external links, Health, workflow status and allocations all relate back to it.
+```text
+Actual to date + remaining Allocation Forecast = Projected effort / cost
+```
 
-### Business Areas and Initiatives
+Projected resource effort is not the same as Work Package Estimate.
 
-Business Areas are controlled reference values. Initiatives are structured configuration records containing an Initiative name and owning Business Area. Demand can omit Initiative, but if it has one, its Business Area must match the Initiative owner.
+## Allocation FTE semantics
 
-### Allocations
+Allocation values are percentages/fractions of the Person's available FTE rather than absolute FTE values.
 
-Each committed allocation is its own JSON record linking `demandId` and `teamMemberId`. Its forecast contains percentage values keyed by configured planning month. This separation lets one Demand have many allocated people and one person contribute to many Demand items.
+```text
+Forecast FTE = allocation fraction × Person FTE
+```
 
-### Status Reports
+For example, a 100% allocation for a 0.8 FTE Person contributes 0.8 FTE.
 
-The current draft is working state in `status-reports/draft.json`. Published reports are separate immutable JSON snapshots. Historical report bodies are intentionally lazy-loaded to keep startup I/O independent of the number of reports accumulated over time.
+Forecast effort/cost is then:
 
-## Workspace folder structure
+```text
+Forecast days = Forecast FTE × working days in month
+Forecast cost = Forecast days × Person Role day rate
+```
 
-A typical active workspace looks like:
+If the Person's Role has no usable day rate, reporting falls back to the configured Default / blended day rate.
+
+## Actuals and financial semantics
+
+Import Oracle Actuals through **Admin → Actuals**. Oracle `People #` / `Person #` matches AMO `staffNumber`; Project Number maps Actuals to Defined Demand.
+
+Only aggregated Actuals facts are stored. Imported `actualHours` and `actualCostGbp` are authoritative observations.
+
+- Actual days = Actual hours ÷ configured Standard working hours per day.
+- Actual FTE = Actual hours ÷ full-time working hours for the month.
+- Actual cost/recovery = imported Oracle Cost in GBP.
+
+AMO does **not** recalculate Actual cost using Role rates.
+
+For a reporting month, imported Actuals win when that Actuals period exists. Allocation remains the planning baseline for variance comparison and remains the reported source for non-imported/future months.
+
+AMO does not infer Work-Package-level Actuals where Oracle only provides Project/Demand-level facts.
+
+## Reporting assumptions
+
+The Reporting assumptions in Config contain:
+
+- **Standard working hours per day** — used to convert Actual hours into effort days/FTE;
+- **Default / blended day rate (£)** — used for Initial ROM and Work Package estimate valuation and as the fallback where a named Person's Role has no rate.
+
+Initial ROM/WP £ values are indicative because no named resource mix is known. Named Allocation Forecast uses actual configured Role mix. Oracle Actual £ remains authoritative.
+
+## Resource Plan
+
+Resource Plan is the primary capacity/resource-owner view. It is read-only management reporting over People, Allocation Forecast and Actuals.
+
+It shows:
+
+- available capacity in FTE with days/£ context;
+- Actual or Forecast reported effort by month;
+- remaining/over capacity and utilisation;
+- Person-level utilisation and Actual-versus-plan signals;
+- allocation detail showing both allocation percentage and FTE-scaled equivalent;
+- capacity value, forecast recovery and Actual recovery context;
+- unmet Demand and reconciliation/management signals.
+
+Management signals distinguish No Actuals against plan, Low overall effort, Effort redirected, Unplanned Demand effort, Over capacity and Unmapped project facts. AMO reports observable patterns; Status commentary is where the business reason is recorded.
+
+## Dashboard
+
+Dashboard remains a concise portfolio answer surface rather than a duplicate Resource Plan. It shows active/unallocated Demand, capacity position and attention signals with Department/Team scoping.
+
+Capacity calculations use the same canonical Reporting Model as Resource Plan, including Person-FTE scaling for allocations.
+
+## Roadmap
+
+Roadmap is deliberately temporal.
+
+- the delivery window is derived from the earliest Work Package Target Start and latest Work Package Target End;
+- the resource window is derived from Allocations against the parent Defined Demand.
+
+Legacy authored Demand delivery dates are not operationalised and Roadmap does not become a finance table.
+
+## Status Reporting
+
+The live Status Report page is a narrative/Health authoring surface, not another Dashboard. It helps contributors identify Demand needing meaningful updates and capture Status Update, Achievements, Issues/Escalations and Health.
+
+New report snapshots derive Architecture Service context from child Work Packages and persist it as `services[]`. There is no current Demand Service column/filter. The report renderer continues to understand older immutable snapshots that contain a legacy singular `service` value.
+
+Preview/Published reports carry concise immutable portfolio/capacity context plus Demand-level effort signals and narrative. They do not recreate detailed Resource Plan financial tables.
+
+The lifecycle is **Draft → Published → Final**. Published/Final reports are immutable evidence snapshots. See `StatusReporting.md.txt` for collaboration, scope, preview and lifecycle details.
+
+## Team / organisation scope
+
+The organisation hierarchy controls reporting scope:
+
+- Demand follows its Owning Team;
+- People follow Home Team;
+- Allocation/delivery reporting follows the related Demand portfolio;
+- Dashboard, Roadmap and Status Reporting use the same organisational hierarchy.
+
+This makes cross-team contribution visible without moving workforce or Demand ownership incorrectly.
+
+## Workspace and persistence
+
+A typical workspace contains:
 
 ```text
 workspace-root/
   workspace.json
-  .lock.json                 temporary; present only while editing
   config/
     settings.json
   demand/
     DEM-....json
+  work-packages/
+    WP-....json
   team/
     USR-....json
   allocations/
     ALLOC-....json
+  actuals/
+    manifest.json
+    YYYY-MM.json
   ideas/
     IDEA-....json
   status-reports/
     draft.json
-    SR-YYYYMMDD-HHMMSS.json  published history
+    SR-....json
   backups/
-    YYYY-MM-DDTHH-MM-SS-mmm/
-      ... safety snapshot ...
   archive/
-    demand/
-      DEM-....json
-    allocations/
-      ALLOC-....json
 ```
 
-The active entity folders are the working database. `backups/` and `archive/` are maintenance areas and are not themselves part of the active record set.
+Committed changes are dirty-tracked and autosaved. The Workspace page exposes storage/backup state.
 
-## Saving and autosave
+## Backups and archive
 
-AMO dirty-tracks records/documents rather than rewriting the complete datastore after every change. Saving writes changed Demand, People, Allocation and Idea JSON records, configuration when changed, and status-report working documents when changed. Deleted records are removed from their active entity folder.
+Opening a workspace creates a timestamped safety snapshot. Retention keeps every backup taken today, one per recent day within the configured recent window and representative older monthly backups.
 
-Committed changes request an autosave shortly afterwards, with a periodic safety flush if dirty data remains. The workspace banner shows the most recent successful autosave time. **Save Workspace** can also be used explicitly.
+Terminal Demand can be moved from the active dataset into archive once it has been terminal for the configured/archive threshold. Related active Allocations are archived with it so orphaned active allocation records are not left behind.
 
-`workspace.json` is refreshed during a save to maintain the workspace modified timestamp.
+Published Status Reports are already immutable historical records and are not unnecessarily duplicated into every safety snapshot.
 
-## Safety backups
+## Multi-user editing
 
-Opening a workspace creates a timestamped safety snapshot under `backups/` before normal work continues.
+Multiple users may open/read a workspace. AMO uses cooperative locking and newer resource-specific commit/conflict checks for shared edits. Simply opening the workspace does not take the long-lived edit lock.
 
-Backup retention is intentionally bounded:
+This is appropriate for the tactical folder datastore but is not equivalent to a transactional database. Remote workspaces preserve the same application-level concurrency semantics through server endpoints.
 
-- keep every backup taken today;
-- for the preceding days within the seven-day window, keep the first backup from each day;
-- for older history, keep the first retained backup from each calendar month.
+## External links and AMO Assistant
 
-Backups include `workspace.json`, active Demand, People, Allocations, Ideas, Config and **only the current Status Report draft**. Published Status Reports are excluded because they are already immutable historical snapshots and copying the complete report history into every backup would grow I/O and storage unnecessarily.
+Demand Source links back to the Front Door item. Azure DevOps linkage belongs on Work Packages rather than Demand.
 
-The `archive/` tree is also excluded from backup. Archived records are already retained outside the active database.
+AMO Assistant is optional and appears only where configured. It is a supporting interaction layer, not a system of record; AMO, SharePoint, Azure DevOps and Architecture repositories remain authoritative for their respective data.
 
-Backup folders are visible on the Workspace page for manual recovery. Recovery is intentionally a manual filesystem operation in this tactical implementation rather than an automatic restore wizard.
+## Day-to-day operating sequence
 
-## Automatic archive
+A typical working sequence is:
 
-AMO keeps the active working set bounded by moving old terminal Demand out of the active folders.
+1. Receive Raw Demand through the Front Door.
+2. Triage fit, priority, approximate size and whether the request belongs to existing Defined Demand.
+3. Create/amend Defined Demand as the managed portfolio boundary.
+4. Create Work Packages as delivery tranches and link them to Azure DevOps work items.
+5. Adjust Demand-level Allocations to represent the resource plan.
+6. Use Dashboard/Resource Plan/Roadmap to manage portfolio, capacity and schedule.
+7. Import Oracle Actuals and reconcile through Staff Number + Project Number.
+8. Review Initial ROM, WP Estimate, Forecast and Actual/Projected position without conflating them.
+9. Maintain and publish Status Reporting narrative/Health.
+10. Allow completed/terminal work to leave the active set through archive rather than cluttering operational views indefinitely.
 
-During workspace load, Demand in a terminal state and last changed at least **28 days ago** is eligible for archive. Recognised terminal meanings include Completed/Complete, Closed, Cancelled/Canceled, Rejected/Reject, Declined, Withdrawn, Abandoned and Superseded. AMO requires a trustworthy `modifiedAt`, `updatedAt` or `createdAt` timestamp; it does not guess when no usable timestamp exists.
-
-Archived Demand is written to `archive/demand/`. Any Allocation records related to that Demand are written to `archive/allocations/` so active allocations do not become orphaned.
-
-The archive operation writes/overwrites the archive copy **before** deleting the active JSON. This makes the operation idempotent and safer if interrupted. If an old backup is manually restored and reintroduces a terminal record that was previously archived, the next workspace load archives it again and overwrites the existing archive copy for that ID.
-
-Draft status-report entries referencing Demand that leaves the active set are removed from the working draft.
-
-Archived records are not currently included in normal Dashboard, Demand, Roadmap or Resource Plan views.
-
-## Published report lazy loading
-
-Status Report History can grow for years without making normal workspace startup proportionally expensive.
-
-At startup AMO reads `status-reports/draft.json` but, for published reports, initially enumerates only the JSON filenames. The filename provides enough information to list the report ID/date in history. The complete published report JSON is read only when the user clicks **View**. Once read, it is cached in memory for that browser session.
-
-This is deliberately different from Demand, People, Allocations and Config, which are loaded eagerly because Dashboard, Resource Plan, Roadmap, filtering and validation need those records immediately.
-
-## Multi-user editing and `.lock.json`
-
-AMO permits multiple users to open and read the same folder-backed workspace. Editing uses a cooperative workspace-level `.lock.json` file so that only one browser session should edit at a time.
-
-Simply opening the workspace does **not** acquire the lock. AMO requests it when the user begins an Edit/Create transaction or performs a one-shot write such as Publish.
-
-On first edit, the browser asks for a display name and stores that identity locally in that browser. Browser JavaScript cannot reliably discover the logged-in Windows / Active Directory identity or filesystem owner, so the lock uses this explicit AMO identity.
-
-The lock contains a random browser-session ID, user ID/display name, acquisition timestamp, heartbeat timestamp and expiry timestamp. The owning session refreshes it every minute. A lock with no heartbeat for **15 minutes** is considered stale and can be explicitly taken over.
-
-After creating a lock, AMO reads it back twice before enabling editing to reduce simultaneous acquisition races. Save/Save Changes flushes committed changes before releasing the lock. Cancel releases it without creating new changes. If the browser crashes, the heartbeat stops and the lock eventually becomes stale.
-
-This is **cooperative locking, not a transactional database lock**. It is appropriate to the tactical folder datastore and low-concurrency usage. A future hosted datastore should use server-side concurrency controls such as record versions / ETags or database transactions.
-
-## External process links
-
-AMO intentionally links rather than duplicates external process systems where possible.
-
-**Demand Source** can link an AMO Demand item back to its SharePoint Front Door demand. **Work Item** can link it to the Azure DevOps Epic or Feature where detailed delivery work is managed. Architecture deliverables themselves remain governed and published in the organisation's Architecture libraries rather than being copied into the AMO datastore.
-
-If configured, **AMO Assistant** appears at the top of navigation and launches the configured assistant URL in a new window. If the setting is blank, the navigation item is hidden. See **AMO Assistant** above for its intended support role and integration boundary.
-
-## Browser and local-file considerations
-
-AMO currently runs as a static browser application and can be opened directly using `file://`. The File System Access API is used for the selected workspace folder, so a compatible Chromium-based browser is required.
-
-Browser security prevents a `file://` page from using `fetch()` to read arbitrary sibling files. This is why the README displayed inside AMO is not fetched directly from this text file.
-
-The canonical documentation source is `src/docs/AMO-README.md.txt`. It deliberately retains Markdown formatting while using a `.txt` extension so systems such as document-search / Copilot tooling that accept text files can index it.
-
-For runtime display, the same Markdown content is embedded in `src/app-readme-embedded.js`. The application renders that embedded snapshot on the README tab. When documentation changes, the embedded copy should be regenerated or updated from `AMO-README.md.txt` so the searchable documentation and in-app guide remain aligned.
-
-## Operating guidance
-
-A useful day-to-day sequence is:
-
-1. Triage incoming work outside or at the front door and create accepted AMO Demand when it enters the managed Architecture portfolio.
-2. Confirm Business Area, Service, Owning Team, scope and priority.
-3. Link the source SharePoint demand and Azure DevOps work item where available.
-4. Set or refine planned dates, including visually through Roadmap.
-5. Allocate Architecture people across the configured planning months.
-6. Use Dashboard and Resource Plan to identify unallocated work, capacity conflicts and Off Track Demand requiring attention.
-7. Maintain the Status Report draft during the reporting period.
-8. Publish the report when agreed; publication synchronises any approved Health changes back to Demand and creates the immutable reporting snapshot.
-9. Allow completed/terminal work to leave the active working set automatically after the archive threshold rather than keeping operational views indefinitely cluttered.
-
-This keeps AMO focused on departmental demand, ownership, capacity, planning and reporting while SharePoint, Azure DevOps and Architecture repositories continue to own the process information and deliverables for which they are the appropriate systems of record.
+This keeps AMO focused on Architecture portfolio/resource management while the surrounding source systems retain the process and delivery information they own.
