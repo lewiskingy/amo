@@ -1,4 +1,4 @@
-# Defined Demand Step 4 Acceptance
+# Defined Demand and Reporting Acceptance
 
 Validate this candidate against both Local and Remote/Test workspaces before promotion.
 
@@ -20,16 +20,13 @@ Confirm:
 
 ## 2. Minimal Defined Demand creation
 
-Create a new Defined Demand with only:
+Create a new Defined Demand with only Title and Business Area.
 
-- Title;
-- Business Area.
+Confirm it saves successfully, with State defaulted (normally Assessing). Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health, Context and Front Door source must all be optional.
 
-Confirm it saves successfully, with State defaulted (normally Assessing). Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health, Context and Front Door source must all be optional at this point.
+When Team View is scoped to a specific Team, confirm that Team is the natural default. In Whole Department / organisation scope, confirm AMO does not silently assign the first configured Team.
 
-Create another Demand while the global Team View is scoped to a specific Team and confirm that Team is offered as the natural default. In Whole Department / organisation scope, confirm AMO does not silently assign the first configured Team.
-
-## 3. Initial sizing
+## 3. Initial sizing baseline
 
 In Config, inspect Initial Demand Sizing and note the current XS/S/M/L/XL day values.
 
@@ -40,7 +37,9 @@ On a Demand:
 3. save the Demand;
 4. change the Config default for that size;
 5. reopen the existing Demand and confirm its stored Initial ROM has not silently changed;
-6. change the Demand to a different size and confirm the new size snapshots the new configured value.
+6. if the assessment itself is deliberately changed to a different size, confirm the explicit size change re-snapshots the corresponding Initial ROM value.
+
+Later Work Package estimates, Allocations and Actuals must never overwrite Initial ROM.
 
 ## 4. Work Package delivery model
 
@@ -54,73 +53,120 @@ Confirm the Work Package owns only the AMO portfolio metadata needed to manage i
 - Work Package Status;
 - Target Start;
 - Target End;
-- Azure DevOps Work Item Reference for the currently implemented backlog provider.
+- Azure DevOps Work Item Reference.
 
-Confirm **Description / Scope** and **Acceptance Criteria** are not presented or persisted by AMO. Those belong in the authoritative delivery backlog and should not be duplicated here.
+Confirm **Description / Scope** and **Acceptance Criteria** are not presented or persisted by AMO. Those belong in the authoritative delivery backlog.
 
-Service and Work Package Status should be selected from their own configured lists. A Work Package cannot save without a Title, Service and valid Status.
+Service and Work Package Status should be selected from their configured lists. A Work Package cannot save without a Title, Service and valid Status.
 
-Confirm the Demand itself does not expose Service, delivery Scope, delivery Start/End or refined effort fields.
-
-Provider-neutral backlog linkage is deferred: the future model may support Azure DevOps or Jira per Work Package, but never both. Step 4 should not introduce partial Jira fields or a second work-item relationship.
+Confirm Demand itself does not expose Service, delivery Scope, delivery Start/End or refined effort fields.
 
 ## 5. Estimate roll-up and Roadmap
 
-Create at least two Work Packages with estimates and dates under one Defined Demand.
+Create at least two Work Packages under one Defined Demand, leaving at least one estimate blank.
 
 Confirm:
 
-- the Demand Work Package section shows Initial Demand ROM separately from current Work Package estimated effort;
-- Work Package estimated effort is the sum of defined package estimates;
-- the displayed delivery window uses earliest Work Package start and latest Work Package end;
+- Initial Demand ROM remains separate from current Work Package estimated effort;
+- Work Package estimated effort sums only populated package estimates;
+- reporting shows estimate coverage (for example 1/2 WP estimated) rather than implying a complete estimate;
+- the delivery window uses earliest Work Package start and latest Work Package end;
 - Roadmap uses that Work Package-derived delivery window;
-- a Demand with no dated Work Packages shows no committed delivery window, even if migrated legacy Demand dates exist;
+- a Demand with no dated Work Packages shows no committed delivery window;
 - the Roadmap resource line still comes from Demand-level Allocations.
 
-## 6. Allocations and Resource Plan regression
+## 6. Allocation FTE semantics
 
-For a Demand with existing Allocation records:
+Create People with different FTE values, including a 0.8 FTE or 0.5 FTE Person, and create allocations for the same month.
 
-- confirm Allocations remain keyed by Demand ID and Person, not Work Package;
-- edit and save Allocation Forecast as before;
-- confirm Resource Plan still shows capacity, allocation and utilisation correctly;
-- confirm imported Actuals continue to replace Forecast for imported periods and Forecast remains for future/non-imported periods;
-- confirm no Work-Package-level Actuals are inferred.
+Confirm:
 
-## 7. Actuals / Project Number regression
+- Allocation remains stored as Person × Defined Demand × Month;
+- allocation percentage/fraction is interpreted against the Person's available FTE;
+- 100% allocation for a 0.8 FTE Person reports 0.8 FTE, not 1.0 FTE;
+- Resource Plan person utilisation uses the same FTE-scaled calculation;
+- scoped Dashboard capacity uses the same canonical calculation rather than raw allocation percentages;
+- allocation detail clearly distinguishes allocation percentage from equivalent FTE.
+
+## 7. Reporting rates and effort/cost
+
+In Config / Reporting assumptions, set:
+
+- Standard working hours per day;
+- Default / blended day rate.
+
+Ensure Roles have different configured day rates and leave one Role without a usable rate if the UI/data allows it.
+
+Confirm:
+
+- available capacity can be expressed in FTE, days and £;
+- named Allocation Forecast cost uses the Person's Role day rate;
+- missing Role rate falls back to the configured blended/default rate;
+- Initial ROM and Work Package Estimate use the blended/default rate and are treated as indicative £ values;
+- Actual days are derived from imported hours using Standard working hours per day;
+- imported Oracle `actualCostGbp` is shown as Actual cost/recovery without recalculation from Role rates.
+
+## 8. Actuals / Project Number regression
 
 Confirm:
 
 - Project Number remains optional on Demand;
 - digits-only and uniqueness validation remain in place;
-- imported Oracle Actuals continue reconciling through `Demand.projectNumber`;
+- imported Oracle Actuals reconcile through `Demand.projectNumber`;
 - a Demand without Project Number can still be created, allocated and reported normally;
-- legacy Cost Centre / Project Code does not reappear or participate in matching.
+- legacy Cost Centre / Project Code does not reappear or participate in matching;
+- no Work-Package-level Actuals are inferred.
 
-## 8. Status Reporting regression
+For an imported Actuals month, confirm Actuals are the reported value and Allocation remains available as the planning baseline. For a future/non-imported month, confirm Allocation Forecast remains the reported value.
+
+## 9. Defined Demand reporting progression
+
+For a Demand with Initial ROM, partially/fully estimated Work Packages, allocations spanning actualised and future periods, and imported Actuals, confirm the Demand effort/cost outlook shows distinctly:
+
+- Initial ROM — days + indicative £;
+- WP Estimate — days + indicative £ + estimate coverage;
+- Actual to date — effort + imported Oracle £;
+- Remaining Allocation Forecast — effort + forecast £;
+- Projected total — Actual + remaining forecast.
+
+Confirm the projected resource total is not labelled or treated as the Work Package Estimate.
+
+## 10. Capacity and recovery
+
+For a team with Project-backed and non-Project-backed Demand, confirm Resource Plan can distinguish:
+
+- available capacity/value;
+- forecast recovery from allocations to Project-backed Demand;
+- Actual recovery from imported Oracle cost on Project-backed Demand.
+
+Confirm Project Number is sufficient for this current cross-charge/reconciliation classification and no separate Demand-level recoverable flag is required.
+
+## 11. Status Reporting
 
 Open the Status Report authoring page.
 
 Confirm:
 
-- the old Demand-level Service column is not presented as though Service still belongs to Demand;
-- report preview/publish still works for Defined Demand entries;
-- immutable report snapshots can carry the derived list of child Work Package services for reader context;
-- existing Actual-vs-plan reporting prompts still render.
+- there is no obsolete Demand-level Service column/filter/sort;
+- authoring remains focused on Health/narrative rather than Dashboard metrics;
+- Preview/Publish works for Defined Demand entries;
+- new immutable snapshots store child Work Package service context as `services[]`;
+- the canonical report renderer displays that context;
+- an older immutable snapshot containing singular legacy `service` remains readable;
+- Status Report does not reintroduce detailed Resource Plan/financial tables as bespoke report calculations.
 
-## 9. Configuration integrity
+## 12. Configuration integrity
 
-Confirm Config distinguishes:
+Confirm Config distinguishes Demand States, Work Package Statuses, Work Package Services, Initial Demand Sizing and Reporting assumptions.
 
-- Demand States;
-- Work Package Statuses;
-- Work Package Services;
-- Initial Demand Sizing.
+Renaming/removing a Work Package Service still used by Work Packages must be rejected rather than checking Demand records. Demand State references continue to be validated against Demand.
 
-Renaming/removing a Work Package Service that is still used by Work Packages must be rejected rather than checking Demand records. Demand State references continue to be validated against Demand.
+## 13. Canonical implementation / no patch layers
 
-## 10. No duplicate Step 4 implementation
+Inspect the active browser path and confirm:
 
-Inspect the active browser path and confirm the canonical Defined Demand field model/editor lives in `app-demand-model.js`, `app-record-modal.js` and `app-2.js`.
-
-`app-defined-demand-ui.js` is only a narrow compatibility bridge preventing older Department-era wrappers from making Owning Team mandatory. It must not contain a second Demand modal, validation function or list-save implementation. `app-team-scope-clarity.js` must remain terminology/scope presentation only and must not implement another Demand save path.
+- Defined Demand field/editor implementation remains canonical in `app-demand-model.js`, `app-record-modal.js` and `app-2.js`;
+- reporting effort/cost/FTE semantics live in `app-reporting-model.js` rather than being independently recreated by views;
+- `app-defined-demand-reporting.js` contains no post-render Status Report column mutation or synthetic `entry.service` compatibility wrapper;
+- `app-defined-demand-ui.js` remains a narrow compatibility bridge and does not contain a second Demand modal/validation/save implementation;
+- `app-team-scope-clarity.js` remains terminology/scope presentation only.
