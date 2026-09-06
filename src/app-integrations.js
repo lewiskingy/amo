@@ -18,38 +18,50 @@ async function populateSourceTitleIfBlank(record,onDone){
 }
 
 /* ----- Demand register: source provenance only -----
-   The canonical Defined Demand columns live in app-2.js. Delivery metadata belongs to Work Packages. */
+   app-2.js remains the one Demand renderer. This integration layer only supplies the source
+   provenance columns and their specialised presentation/edit behaviour. */
 const INTEGRATION_DEMAND_TAIL_KEYS=new Set(['health']);
-const baseDemandColumns=demandCols.filter(c=>!INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
-const demandTailColumns=demandCols.filter(c=>INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
-function integratedDemandCols(){return gridState.demand.editing?[...baseDemandColumns,{key:'source.url',label:'Source URL',type:'url',editable:true},{key:'source.title',label:'Source Title',type:'text',editable:true},...demandTailColumns]:[...baseDemandColumns,{key:'_source',label:'Source Demand',type:'text',editable:false},...demandTailColumns]}
-function integratedDemandValue(row,col){if(col.key==='_source')return row.source?.title||linkFallback(row.source?.url||'','source')||'';if(col.key==='ownerId')return ownerName(row);return getPath(row,col.key)??''}
-function integratedDemandCell(row,col){
-  if(gridState.demand.editing){
-    if(col.key==='initiative'){const opts=[{value:'',label:'—'},...initiativesForBusinessArea(row.businessArea).map(i=>({value:i.name,label:i.name}))];return `<select class="cell-input" data-edit-key="${col.key}" data-row-id="${row.id}">${opts.map(o=>`<option value="${escHtml(o.value)}" ${String(o.value)===String(row.initiative||'')?'selected':''}>${escHtml(o.label)}</option>`).join('')}</select>`}
-    if(col.type==='select'){const opts=normalizeOptions(col),v=String(getPath(row,col.key)??'');return `<select class="cell-input" data-edit-key="${col.key}" data-row-id="${row.id}">${opts.map(o=>`<option value="${escHtml(o.value)}" ${String(o.value)===v?'selected':''}>${escHtml(o.label)}</option>`).join('')}</select>`}
-    if(!col.editable)return `<span class="nowrap">${escHtml(integratedDemandValue(row,col))}</span>`;
-    const v=getPath(row,col.key)??'',type=col.type==='number'?'number':col.type==='date'?'date':col.type==='url'?'url':'text';return `<input class="cell-input" type="${type}" value="${escHtml(v)}" data-edit-key="${col.key}" data-row-id="${row.id}">`;
+const canonicalDemandColumns=[...demandCols];
+function sourceDemandColumns(editing){
+  const base=canonicalDemandColumns.filter(c=>!INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
+  const tail=canonicalDemandColumns.filter(c=>INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
+  return editing
+    ?[...base,{key:'source.url',label:'Source URL',type:'url',editable:true},{key:'source.title',label:'Source Title',type:'text',editable:true},...tail]
+    :[...base,{key:'_source',label:'Source Demand',type:'text',editable:false,derived:true},...tail]
+}
+function installDemandColumns(){demandCols.splice(0,demandCols.length,...sourceDemandColumns(!!gridState.demand.editing))}
+function restoreCanonicalDemandColumns(){demandCols.splice(0,demandCols.length,...canonicalDemandColumns)}
+
+const baseDisplayValIntegration=displayVal;
+displayVal=function(row,col){if(col?.key==='_source')return row.source?.title||linkFallback(row.source?.url||'','source')||'';return baseDisplayValIntegration(row,col)};
+const baseEditControlIntegration=editControl;
+editControl=function(row,col){if(col?.key==='source.url'){const v=getPath(row,col.key)??'';return `<input class="cell-input" type="url" value="${escHtml(v)}" data-edit-key="${col.key}" data-row-id="${row.id}">`}return baseEditControlIntegration(row,col)};
+
+function decorateDemandSourceCells(table,rows){
+  if(!table||gridState.demand.editing)return;
+  const cols=sourceDemandColumns(false),sourceIndex=cols.findIndex(c=>c.key==='_source');if(sourceIndex<0)return;
+  for(const tr of table.tBodies?.[0]?.querySelectorAll('tr[data-row]')||[]){
+    const row=rows.find(r=>String(r.id)===String(tr.dataset.row));if(!row||!tr.cells?.[sourceIndex])continue;
+    tr.cells[sourceIndex].innerHTML=integrationLink(row.source?.url,row.source?.title,'source')
   }
-  if(col.key==='title')return row.source?.url?`<a href="${escHtml(row.source.url)}" target="_blank" rel="noopener noreferrer"><strong>${escHtml(row.title)}</strong></a>`:`<strong>${escHtml(row.title)}</strong>`;
-  if(col.key==='_source')return integrationLink(row.source?.url,row.source?.title,'source');
-  return escHtml(integratedDemandValue(row,col));
 }
-function integratedDemandFilter(col){const value=gridState.demand.filters[col.key]||'',fk=`demand:${col.key}`;if(col.type==='select'){let options;if(col.key==='initiative')options=[...new Set(normalizeInitiatives(db.settings.initiatives||[]).map(i=>i.name))];else options=normalizeOptions(col).map(x=>x.label);return `<select data-filter-key="${fk}" data-grid="demand" data-key="${col.key}"><option value="">All</option>${options.map(v=>`<option value="${escHtml(v)}" ${String(value)===String(v)?'selected':''}>${escHtml(v)}</option>`).join('')}</select>`}return `<input data-filter-key="${fk}" data-grid="demand" data-key="${col.key}" value="${escHtml(value)}" placeholder="contains…">`}
-function renderIntegratedDemandGrid(){
-  const focus=rememberFocus(),s=gridState.demand,cols=integratedDemandCols(),source=s.editing?s.draft:db.demand;
-  let rows=source.filter(r=>(!s.editing||!s.deleted.has(r.id))&&cols.every(c=>{const f=String(s.filters[c.key]||'').toLowerCase();return!f||String(integratedDemandValue(r,c)).toLowerCase().includes(f)}));
-  if(s.sort){const c=cols.find(x=>x.key===s.sort);if(c){rows=[...rows].sort((a,b)=>String(integratedDemandValue(a,c)).localeCompare(String(integratedDemandValue(b,c)),undefined,{numeric:true,sensitivity:'base'}));if(s.direction==='desc')rows.reverse()}}
-  const table=$('demandTable'),count=$('demandCount'),toolbar=$('demandToolbar');toolbar.innerHTML=s.editing?'<button class="btn primary" data-grid-new>New Demand</button><button class="btn success" data-grid-save>Save Changes</button><button class="btn" data-grid-cancel>Cancel</button><button class="btn" data-grid-clear>Clear Filters</button>':`<button class="btn primary" data-grid-new ${workspaceHandle?'':'disabled'}>New Demand</button><button class="btn" data-grid-edit ${workspaceHandle?'':'disabled'}>Edit List</button><button class="btn" data-grid-clear>Clear Filters</button>`;
-  count.textContent=workspaceHandle?`Showing ${rows.length} of ${source.length-(s.editing?s.deleted.size:0)} records`:'No workspace loaded';
-  table.innerHTML=`<thead><tr>${cols.map(c=>`<th><button class="sort-btn" data-sort="${c.key}">${c.label}${sortMark('demand',c.key)}</button></th>`).join('')}${s.editing?'<th>Delete</th>':''}</tr><tr class="filter-row">${cols.map(c=>`<th>${integratedDemandFilter(c)}</th>`).join('')}${s.editing?'<th></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr data-row="${r.id}" class="${dirtyRecords.demand.has(r.id)?'row-dirty':''}">${cols.map(c=>`<td>${integratedDemandCell(r,c)}</td>`).join('')}${s.editing?`<td><button class="btn danger" data-grid-delete="${r.id}">Delete</button></td>`:''}</tr>`).join('')}</tbody>`;
-  table.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>toggleSort('demand',b.dataset.sort));table.querySelectorAll('[data-filter-key]').forEach(el=>{el.oninput=e=>scheduleFilter('demand',e.target.dataset.key,e.target.value);el.onchange=e=>{s.filters[e.target.dataset.key]=e.target.value;renderGrid('demand')}});table.querySelectorAll('tbody tr[data-row]').forEach(tr=>{tr.ondblclick=e=>{if(!e.target.closest('button,input,select,textarea,a'))openRecordModal('demand',tr.dataset.row,'view')}});
-  toolbar.querySelector('[data-grid-new]')?.addEventListener('click',()=>openRecordModal('demand',null,'edit'));toolbar.querySelector('[data-grid-edit]')?.addEventListener('click',()=>{s.editing=true;s.draft=clone(db.demand);s.deleted=new Set();renderGrid('demand')});toolbar.querySelector('[data-grid-cancel]')?.addEventListener('click',()=>{s.editing=false;s.draft=null;s.deleted=new Set();renderGrid('demand')});toolbar.querySelector('[data-grid-clear]')?.addEventListener('click',()=>{s.filters={};renderGrid('demand')});toolbar.querySelector('[data-grid-save]')?.addEventListener('click',()=>saveGrid('demand'));
-  if(s.editing){table.querySelectorAll('[data-edit-key]').forEach(el=>{el.onchange=e=>{const r=s.draft.find(x=>x.id===e.target.dataset.rowId),key=e.target.dataset.editKey,col=cols.find(c=>c.key===key);let v=e.target.value;if(col?.type==='number')v=v===''?null:Number(v);setPath(r,key,v);if(key==='initialEstimate.size'){r.initialEstimate=r.initialEstimate||{};r.initialEstimate.estimatedDays=v?Number(db.settings.demandSizeDays?.[v]??window.DefinedDemandModel?.DEFAULT_SIZE_DAYS?.[v]):null}if(key==='businessArea'&&r.initiative&&!initiativesForBusinessArea(v).some(i=>i.name===r.initiative)){r.initiative='';renderGrid('demand')}};if(el.dataset.editKey==='source.url')el.onblur=async e=>{const r=s.draft.find(x=>x.id===e.target.dataset.rowId);setPath(r,'source.url',e.target.value);await populateSourceTitleIfBlank(r,()=>renderGrid('demand'))}});table.querySelectorAll('[data-grid-delete]').forEach(b=>b.onclick=()=>{s.deleted.add(b.dataset.gridDelete);renderGrid('demand')})}
-  else window.WorkPackages?.renderDemandTreeRows?.(table,rows);
-  restoreFocus(focus);
+function bindDemandSourceTitleLookup(table){
+  if(!table||!gridState.demand.editing)return;
+  table.querySelectorAll('[data-edit-key="source.url"]').forEach(el=>el.addEventListener('blur',async e=>{
+    const row=gridState.demand.draft?.find(x=>String(x.id)===String(e.target.dataset.rowId));if(!row)return;
+    setPath(row,'source.url',e.target.value);
+    await populateSourceTitleIfBlank(row,()=>renderGrid('demand'))
+  }))
 }
-const baseRenderGridIntegration=renderGrid;renderGrid=function(name){return name==='demand'?renderIntegratedDemandGrid():baseRenderGridIntegration(name)};
+const baseRenderGridIntegration=renderGrid;
+renderGrid=function(name){
+  if(name!=='demand')return baseRenderGridIntegration(name);
+  installDemandColumns();
+  try{
+    const result=baseRenderGridIntegration(name),table=$('demandTable'),rows=gridRows('demand');
+    decorateDemandSourceCells(table,rows);bindDemandSourceTitleLookup(table);return result
+  }finally{restoreCanonicalDemandColumns()}
+};
 
 /* Modal: best-effort source title lookup after URL blur. */
 const baseRenderRecordModalIntegration=renderRecordModal;renderRecordModal=function(){baseRenderRecordModalIntegration();if(recordModalState.type==='demand'&&recordModalState.mode==='edit'){const urlEl=$('recordModalBody').querySelector('[data-modal-field="source.url"]'),titleEl=$('recordModalBody').querySelector('[data-modal-field="source.title"]');if(urlEl)urlEl.addEventListener('blur',async()=>{if(titleEl?.value.trim()||!urlEl.value.trim())return;const title=await fetchRemotePageTitle(urlEl.value.trim());if(title&&titleEl){titleEl.value=title;recordModalState.draft=readModalDraft()}})}};
