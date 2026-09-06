@@ -7,6 +7,9 @@ const config=fs.readFileSync('src/app-config.js','utf8');
 const workPackages=fs.readFileSync('src/app-work-packages.js','utf8');
 const roadmap=fs.readFileSync('src/app-roadmap.js','utf8');
 const reporting=fs.readFileSync('src/app-defined-demand-reporting.js','utf8');
+const statusReport=fs.readFileSync('src/app-status-report.js','utf8');
+const reportRenderer=fs.readFileSync('src/app-report-renderer.js','utf8');
+const reportingModel=fs.readFileSync('src/app-reporting-model.js','utf8');
 const integrations=fs.readFileSync('src/app-integrations.js','utf8');
 const compat=fs.readFileSync('src/app-defined-demand-ui.js','utf8');
 const scopeClarity=fs.readFileSync('src/app-team-scope-clarity.js','utf8');
@@ -61,12 +64,26 @@ assert.match(config,/demandSizeDays/);
 assert.match(roadmap,/summaryForDemand/);
 assert.doesNotMatch(roadmap,/legacyDeliveryWindow|Legacy Demand dates/);
 
-// Status Reporting no longer depends on Demand.service; Work Package services are immutable derived context.
-assert.match(reporting,/servicesForDemand/);
-assert.match(reporting,/entry\.services=\[\.\.\.services\]/);
-assert.match(reporting,/entry\.service=services\.join/);
-assert.match(reporting,/removeObsoleteDemandServiceColumn/);
+// Status Reporting natively snapshots Work Package services; no Demand.service column or post-render mutation remains.
+assert.match(statusReport,/const services=window\.WorkPackages\?\.summaryForDemand/);
+assert.match(statusReport,/services:\[\.\.\.services\]/);
+assert.doesNotMatch(statusReport,/filters:\{[^}]*service/);
+assert.doesNotMatch(statusReport,/th\('service','Service'\)|d\.service===f\.service/);
+assert.doesNotMatch(reporting,/removeObsoleteDemandServiceColumn|snapshotStatusEntry=function|entry\.service=/);
+assert.match(reportRenderer,/Array\.isArray\(entry\?\.services\)/);
+assert.match(reportRenderer,/entry\?\.service/,'Historical report snapshots with legacy service remain readable');
 assert.match(index,/app-defined-demand-reporting\.js\?v=20260905-1/);
+
+// Step 5 reporting has one canonical model for FTE scaling and financial semantics.
+assert.match(reportingModel,/allocationFte=/);
+assert.match(reportingModel,/allocationFraction\(a,month\)\*personFte/);
+assert.match(reportingModel,/defaultDayRate/);
+assert.match(reportingModel,/actualCostGbp/);
+assert.match(reportingModel,/wpEstimatedCount/);
+assert.match(reportingModel,/projectedCost/);
+assert.match(schema.recordTypes.allocation.semantics,/allocation fraction × Person FTE/);
+assert.match(schema.reportingInvariants.actualCost,/authoritative/);
+assert.match(schema.reportingInvariants.projected,/Actual to date/);
 
 // Compatibility layers no longer duplicate Demand modal/list persistence.
 assert.match(compat,/compatibility bridge/i);
@@ -81,8 +98,8 @@ for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWit
   assert(['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled'].includes(d.status),`${file} has non-canonical Demand State ${d.status}`);
 }
 
-// Allocation / Actuals boundaries remain unchanged by Step 4.
-assert.equal(schema.recordTypes.allocation.semantics,'Allocation remains Person × Defined Demand × Month; Step 4 does not move resource planning to Work Package.');
+// Allocation / Actuals boundaries remain at Defined Demand while their reporting semantics are refined.
+assert.match(schema.recordTypes.allocation.semantics,/Person × Defined Demand × Month/);
 assert.match(schema.reportingInvariants.actuals,/Demand\.projectNumber/);
 assert.match(schema.reportingInvariants.workPackageActuals,/No Work Package Actuals/);
 
