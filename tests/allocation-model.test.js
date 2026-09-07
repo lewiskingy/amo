@@ -56,3 +56,4 @@ const summary=model.legacySummary(allocations);
 assert.equal(summary.count,1);assert.equal(summary.demandCount,1);assert.deepEqual(Array.from(summary.demandIds),['DEM-1']);
 
 console.log('Allocation model tests passed');
+require('./work-package-resource-planning.test.js');
