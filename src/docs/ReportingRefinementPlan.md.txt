@@ -64,7 +64,7 @@ Actual cost/recovery = imported Oracle Cost in GBP
 
 AMO never recalculates imported Actual cost from Role rates.
 
-Actuals reconcile to Defined Demand through `Demand.projectNumber` and to People through Staff Number. AMO does not manufacture Work-Package-level Actuals.
+Actuals reconcile dynamically to Defined Demand through `Demand.projectNumber` and to People through Staff Number. AMO does not manufacture Work-Package-level Actuals.
 
 ### Reported effort
 
@@ -111,7 +111,7 @@ The same imported monetary fact may be labelled **Actual cost** at Demand level 
 
 ## Canonical implementation
 
-`src/app-reporting-model.js` owns the reporting calculations. Views should consume it rather than recreate formulas.
+`src/app-reporting-model.js` owns the quantitative reporting calculations. Views and business-classification modules must consume it rather than recreate formulas.
 
 It owns:
 
@@ -126,6 +126,14 @@ It owns:
 - management/variance signals;
 - portfolio capacity/recovery aggregation.
 
+`src/app-estimates-funding.js` owns the current Defined Demand planning/funding lifecycle and funding-status semantics. It may consume ReportingModel values but does not own resource-reporting arithmetic.
+
+`src/app-resource-plan.js` is the sole Resource Plan presentation/controller. It renders month basis, capacity, reported effort, individual utilisation, Actual-versus-plan detail and resource-owner financial context from the canonical models. Other modules must not wrap or post-render mutate `renderResource`.
+
+`src/app-4.js` is retained only as a compatibility loader for older cached/local shells and contains no Resource Plan implementation.
+
+The former `src/app-financial-planning.js` implementation is retired as a load-safe compatibility file. It represented an older Demand/funding model (`triage`, legacy Work Package estimate fields and older funding states), independently recalculated working days/allocation value, and wrapped Resource Plan/Dashboard rendering. Those responsibilities are now split deliberately between the current planning/funding model, ReportingModel, and canonical view renderers.
+
 `src/app-organization-hierarchy-compat.js` uses the canonical allocation-FTE helper for scoped Dashboard capacity rather than summing raw allocation percentages.
 
 ## User-facing surfaces
@@ -134,12 +142,15 @@ It owns:
 
 Primary capacity/resource-owner surface. It shows:
 
+- an explicit **ACTUAL** or **FORECAST** basis in every visible month;
 - available capacity in FTE with days/£ context;
 - reported Actual/Forecast effort in FTE, days and £;
 - utilisation and over-capacity periods;
 - Person-level Actual vs plan using canonical FTE scaling;
-- allocation detail that distinguishes allocation percentage from equivalent FTE;
+- allocation detail that distinguishes allocation percentage from equivalent FTE and, for Actual periods, observed FTE versus the retained plan;
 - capacity value, forecast recovery and Actual recovery.
+
+An imported month must never be visually indistinguishable from a forecast month. When July Actuals exist, July uses observed hours/Oracle cost throughout these reporting rows while later non-imported periods remain Forecast.
 
 ### Defined Demand
 
@@ -166,6 +177,10 @@ Remains temporal. Work Package dates define delivery windows and Demand allocati
 ### Status Reporting
 
 Status authoring remains narrative/Health focused rather than another Dashboard. Published/Preview report snapshots retain immutable portfolio context and Work Package-derived service context. No Demand-level Service is reintroduced as a domain field.
+
+## Deployment asset consistency
+
+Hosted application shells rewrite local JavaScript asset query versions to the current Cloudflare deployment build ID. This prevents a newly deployed HTML shell or canonical renderer from being combined with an older cached compatibility module. Dynamically loaded modules use the same build identity.
 
 ## Configuration
 
@@ -194,4 +209,7 @@ Tests must protect these rules:
 - Actual-period-wins semantics remain intact;
 - projected total is Actual + remaining forecast;
 - no Work Package Actuals are inferred;
-- Project Number remains the Actuals/recovery reconciliation boundary.
+- Project Number remains the Actuals/recovery reconciliation boundary;
+- `app-resource-plan.js` is the sole owner of Resource Plan rendering;
+- compatibility/financial modules do not wrap `renderResource` or recreate reporting arithmetic;
+- hosted shells version application JavaScript against the current deployment build.
