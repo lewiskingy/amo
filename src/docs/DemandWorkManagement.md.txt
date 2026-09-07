@@ -9,165 +9,143 @@ Raw Demand
 SharePoint Front Door
       ↓
 Triage
-AMO + Azure DevOps
       ↓
 Defined Demand
 AMO portfolio boundary
-      ↓
-Work Packages
-AMO delivery metadata + Azure DevOps work items
-      ↓
-Allocations / Actuals
-AMO resource plan + Oracle reconciliation
+      ├─ Initial ROM
+      ├─ Budget Forecast
+      ├─ Project Number / Actuals identity
+      └─ Work Packages
+         ├─ delivery estimate
+         └─ named-person Resource Plan
 ```
 
-**Raw Demand** is an incoming request that has not yet been qualified into a managed body of Architecture work.
+**Defined Demand** is the recognised portfolio boundary. It may exist before a Project Number, final Owning Team, committed dates or complete delivery decomposition are known.
 
-**Triage** assesses whether Architecture involvement is required, whether the request belongs to existing managed work, likely priority, approximate size and capacity implications. AMO can support this assessment alongside Azure DevOps; it does not replace the Front Door or create another intake backlog.
+**Work Package** is a discrete delivery tranche beneath Defined Demand. AMO stores portfolio metadata only; detailed delivery description/scope and acceptance criteria remain in the authoritative delivery backlog.
 
-**Defined Demand** is the recognised portfolio boundary represented by an AMO Demand record. It can exist before a Project Number, final Owning Team, committed dates or complete delivery decomposition are known.
+## Creating and decomposing Demand
 
-**Work Package** is a discrete delivery tranche beneath Defined Demand. AMO stores only the portfolio metadata needed for visibility and reporting: title, Architecture Service, status, estimated effort, target dates and the Azure DevOps Work Item Reference. Detailed description/scope and acceptance criteria remain in the authoritative delivery backlog and are not duplicated in AMO.
+Initial Demand creation is deliberately lightweight. Title and Business Area are the only mandatory user-entered fields; lifecycle state is defaulted.
 
-## Creating Defined Demand
+For each new request, first decide whether the work belongs to existing Defined Demand. If yes, add or amend the appropriate Work Package rather than creating duplicate Demand. If no, create a new Defined Demand and add Work Packages as delivery understanding develops.
 
-The initial record is deliberately lightweight. The user must provide only:
+## Planning progression
 
-- **Title**;
-- **Business Area**.
-
-Demand State defaults to the configured initial state, normally **Assessing**. Initiative, Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health, Summary/Context and Front Door source/reference may be added as the Demand matures.
-
-For each Raw Demand item, first decide whether the work belongs to an existing Defined Demand.
-
-- If **yes**, add or amend the appropriate Work Package beneath that Demand rather than creating duplicate Demand.
-- If **no**, create a new Defined Demand and add Work Packages when sufficient delivery information exists.
-
-Several Front Door requests can therefore contribute Work Packages to the same Defined Demand.
-
-## Estimation and reporting progression
-
-Defined Demand uses coarse T-shirt sizing for the initial assessment. Configuration supplies default day values for XS/S/M/L/XL and AMO snapshots the selected value as the Initial ROM.
-
-Work Packages use **Estimated Effort (days)** for the refined delivery estimate. Reporting retains estimate coverage so a partially decomposed Demand is not presented as though the WP estimate is complete.
-
-Allocation Forecast is a different measure again: it is the current resource plan and does not require all future Work Packages to have been decomposed.
-
-Actuals are observed effort/cost imported from Oracle.
+AMO deliberately retains each level of planning knowledge:
 
 ```text
-Initial Demand ROM
-        ↓
+Initial ROM
+    ↓
+Budget Forecast
+    ↓ compare
 Work Package Estimate
-        ↓
-Allocation Forecast
-        ↓
-Actual Effort / Cost
+    ↓ compare
+Work Package Resource Plan
+    ↓
+Actual to date + remaining Resource Plan
+    = Projected effort
 ```
 
-These are complementary measures and must not overwrite one another.
+### Initial ROM
 
-### Financial valuation
+The early assessment baseline. It remains separately reportable.
 
-- Initial ROM and Work Package Estimate use the configured default/blended day rate because no named resource mix is known.
-- Named Allocation Forecast uses the Person's Role day rate, falling back to the configured blended/default rate when the Role has no rate.
-- Imported Oracle Actual cost is authoritative and is never recalculated from AMO rates.
+### Budget Forecast
 
-### Allocation FTE semantics
+The current effort forecast for budgetary and portfolio-planning purposes. It may change as understanding improves. It is **not** an approved financial budget and does not automatically change Work Package estimates or allocations.
 
-Allocation values are percentages/fractions of a Person's available FTE, not absolute FTE values.
+### Work Package Estimate
+
+The current delivery estimate of an individual Work Package. Demand WP Estimate is the sum of populated child estimates, with estimate coverage retained.
+
+### Work Package Resource Plan
+
+New allocations are created only against Work Packages:
 
 ```text
-Forecast FTE = allocation fraction × Person FTE
+Person × Work Package × Month
 ```
 
-A 100% allocation for a 0.8 FTE Person therefore contributes 0.8 FTE.
+`demandId` remains parent context and must match the Work Package's parent Demand. Demand Resource Plan totals are derived roll-ups across child Work Packages.
 
-### Reported and projected effort
+Existing Demand-only allocations remain supported only as explicit legacy / undecomposed transition records. They are never silently assigned to a Work Package.
 
-For an individual month, imported Actuals win when the Actuals period exists; Allocation Forecast is used otherwise.
+### Actuals and projected effort
 
-Across a horizon:
+Oracle Actuals remain observed Demand/Project facts:
+
+```text
+Person × Project Number × Month
+          ↓
+Demand.projectNumber
+```
+
+Actuals are not inferred at Work Package level.
+
+For an imported month, Actuals are the reported value; otherwise Allocation Forecast is used. Across the horizon:
 
 ```text
 Actual to date + remaining Allocation Forecast = Projected effort / cost
 ```
 
-Projected resource effort is not the same as the current Work Package Estimate.
+Projected effort is compared with Budget Forecast using wording such as **above Budget Forecast**, not “over budget”.
+
+## Resource and financial semantics
+
+Allocation values are fractions of a Person's available FTE:
+
+```text
+Forecast FTE = allocation fraction × Person FTE
+```
+
+Forecast days/cost are valued using the Person's Role day rate, with the configured blended/default rate as fallback. Initial ROM, Budget Forecast and Work Package estimates may use the blended/default rate for indicative valuation. Imported Oracle Actual cost is authoritative and never recalculated from AMO rates.
 
 ## Service, status and dates
 
-Architecture **Service** is a Work Package attribute, not a Defined Demand attribute. A single Defined Demand can contain Strategy, Design, Consultancy and Assurance packages.
+Architecture Service, delivery Status and target dates are Work Package concerns. Demand delivery window is derived from child Work Package dates. Defined Demand does not own current delivery dates.
 
-Defined Demand **State** describes the portfolio lifecycle: Assessing, Defined, Planned, In Progress, On Hold, Complete or Cancelled.
+## Resource planning UX
 
-Work Package **Status** describes delivery progress and is configured separately.
-
-Target Start and Target End are authored on Work Packages. The Demand Roadmap delivery window is derived from the earliest child start and latest child end. Defined Demand does not own current delivery dates.
-
-## Managing Work Packages in AMO
-
-The canonical Work Package management surface is the nested Work Package row under Defined Demand in the Demand Register.
-
-AMO stores:
-
-- Title;
-- Architecture Service;
-- Estimated Effort (days);
-- delivery Status;
-- Target Start / Target End;
-- Azure DevOps Work Item Reference.
-
-AMO does **not** persist Work Package description/scope or acceptance criteria. Those stay in the delivery backlog.
-
-## Planning and Actuals boundaries
-
-Work Packages explain **what is being delivered**. Allocations explain **how much Person capacity is planned against Defined Demand**. Actuals explain **how much effort/cost was recorded against the Oracle Project Number associated with that Defined Demand**.
+The canonical allocation path is:
 
 ```text
-Allocation Forecast
-Person × Defined Demand × Month
-
-Actuals
-Person × Project Number × Month
-          ↓
-Demand.projectNumber
-          ↓
-Defined Demand
+Demand
+  ↓
+Work Package
+  ↓
+Person
+  ↓
+Monthly allocation
 ```
 
-Allocations and Actuals remain at Defined Demand level. AMO does not manufacture Work-Package-level Actuals.
+The Allocations view shows Demand planning context, child Work Package estimates and Resource Plan totals. Legacy undecomposed allocations are shown separately and can be explicitly migrated to a valid child Work Package.
 
-A Defined Demand can be planned and allocated without a Project Number; it simply cannot reconcile Oracle Actuals directly until a unique Project Number is present.
+## Reporting and management signals
+
+Demand reporting shows ROM, Budget Forecast, WP Estimate, Resource Plan, Actual to date and Projected effort together, while preserving their distinct meanings.
+
+Management signals highlight:
+
+- missing Budget Forecast;
+- incomplete WP estimate coverage;
+- material WP Estimate variance against Budget Forecast;
+- material Resource Plan variance against Budget Forecast;
+- material Projected variance against Budget Forecast;
+- legacy undecomposed allocations.
+
+Status Report snapshots persist report-time planning context. Historical published reports therefore do not read live planning values later.
 
 ## Recovery semantics
 
-Project Number is the current cross-charge/reconciliation indicator. AMO does not maintain a second Demand-level `recoverable` flag.
+Project Number remains the cross-charge/reconciliation indicator.
 
-- **Capacity value** — theoretical value of available People capacity.
-- **Forecast recovery** — value of named allocations to Project-backed Defined Demand.
-- **Actual recovery** — imported Oracle cost against Project-backed Defined Demand.
-
-At Demand level the same imported £ fact may be described as Actual cost; at team/resource-owner level it may be described as Actual recovery.
-
-## Migration from the older Demand model
-
-Schema migration preserves useful history without inventing relationships:
-
-- legacy Demand Service is retained only as history and is not copied to Work Packages;
-- legacy triage ROM becomes the Initial Estimate where meaningful;
-- legacy triage/scope text is consolidated into Summary / Context;
-- legacy `workPackage.architectureOwner` becomes Demand `ownerId`;
-- legacy Demand dates remain history and do not drive the current Roadmap;
-- legacy Deliverables are not silently converted into Work Packages;
-- legacy Cost Centre / Project Code is not migrated into Project Number.
-
-Current saves remove retired operational fields from the active Demand representation.
+- **Capacity value** — theoretical value of available People capacity;
+- **Forecast recovery** — value of named Resource Plan allocations on Project-backed Demand;
+- **Actual recovery** — imported Oracle cost on Project-backed Demand.
 
 ## System responsibilities
 
 - **SharePoint Front Door** owns intake and the authoritative Raw Demand source record.
-- **Azure DevOps** owns triage/backlog execution, detailed Work Package scope, acceptance criteria and work tracking.
-- **AMO** owns Defined Demand, Work Package portfolio metadata, resource allocations, portfolio/resource reporting and Actuals reconciliation.
-
-AMO stores only the Azure DevOps Work Item Reference on a Work Package. Organisation and Project are inherited from System, Department and Team configuration; AMO does not guess them when Owning Team is absent.
+- **Azure DevOps / Jira** owns detailed delivery backlog content and work tracking.
+- **AMO** owns Defined Demand, Budget Forecast, Work Package portfolio metadata, Work Package Resource Plan, portfolio/resource reporting and Actuals reconciliation.
