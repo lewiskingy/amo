@@ -85,3 +85,16 @@
   `;document.head.appendChild(style)}
   start();
 })();
+
+/* Resource Planning is loaded here because this integration point runs after the legacy app-3
+   allocation implementation. The new module is the canonical renderer/save path for PR B while
+   the old functions remain load-safe for older cached clients. */
+(function loadWorkPackageResourcePlanning(){
+  if(window.__amoWorkPackageResourcePlanningLoading||window.WorkPackageResourcePlanning)return;
+  window.__amoWorkPackageResourcePlanningLoading=true;
+  const script=document.createElement('script');
+  script.src='app-work-package-resource-planning.js?v=20260907-1';
+  script.onload=()=>{window.__amoWorkPackageResourcePlanningLoading=false;if(typeof renderAllocations==='function')renderAllocations()};
+  script.onerror=()=>{window.__amoWorkPackageResourcePlanningLoading=false;console.warn('Could not load Work Package resource planning UI.')};
+  document.head.appendChild(script);
+})();
