@@ -111,4 +111,5 @@ assert.match(schema.reportingInvariants.actuals,/Demand\.projectNumber/);
 assert.match(schema.reportingInvariants.workPackageActuals,/No Work Package Actuals/);
 
 console.log('Defined Demand cross-view contract tests passed');
+require('./work-package-resource-planning.test.js');
 require('./demand-work-package-renderer-contract.test.js');
