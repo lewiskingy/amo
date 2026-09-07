@@ -19,11 +19,20 @@ Only Title and Business Area require user input to create the record.
 - `ownerId` — Architecture Owner accountable for the Defined Demand;
 - `initialEstimate.size` — XS/S/M/L/XL;
 - `initialEstimate.estimatedDays` — snapshotted default ROM for the chosen size;
+- `budgetForecast.estimatedDays` — current effort forecast used for budgetary and portfolio-planning purposes;
 - `projectNumber` — optional Oracle Project Number for Actuals reconciliation;
 - `health` — portfolio delivery health once meaningful;
 - `context` — Summary / Context for why the Defined Demand exists;
 - `source` — Front Door provenance/reference;
 - funding/planning metadata owned by the existing Demand planning capability.
+
+### Demand Budget Forecast
+
+`budgetForecast.estimatedDays` is deliberately separate from the ROM and from the resource plan.
+
+It answers: **what effort do we currently forecast this Demand will require for budgetary/planning purposes?**
+
+It is not an approved budget and it is not changed automatically when Work Package estimates or named-resource allocations change. Reporting can compare the Budget Forecast with Work Package estimates and the rolled-up resource plan without conflating those measures.
 
 ### Derived, not authored on Demand
 
@@ -31,7 +40,8 @@ Only Title and Business Area require user input to create the record.
 - current refined estimated effort = sum of child `estimatedEffortDays` values that exist;
 - delivery start = earliest child `targetStart`;
 - delivery end = latest child `targetEnd`;
-- Work Package Service mix.
+- Work Package Service mix;
+- Demand resource plan = sum of child Work Package allocations, plus any explicitly retained legacy undecomposed allocations during transition.
 
 ### Removed from the current Demand model
 
@@ -66,18 +76,47 @@ Removed legacy values may be retained under `legacy` for audit/history but do no
 - `targetEnd`;
 - `azureDevOpsWorkItemId`.
 
-Work Package does not own Allocation or Actuals in this model.
+Work Package owns the delivery planning level at which named people are allocated. Actuals do not move to Work Package level: Oracle Actuals remain reconciled to parent Demand through Project Number.
+
+## Allocation
+
+Steady-state Allocation is:
+
+```text
+Person × Work Package × Month
+```
+
+An allocation retains both:
+
+- `demandId` — required parent Demand context;
+- `workPackageId` — the delivery package being resourced;
+- `teamMemberId` — Person;
+- `forecast` — monthly fraction of the Person's available FTE.
+
+The referenced Work Package must belong to the referenced Demand. `demandId` is retained rather than inferred so validation, querying and Demand reporting remain simple and explicit.
+
+Pre-existing records without `workPackageId` remain readable as **legacy undecomposed allocations**. They are not silently assigned to a Work Package. During transition they continue contributing once to the parent Demand resource plan until the user explicitly decomposes them.
 
 ## Measurement progression
 
 ```text
-Initial Demand Size / ROM
+Demand ROM Estimate
         ↓
-Work Package Estimated Effort
+Demand Budget Forecast
+        ↓ compare
+Work Package Estimate
+        ↓ compare
+Work Package Resource Plan Allocations
         ↓
-Allocation Forecast
-        ↓
-Actual Effort
+Actuals at Demand / Project level
 ```
 
-Each measure represents a different level of confidence and should remain separately reportable rather than overwriting the previous one.
+These are not successive overwrites of one field:
+
+- **Demand ROM Estimate** is the original baseline expectation;
+- **Demand Budget Forecast** is the current effort forecast for budgetary/planning purposes, not an approved budget;
+- **Work Package Estimate** describes the effort implied by defined delivery packages;
+- **Work Package Resource Plan Allocations** are the named-person monthly plan and roll up to the Demand resource forecast;
+- **Actuals** remain observed Oracle facts reconciled at Demand level through Project Number.
+
+Each measure remains separately reportable so AMO can show meaningful planning variance rather than hiding it by moving the target.
