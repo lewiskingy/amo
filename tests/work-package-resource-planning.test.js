@@ -1,0 +1,27 @@
+const fs=require('fs'),assert=require('assert');
+const ui=fs.readFileSync('src/app-work-package-resource-planning.js','utf8');
+const allocationModel=fs.readFileSync('src/app-allocation-model.js','utf8');
+const filterToolbar=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
+
+assert.match(ui,/Demand provides planning context/);
+assert.match(ui,/named-person allocations are created against Work Packages/);
+assert.match(ui,/function blankAllocation\(demandId,workPackageId\)/);
+assert.match(ui,/workPackageId/);
+assert.match(ui,/data-add-wp/);
+assert.match(ui,/Allocate Person/);
+assert.match(ui,/New allocations must be created against a Work Package/);
+assert.match(ui,/legacy-wp-select/);
+assert.match(ui,/Unassigned to WP/);
+assert.match(ui,/assignLegacy/);
+assert.match(ui,/wp\.demandId!==a\.demandId/);
+assert.match(ui,/Budget Forecast/);
+assert.match(ui,/WP Estimate/);
+assert.match(ui,/Resource Plan/);
+assert.match(ui,/packageSummary/);
+assert.match(ui,/planningSummary/);
+assert.match(ui,/window\.AllocationModel\?\.validate/);
+assert.match(ui,/allowLegacy:true/,'Legacy Demand-only allocations remain editable during migration');
+assert.doesNotMatch(ui,/Actual.*workPackageId|workPackage.*Actual/i,'WP resource planning must not invent WP Actuals');
+assert.match(allocationModel,/Legacy allocation is not yet assigned to a Work Package/);
+assert.match(filterToolbar,/app-work-package-resource-planning\.js/);
+console.log('Work Package resource planning tests passed');
