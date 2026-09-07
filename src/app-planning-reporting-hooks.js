@@ -16,8 +16,14 @@
     const roadmapNotice=document.querySelector('#roadmap > .notice');if(roadmapNotice)roadmapNotice.innerHTML='Delivery dates are maintained on Work Packages. The thin line is derived from child Work Package dates; the resource line is the <strong>roll-up of Work Package Resource Plan allocations</strong> to the parent Demand. Legacy undecomposed allocations remain visible only during migration.';
     const roadmapHero=document.querySelector('#roadmap .hero p');if(roadmapHero)roadmapHero.textContent='Work Package delivery windows compared with the resource plan rolled up to the parent Defined Demand.';
   }
+  function normalizeResourceHeadings(){
+    const planning=document.getElementById('resourceDemandPlanningSection');if(!planning)return;
+    const planningTitle=planning.querySelector('h2');if(planningTitle)planningTitle.textContent='Demand planning position';
+    const planningSub=planning.querySelector('.section-title .muted');if(planningSub)planningSub.textContent='Budget Forecast → Work Package Estimate → Resource Plan → Actual / Projected';
+    const detailTitle=planning.previousElementSibling;if(detailTitle?.classList?.contains('section-title')){const h=detailTitle.querySelector('h2');if(h)h.textContent='Work Package resource detail';const sub=detailTitle.querySelector('.muted');if(sub)sub.textContent='Plan is attributed to Work Packages; imported Actuals remain at parent Demand / Project Number.'}
+  }
   const dashboardKpis=document.getElementById('kpiGrid');if(dashboardKpis)new MutationObserver(()=>queueMicrotask(appendDashboardPlanningSignals)).observe(dashboardKpis,{childList:true});
-  function refresh(){updateStaticWording();appendDashboardPlanningSignals();window.PlanningReportingUI?.enhanceResource?.();window.PlanningReportingUI?.enhanceStatusTable?.();window.PlanningReportingUI?.enhanceDemandModal?.()}
+  function refresh(){updateStaticWording();appendDashboardPlanningSignals();window.PlanningReportingUI?.enhanceResource?.();normalizeResourceHeadings();window.PlanningReportingUI?.enhanceStatusTable?.();window.PlanningReportingUI?.enhanceDemandModal?.()}
   refresh();window.addEventListener('amo:reporting-model-updated',refresh);window.addEventListener('amo:work-packages-updated',refresh);
-  window.PlanningReportingHooks={refresh,appendDashboardPlanningSignals};
+  window.PlanningReportingHooks={refresh,appendDashboardPlanningSignals,normalizeResourceHeadings};
 })();
