@@ -1,7 +1,7 @@
 const fs=require('fs'),assert=require('assert');
 const ui=fs.readFileSync('src/app-work-package-resource-planning.js','utf8');
+const app3=fs.readFileSync('src/app-3.js','utf8');
 const allocationModel=fs.readFileSync('src/app-allocation-model.js','utf8');
-const filterToolbar=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
 
 assert.match(ui,/Demand provides planning context/);
 assert.match(ui,/named-person allocations are created against Work Packages/);
@@ -23,5 +23,7 @@ assert.match(ui,/window\.AllocationModel\?\.validate/);
 assert.match(ui,/allowLegacy:true/,'Legacy Demand-only allocations remain editable during migration');
 assert.doesNotMatch(ui,/Actual.*workPackageId|workPackage.*Actual/i,'WP resource planning must not invent WP Actuals');
 assert.match(allocationModel,/Legacy allocation is not yet assigned to a Work Package/);
-assert.match(filterToolbar,/app-work-package-resource-planning\.js/);
+assert.match(app3,/Canonical allocation UI and persistence now live in app-work-package-resource-planning\.js/);
+assert.doesNotMatch(app3,/addAllocationForDemand|makeBlankAllocation|New Allocation/,'Legacy Demand-level allocation creation path must be retired');
+assert.match(app3,/app-work-package-resource-planning\.js/);
 console.log('Work Package resource planning tests passed');
