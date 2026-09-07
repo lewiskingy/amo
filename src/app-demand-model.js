@@ -1,7 +1,9 @@
-/* Canonical Defined Demand model for Step 4.
-   Demand is the early/portfolio boundary; Work Packages own delivery service, scope, dates and refined estimates. */
+/* Canonical Defined Demand model.
+   Demand is the early/portfolio boundary; Work Packages own delivery service, scope, dates and refined estimates.
+   Demand ROM Estimate is the immutable early baseline. Demand Budget Forecast is the current forecast for
+   budgetary/planning purposes and is deliberately distinct from an approved budget or named-resource plan. */
 (function initDefinedDemandModel(){
-  const MODEL_VERSION=2;
+  const MODEL_VERSION=3;
   const DEMAND_STATES=['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled'];
   const WORK_PACKAGE_STATUSES=['Planned','Ready','In Progress','Blocked','Complete','Cancelled'];
   const DEFAULT_SIZE_DAYS={XS:2,S:5,M:10,L:20,XL:40};
@@ -42,6 +44,11 @@
     if(estimatedDays==null&&size)estimatedDays=normalizeSizeDays(settings?.demandSizeDays)[size];
     return{size:size||'',estimatedDays}
   }
+  function normalizeBudgetForecast(value){
+    const src=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+    const estimatedDays=numberOrNull(src.estimatedDays);
+    return{estimatedDays:estimatedDays!=null&&estimatedDays>=0?estimatedDays:null}
+  }
   function legacySnapshot(d){
     const legacy={...(d?.legacy||{})};
     if(d?.service&&!legacy.service)legacy.service=d.service;
@@ -62,17 +69,18 @@
     return next
   }
   function normalizeDemand(d,settings){
-    const next=d;next.context=contextFromLegacy(next);next.ownerId=trim(next.ownerId||next?.workPackage?.architectureOwner)||null;next.initialEstimate=initialEstimateFromLegacy(next,settings);next.status=canonicalState(next.status);next.source=next.source||{type:'SharePoint',id:'',url:'',title:''};next.source.type=next.source.type||'SharePoint';next.source.id=trim(next.source.id);next.source.url=trim(next.source.url);next.source.title=trim(next.source.title);next.businessArea=trim(next.businessArea);next.initiative=trim(next.initiative);next.projectNumber=trim(next.projectNumber);next.priority=trim(next.priority);next.health=trim(next.health);next.legacy=legacySnapshot(next);delete next.service;delete next.phase;delete next.triage;delete next.workPackage;delete next.deliverables;next.demandModelVersion=MODEL_VERSION;return next
+    const next=d;next.context=contextFromLegacy(next);next.ownerId=trim(next.ownerId||next?.workPackage?.architectureOwner)||null;next.initialEstimate=initialEstimateFromLegacy(next,settings);next.budgetForecast=normalizeBudgetForecast(next.budgetForecast);next.status=canonicalState(next.status);next.source=next.source||{type:'SharePoint',id:'',url:'',title:''};next.source.type=next.source.type||'SharePoint';next.source.id=trim(next.source.id);next.source.url=trim(next.source.url);next.source.title=trim(next.source.title);next.businessArea=trim(next.businessArea);next.initiative=trim(next.initiative);next.projectNumber=trim(next.projectNumber);next.priority=trim(next.priority);next.health=trim(next.health);next.legacy=legacySnapshot(next);delete next.service;delete next.phase;delete next.triage;delete next.workPackage;delete next.deliverables;next.demandModelVersion=MODEL_VERSION;return next
   }
   function migrateWorkspace(settings,demand){
     const beforeSettings=JSON.stringify(settings||{});normalizeSettings(settings);let changed=beforeSettings!==JSON.stringify(settings||{}),demandIds=[];
     for(const d of demand||[]){const before=JSON.stringify(d);normalizeDemand(d,settings);if(before!==JSON.stringify(d)){changed=true;demandIds.push(d.id)}}
-    return{changed,demandIds,note:changed?'Defined Demand model v2: Demand lifecycle, initial sizing and delivery-boundary fields normalised; legacy delivery metadata retained under legacy.':''}
+    return{changed,demandIds,note:changed?'Defined Demand model v3: Demand Budget Forecast added as a separate budgetary forecast from immutable ROM, Work Package estimates and resource allocations; current Demand fields normalised and legacy delivery metadata retained under legacy.':''}
   }
   function initialEstimateDays(d){return numberOrNull(d?.initialEstimate?.estimatedDays)}
+  function budgetForecastDays(d){return numberOrNull(d?.budgetForecast?.estimatedDays)}
   function isOpen(d){return !TERMINAL_STATES.has(canonicalState(d?.status))}
   function legacyDeliveryWindow(d){const legacy=d?.legacy?.demandWorkPackage||{};return{start:trim(legacy.targetStart),end:trim(legacy.targetEnd),legacy:!!(legacy.targetStart||legacy.targetEnd)}}
   function cleanForSave(d,settings){const next=structuredClone(d);normalizeDemand(next,settings);return next}
 
-  window.DefinedDemandModel={MODEL_VERSION,DEMAND_STATES,WORK_PACKAGE_STATUSES,DEFAULT_SIZE_DAYS,normalizeSizeDays,inferSize,canonicalState,normalizeSettings,normalizeDemand,migrateWorkspace,initialEstimateDays,isOpen,legacyDeliveryWindow,cleanForSave};
+  window.DefinedDemandModel={MODEL_VERSION,DEMAND_STATES,WORK_PACKAGE_STATUSES,DEFAULT_SIZE_DAYS,normalizeSizeDays,inferSize,canonicalState,normalizeSettings,normalizeDemand,migrateWorkspace,initialEstimateDays,budgetForecastDays,isOpen,legacyDeliveryWindow,cleanForSave};
 })();
