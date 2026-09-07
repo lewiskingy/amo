@@ -1,6 +1,7 @@
 {
   "schemaVersion": 3,
-  "demandModelVersion": 2,
+  "demandModelVersion": 3,
+  "allocationModelVersion": 1,
   "applicationName": "Architecture Management Office",
   "appearance": "light",
   "planningWindow": {"fromMonth": "2026-09-01", "toMonth": "2027-02-01"},

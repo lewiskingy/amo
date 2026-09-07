@@ -2,9 +2,12 @@
 
 AMO keeps planning and observed effort as separate facts.
 
-- **Allocations** are the planning/forecast source of truth at Person × Defined Demand × Month.
-- **Actuals** are imported observed effort/cost from Oracle.
-- Reporting composes them month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation Forecast.
+- **Demand ROM Estimate** is the immutable early estimate baseline.
+- **Demand Budget Forecast** is the current effort forecast for budgetary/portfolio-planning purposes; it is not an approved budget.
+- **Work Package Estimate** is the refined delivery estimate for a package.
+- **Allocations** are the named-resource planning source of truth at Person × Work Package × Month in the steady-state model.
+- **Actuals** are imported observed effort/cost from Oracle and remain reconciled at Demand/Project level.
+- Reporting composes Actuals and Allocation Forecast month by month: if an Actuals period exists, that month uses Actuals; otherwise it uses Allocation Forecast.
 - The calendar date does not move the cut-over. A future/non-imported month remains Forecast until an Actuals period exists.
 - A loaded Actuals month is authoritative. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
 - Imported Oracle `Cost in GBP` is authoritative Actual cost/recovery; AMO never recalculates it using Role rates.
@@ -67,36 +70,51 @@ Forecast days = Forecast FTE × working days in month
 Forecast cost = Forecast days × Person Role day rate
 ```
 
+In the steady-state model each Allocation targets a Work Package and retains its parent `demandId`. Demand resource forecast is therefore the roll-up of all child Work Package allocations.
+
+Pre-existing Demand-only allocation records without `workPackageId` remain readable as **legacy undecomposed allocations** during transition. They continue to contribute once to the parent Demand forecast until explicitly assigned/decomposed through the Work Package allocation UX. AMO must never silently guess a Work Package for a legacy allocation.
+
 Where the Person's Role has no configured rate, the configured **Default / blended day rate** is used as the fallback.
 
-The same blended/default rate values Initial ROM and Work Package estimates because those estimates do not yet identify a named Role/person mix. Their £ values are therefore indicative.
+The same blended/default rate values Demand ROM, Demand Budget Forecast and Work Package estimates because those measures do not identify a named Role/person mix. Their £ values are therefore indicative rather than approved financial budgets.
 
-## Demand estimate progression
+## Planning progression
 
 Reporting deliberately keeps the stages of knowledge distinct:
 
 ```text
-Initial ROM
+Demand ROM Estimate
     ↓
+Demand Budget Forecast
+    ↓ compare
 Work Package Estimate
+    ↓ compare
+Work Package Resource Plan Allocations
     ↓
-Allocation Forecast
-    ↓
-Actual Effort / Cost
+Actual Effort / Cost at Demand Project level
 ```
 
-- **Initial ROM** preserves the early assessment expectation.
+- **Demand ROM Estimate** preserves the early assessment expectation.
+- **Demand Budget Forecast** is the current effort forecast used for budgetary/portfolio planning; it is not an approved budget and does not move automatically with the resource plan.
 - **Work Package Estimate** is the sum of populated child package estimates; reporting retains estimate coverage.
-- **Allocation Forecast** is the current named resource plan and can exceed the WP estimate where decomposition is incomplete.
-- **Actuals** are observed Oracle facts.
+- **Work Package Resource Plan Allocations** are the current named resource plan and roll up to the parent Demand resource forecast.
+- **Actuals** are observed Oracle facts attached to Demand via Project Number; no Work Package Actual is inferred.
+
+Useful comparisons therefore include:
+
+```text
+Work Package Estimate vs Demand Budget Forecast
+Resource Plan Forecast vs Demand Budget Forecast
+Resource Plan Forecast vs Work Package Estimate
+```
 
 Across a reporting horizon:
 
 ```text
-Actual to date + remaining Allocation Forecast = Projected effort / cost
+Actual to date + remaining Resource Plan Forecast = Projected effort / cost
 ```
 
-Projected resource effort is not the same measure as Work Package Estimate.
+Projected resource effort is not the same measure as Work Package Estimate or Demand Budget Forecast.
 
 ## Management classifications
 
@@ -116,7 +134,7 @@ The classifications are:
 - **No Actuals against plan** — material planned allocation but effectively no Actual effort overall.
 - **Low overall effort** — materially less total effort recorded than planned.
 - **Effort redirected** — total effort broadly matches plan but material shortfall on one Demand is offset by increased effort elsewhere.
-- **Unplanned Demand effort** — Actual effort recorded against known Demand without a corresponding Person allocation for the period.
+- **Unplanned Demand effort** — Actual effort recorded against known Demand without a corresponding resource allocation for the period.
 - **Over capacity** — total Actual effort exceeds the configured capacity threshold.
 - **Unmapped project facts** — known-Person Actuals cannot be mapped unambiguously to AMO Demand.
 
@@ -128,18 +146,21 @@ AMO does not infer why effort moved. Status commentary is where the business rea
 
 Resource Plan is the detailed capacity/resource-owner view. It presents available and reported capacity in FTE with days/£ context, Person utilisation, Actual-versus-plan variance, allocation detail, and capacity/recovery information. Forecast allocation displays both the allocation percentage and its FTE-scaled equivalent.
 
+The steady-state allocation hierarchy is Demand → Work Package → Person. Demand-level resource totals are roll-ups, not separately authored person allocations.
+
 ### Dashboard
 
 Capacity Outlook uses Actual effort for loaded periods and Forecast elsewhere. Organisational scope uses the same canonical FTE-scaled allocation calculations as Resource Plan rather than summing raw allocation percentages.
 
 ### Defined Demand
 
-The Demand effort and cost outlook shows the management progression directly:
+The Demand effort and cost outlook should retain these measures separately:
 
-- Initial ROM — days + indicative £;
+- Demand ROM Estimate — days + indicative £;
+- Demand Budget Forecast — days + indicative £ for budgetary planning, explicitly not approved budget;
 - Work Package Estimate — days + indicative £ + estimate coverage;
 - Actual to date — effort days + imported Oracle £;
-- Remaining Allocation Forecast — effort days + forecast £;
+- Remaining Resource Plan Forecast — effort days + forecast £;
 - Projected total — Actual + remaining plan.
 
 Actual-versus-plan management signals remain available alongside this progression.
@@ -154,4 +175,6 @@ Service is not read from `Demand.service`. Current snapshots carry a `services` 
 
 ## Forecast preservation
 
-Actuals do not overwrite Allocations. Allocation Forecast remains available as the planning baseline for variance analysis even where the reported value for a period is Actual.
+Actuals do not overwrite Allocations. Resource Plan Forecast remains available as the planning baseline for variance analysis even where the reported value for a period is Actual.
+
+Actuals remain Demand/Project-level observations. AMO does not manufacture Work Package Actuals from the detailed Work Package Resource Plan.
