@@ -1,8 +1,9 @@
 (function initActuals(){
   const DEFAULTS={worksheet:'YTD Oracle Download'};
   /* Canonical import fields are deliberately independent of Oracle display labels. Oracle exports
-     have used both "People #" and "Person #" for the workforce identifier. AMO always maps that
-     source value to Person.staffNumber and stores it as fact.staffNumber. */
+     have used both "People #" and "Person #" for the workforce identifier. AMO stores the source
+     Staff Number and Project Number on every retained fact; current AMO Person/Demand identities are
+     resolved dynamically when facts are read, so later workspace corrections do not require reimport. */
   const COLUMN_ALIASES={
     'Portfolio':['Portfolio'],
     'Programme':['Programme'],
@@ -17,6 +18,7 @@
   };
   const REQUIRED_COLUMNS=Object.keys(COLUMN_ALIASES);
   const FACT_SCHEMA_VERSION=1;
+  const RESOLVED_REPOSITORY=Symbol('amo-actuals-resolved-repository');
 
   function settings(){return{...DEFAULTS,...((typeof db!=='undefined'&&db.settings?.actualsImport)||{})}}
   function normalizeMonth(value){const text=String(value??'').trim(),m=text.match(/^(\d{4})[\/-](\d{1,2})(?:[\/-]\d{1,2})?$/);if(!m)return'';return`${m[1]}-${String(Number(m[2])).padStart(2,'0')}`}
@@ -30,13 +32,29 @@
   function staffIds(person){return uniq([person?.staffNumber].map(v=>String(v??'').trim()))}
   function projectNumber(demand){return String(demand?.projectNumber??'').trim()}
   function buildScope(team=[],demand=[]){
-    const personByStaffNumber=new Map(),projectByNumber=new Map(),projectCandidates=new Map(),ambiguousProjectNumbers=new Set();
-    for(const p of team)for(const id of staffIds(p))personByStaffNumber.set(norm(id),p);
+    const personByStaffNumber=new Map(),staffCandidates=new Map(),ambiguousStaffNumbers=new Set(),projectByNumber=new Map(),projectCandidates=new Map(),ambiguousProjectNumbers=new Set();
+    for(const p of team)for(const id of staffIds(p)){const key=norm(id),rows=staffCandidates.get(key)||[];rows.push(p);staffCandidates.set(key,rows)}
+    for(const [key,rows] of staffCandidates){if(rows.length===1)personByStaffNumber.set(key,rows[0]);else ambiguousStaffNumbers.add(key)}
     for(const d of demand){const id=projectNumber(d);if(!id)continue;const key=norm(id),rows=projectCandidates.get(key)||[];rows.push(d);projectCandidates.set(key,rows)}
     for(const [key,rows] of projectCandidates){if(rows.length===1)projectByNumber.set(key,rows[0]);else ambiguousProjectNumbers.add(key)}
-    return{personByStaffNumber,projectByNumber,ambiguousProjectNumbers,teamCount:team.length,demandCount:demand.length}
+    return{personByStaffNumber,ambiguousStaffNumbers,projectByNumber,ambiguousProjectNumbers,teamCount:team.length,demandCount:demand.length}
   }
   function matchPerson(get,scope){const staffNumber=String(get('Staff Number')??'').trim();if(staffNumber&&scope.personByStaffNumber.has(norm(staffNumber)))return{person:scope.personByStaffNumber.get(norm(staffNumber)),match:'staff-number'};return{person:null,match:null}}
+
+  function resolveFact(fact,{team=(typeof db!=='undefined'?db.team:[])||[],demand=(typeof db!=='undefined'?db.demand:[])||[],scope=null}={}){
+    const index=scope||buildScope(team,demand),sourceStaff=String(fact?.staffNumber??fact?.personNumber??'').trim(),sourceProject=String(fact?.projectNumber??'').trim();
+    let person=null,demandRecord=null,personResolution='unmatched',demandResolution='unmatched';
+    if(sourceStaff){const key=norm(sourceStaff);if(index.ambiguousStaffNumbers.has(key))personResolution='ambiguous';else if(index.personByStaffNumber.has(key)){person=index.personByStaffNumber.get(key);personResolution='matched'}}else if(fact?.teamMemberId){person=team.find(p=>p.id===fact.teamMemberId)||null;personResolution=person?'legacy-id':'unmatched'}
+    if(sourceProject){const key=norm(sourceProject);if(index.ambiguousProjectNumbers.has(key))demandResolution='ambiguous';else if(index.projectByNumber.has(key)){demandRecord=index.projectByNumber.get(key);demandResolution='matched'}}else if(fact?.demandId){demandRecord=demand.find(d=>d.id===fact.demandId)||null;demandResolution=demandRecord?'legacy-id':'unmatched'}
+    return{...fact,staffNumber:sourceStaff||fact?.staffNumber||null,teamMemberId:person?.id||null,demandId:demandRecord?.id||null,resolution:{person:personResolution,demand:demandResolution}}
+  }
+  function resolvePeriod(period,scope={}){if(!period)return period;const team=scope.team||(typeof db!=='undefined'?db.team:[])||[],demand=scope.demand||(typeof db!=='undefined'?db.demand:[])||[],index=buildScope(team,demand);return{...period,facts:(period.facts||[]).map(f=>resolveFact(f,{team,demand,scope:index}))}}
+  function decorateRepository(repo){if(!repo||repo[RESOLVED_REPOSITORY]||typeof repo.readActualsPeriod!=='function')return repo;const read=repo.readActualsPeriod.bind(repo);repo.readActualsPeriod=async month=>resolvePeriod(await read(month));Object.defineProperty(repo,RESOLVED_REPOSITORY,{value:true});return repo}
+  if(typeof window.setWorkspaceRepository==='function'){
+    const setWorkspaceRepository=window.setWorkspaceRepository;
+    window.setWorkspaceRepository=repo=>setWorkspaceRepository(decorateRepository(repo));
+  }
+  if(window.workspaceRepository)decorateRepository(window.workspaceRepository);
 
   function worksheetAccessor(ws){
     const range=window.XLSX.utils.decode_range(ws['!ref']||'A1:A1'),cell=(r,c)=>{const entry=Array.isArray(ws)?ws[r]?.[c]:ws[window.XLSX.utils.encode_cell({r,c})];return entry?.v??null},rawIndex={},index={},matchedHeaders={};
@@ -70,7 +88,7 @@
 
   async function storedSummary(){const repo=window.workspaceRepository;if(!repo?.listActualsPeriods)return{months:[],periods:[],manifest:null};const months=await repo.listActualsPeriods(),periods=await Promise.all(months.map(m=>repo.readActualsPeriod(m))),manifest=await repo.readActualsManifest();return{months,periods:periods.filter(Boolean),manifest}}
   function replacementPreview(analysis,existingMonths=[]){const incoming=analysis.months||[],replace=incoming.filter(m=>existingMonths.includes(m)),add=incoming.filter(m=>!existingMonths.includes(m));return{incoming,replace,add,firstMonth:incoming[0]||null,latestMonth:incoming.at(-1)||null,replaceFirst:replace[0]||null,replaceLatest:replace.at(-1)||null}}
-  async function commitImport({analysis,fileName,worksheet}){const repo=window.workspaceRepository;if(!repo?.replaceActualsPeriods)throw new Error('The current workspace does not support Actuals imports.');const sourceColumn=analysis.sourceHeaders?.['Staff Number']||'People # / Person #',manifest={schemaVersion:FACT_SCHEMA_VERSION,source:{fileName,worksheet,staffNumberColumn:analysis.sourceHeaders?.['Staff Number']||null},import:{completedAt:new Date().toISOString(),sourceRows:analysis.stats.sourceRows,factRows:analysis.factRows,firstMonth:analysis.firstMonth,latestMonth:analysis.latestMonth,periods:analysis.months},totals:{hours:analysis.totalHours,costGbp:analysis.totalCostGbp},warnings:[analysis.stats.invalidMonthRows?`${analysis.stats.invalidMonthRows} source row(s) had an invalid Month and were ignored.`:'',analysis.stats.missingProjectRows?`${analysis.stats.missingProjectRows} source row(s) had no Project Number and were ignored.`:'',analysis.stats.unmatchedStaffRows?`${analysis.stats.unmatchedStaffRows} source row(s) had ${sourceColumn} values that did not match current AMO Staff Numbers and were ignored.`:'',analysis.stats.outOfScopePersonlessRows?`${analysis.stats.outOfScopePersonlessRows} personless source row(s) did not map to a current AMO Demand Project Number and were ignored as outside AMO scope.`:'',analysis.stats.unmatchedProjectRows?`${analysis.stats.unmatchedProjectRows} source row(s) matched current AMO People but their Project Number did not map to Demand; these rows were retained as unmapped Actuals.`:'',analysis.stats.ambiguousProjectRows?`${analysis.stats.ambiguousProjectRows} source row(s) used a Project Number assigned to more than one AMO Demand; these rows were retained without Demand attribution until the duplicate Project Number is resolved.`:''].filter(Boolean)};await repo.replaceActualsPeriods(analysis.periods,manifest);window.dispatchEvent(new CustomEvent('amo:actuals-updated',{detail:{manifest}}));return manifest}
+  async function commitImport({analysis,fileName,worksheet}){const repo=window.workspaceRepository;if(!repo?.replaceActualsPeriods)throw new Error('The current workspace does not support Actuals imports.');const sourceColumn=analysis.sourceHeaders?.['Staff Number']||'People # / Person #',manifest={schemaVersion:FACT_SCHEMA_VERSION,source:{fileName,worksheet,staffNumberColumn:analysis.sourceHeaders?.['Staff Number']||null},import:{completedAt:new Date().toISOString(),sourceRows:analysis.stats.sourceRows,factRows:analysis.factRows,firstMonth:analysis.firstMonth,latestMonth:analysis.latestMonth,periods:analysis.months},totals:{hours:analysis.totalHours,costGbp:analysis.totalCostGbp},warnings:[analysis.stats.invalidMonthRows?`${analysis.stats.invalidMonthRows} source row(s) had an invalid Month and were ignored.`:'',analysis.stats.missingProjectRows?`${analysis.stats.missingProjectRows} source row(s) had no Project Number and were ignored.`:'',analysis.stats.unmatchedStaffRows?`${analysis.stats.unmatchedStaffRows} source row(s) had ${sourceColumn} values that did not match current AMO Staff Numbers and were ignored.`:'',analysis.stats.outOfScopePersonlessRows?`${analysis.stats.outOfScopePersonlessRows} personless source row(s) did not map to a current AMO Demand Project Number and were ignored as outside AMO scope.`:'',analysis.stats.unmatchedProjectRows?`${analysis.stats.unmatchedProjectRows} source row(s) matched current AMO People but their Project Number did not map to Demand; these rows were retained as unmapped Actuals and will reconcile automatically if the current Demand Project Number is later configured.`:'',analysis.stats.ambiguousProjectRows?`${analysis.stats.ambiguousProjectRows} source row(s) used a Project Number assigned to more than one AMO Demand; these rows were retained without Demand attribution until the duplicate Project Number is resolved.`:''].filter(Boolean)};await repo.replaceActualsPeriods(analysis.periods,manifest);window.dispatchEvent(new CustomEvent('amo:actuals-updated',{detail:{manifest}}));return manifest}
   async function clear(){const repo=window.workspaceRepository;if(!repo?.clearActuals)throw new Error('No workspace is open.');await repo.clearActuals();window.dispatchEvent(new CustomEvent('amo:actuals-updated',{detail:{manifest:null}}))}
-  window.Actuals={DEFAULTS,COLUMN_ALIASES,REQUIRED_COLUMNS,FACT_SCHEMA_VERSION,settings,normalizeMonth,inspectWorkbook,buildScope,aggregateWorksheet,analyzeWorkbook,storedSummary,replacementPreview,commitImport,clear};
+  window.Actuals={DEFAULTS,COLUMN_ALIASES,REQUIRED_COLUMNS,FACT_SCHEMA_VERSION,settings,normalizeMonth,inspectWorkbook,buildScope,resolveFact,resolvePeriod,decorateRepository,aggregateWorksheet,analyzeWorkbook,storedSummary,replacementPreview,commitImport,clear};
 })();

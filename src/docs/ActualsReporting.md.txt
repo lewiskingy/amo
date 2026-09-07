@@ -9,6 +9,23 @@ AMO keeps planning and observed effort as separate facts.
 - A loaded Actuals month is authoritative. If an individual has no Actual row in that period, their Actual effort is zero rather than silently falling back to Forecast.
 - Imported Oracle `Cost in GBP` is authoritative Actual cost/recovery; AMO never recalculates it using Role rates.
 
+## Source facts and dynamic reconciliation
+
+The durable Actuals fact preserves Oracle source identities. AMO does not require a reimport merely because current workspace identity/configuration changes after the fact was stored.
+
+The reconciliation keys are:
+
+```text
+fact.projectNumber -> Demand.projectNumber
+fact.staffNumber   -> Person.staffNumber
+```
+
+`demandId` and `teamMemberId` are reporting-time relationships derived from those source keys when a stored period is read. Existing facts therefore begin contributing to the relevant Demand/Person as soon as a unique current mapping exists. For example, adding Project Number `11702` to a Demand immediately reconciles already-stored facts carrying `projectNumber: "11702"`.
+
+The source keys take precedence over any historical `demandId` / `teamMemberId` values contained in an older stored fact. This keeps prior imports compatible while preventing stale import-time relationships from overriding the current workspace model. Read-time reconciliation does not rewrite the stored Oracle fact.
+
+If more than one Demand has the same Project Number, or more than one Person has the same Staff Number, the relationship remains unresolved rather than selecting one arbitrarily. Correcting the duplicate causes the existing stored facts to reconcile automatically on the next read.
+
 ## Defined Demand and Project Number
 
 Defined Demand does not have to be a formal Project and may exist before a Project Number is known.
@@ -23,11 +40,13 @@ Project Number is also the current indicator used by reporting to identify Proje
 
 Project Number is stored as a string so source identifiers are preserved exactly, while the current UI accepts digits only. It must not be assigned to more than one Demand. Legacy Cost Centre / Project Code values are not an Actuals mapping source and are not migrated into Project Number.
 
-If Oracle Actuals contain a Project Number that is not mapped to Demand, facts for known AMO People are retained without Demand attribution so Person-level effort remains factual. Duplicate Demand Project Numbers are treated the same way: AMO surfaces the reconciliation problem rather than arbitrarily selecting one Demand.
+If Oracle Actuals contain a Project Number that is not currently mapped to Demand, retained facts remain without Demand attribution until a unique current mapping exists. Duplicate Demand Project Numbers are treated the same way: AMO surfaces the reconciliation problem rather than arbitrarily selecting one Demand.
 
 ## Identity and effort conversion
 
-Oracle `People #` (or `Person #` in older exports) matches AMO Person `staffNumber`. Name matching is not used. Rows for an unmatched Person identifier are excluded from curated People Actuals and surfaced as reconciliation information.
+Oracle `People #` (or `Person #` in older exports) matches AMO Person `staffNumber`. Name matching is not used. Retained facts are resolved against the current Staff Number mapping whenever Actuals are read.
+
+The current importer still curates the large Oracle download before persistence: rows for a Staff Number that is not in current AMO People are excluded unless the row is otherwise retained through the existing project-scope rules. Dynamic reconciliation can remap facts that were stored previously, but it cannot recover source rows that were never persisted; those require a later reimport once they are in scope.
 
 Actual hours are converted using **Standard working hours per day** under Reporting assumptions (7.5 by default):
 

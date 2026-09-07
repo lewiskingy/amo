@@ -1,7 +1,8 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const encodeCell=({r,c})=>`${String.fromCharCode(65+c)}${r+1}`;
 const decodeRange=ref=>{const [a,b]=String(ref).split(':'),parse=s=>({c:s.charCodeAt(0)-65,r:Number(s.slice(1))-1});return{s:parse(a),e:parse(b)}};
-const context={window:{XLSX:{utils:{encode_cell:encodeCell,decode_range:decodeRange}}},console,CustomEvent:function(){}};vm.createContext(context);vm.runInContext(fs.readFileSync('src/app-actuals.js','utf8'),context);const Actuals=context.window.Actuals;
+let assignedRepository=null;
+const context={window:{XLSX:{utils:{encode_cell:encodeCell,decode_range:decodeRange}},workspaceRepository:null,setWorkspaceRepository:repo=>{assignedRepository=repo;context.window.workspaceRepository=repo;return repo}},console,CustomEvent:function(){}};vm.createContext(context);vm.runInContext(fs.readFileSync('src/app-actuals.js','utf8'),context);const Actuals=context.window.Actuals;
 
 assert.equal(Actuals.normalizeMonth('2026/7'),'2026-07');
 assert.equal(Actuals.normalizeMonth('2026/07'),'2026-07');
@@ -28,6 +29,20 @@ const matched=july.facts.find(f=>f.staffNumber==='S1'&&f.projectNumber==='001');
 const unmatched=july.facts.find(f=>f.projectNumber==='999');assert.equal(unmatched.teamMemberId,'USR-1');assert.equal(unmatched.demandId,null);assert.equal(unmatched.actualHours,-1.5);assert.equal(unmatched.actualCostGbp,-20);
 const unattributed=july.facts.find(f=>f.staffNumber===null);assert.equal(unattributed.demandId,'DEM-1');assert.equal(unattributed.actualHours,0);assert.equal(unattributed.actualCostGbp,25);
 const august=result.periods.find(p=>p.month==='2026-08');assert.equal(august.facts.length,1);assert.equal(august.facts[0].staffNumber,'S2');
+
+/* Stored source keys are authoritative at read time. A previously-unmatched fact immediately follows current Demand/People configuration without reimport. */
+const staleFact={projectNumber:'11702',staffNumber:'66324Z',teamMemberId:null,demandId:null,actualHours:62,actualCostGbp:6477.14};
+const currentScope={team:[{id:'USR-002',staffNumber:'66324Z',name:'William Parker'}],demand:[{id:'DEM-2026-0001',projectNumber:'11702',title:'iPaaS'}]};
+const resolved=Actuals.resolveFact(staleFact,currentScope);assert.equal(resolved.teamMemberId,'USR-002');assert.equal(resolved.demandId,'DEM-2026-0001');assert.equal(resolved.resolution.person,'matched');assert.equal(resolved.resolution.demand,'matched');
+const moved=Actuals.resolveFact({...staleFact,teamMemberId:'OLD-USR',demandId:'OLD-DEM'},currentScope);assert.equal(moved.teamMemberId,'USR-002');assert.equal(moved.demandId,'DEM-2026-0001','source keys override stale persisted AMO ids');
+const duplicateProject=Actuals.resolveFact(staleFact,{team:currentScope.team,demand:[...currentScope.demand,{id:'DEM-DUP',projectNumber:'11702'}]});assert.equal(duplicateProject.demandId,null);assert.equal(duplicateProject.resolution.demand,'ambiguous');
+const duplicateStaff=Actuals.resolveFact(staleFact,{team:[...currentScope.team,{id:'USR-DUP',staffNumber:'66324Z'}],demand:currentScope.demand});assert.equal(duplicateStaff.teamMemberId,null);assert.equal(duplicateStaff.resolution.person,'ambiguous');
+
+/* Repository reads are decorated, not stored facts rewritten. Reporting/Admin therefore see current resolution while the persisted period remains unchanged. */
+const persisted={schemaVersion:1,month:'2026-07',facts:[staleFact]};
+context.db={team:currentScope.team,demand:currentScope.demand};
+const repo={readActualsPeriod:async()=>persisted};context.window.setWorkspaceRepository(repo);
+(async()=>{const dynamic=await assignedRepository.readActualsPeriod('2026-07');assert.equal(dynamic.facts[0].demandId,'DEM-2026-0001');assert.equal(dynamic.facts[0].teamMemberId,'USR-002');assert.equal(persisted.facts[0].demandId,null,'read-time resolution must not mutate persisted source facts')})().catch(e=>{console.error(e);process.exit(1)});
 
 /* Duplicate Demand Project Numbers are never resolved arbitrarily. Facts remain usable at Person/Project level but have no Demand attribution. */
 const ambiguousScope={team:scope.team,demand:[{id:'DEM-1',projectNumber:'001'},{id:'DEM-2',projectNumber:'001'}]};
