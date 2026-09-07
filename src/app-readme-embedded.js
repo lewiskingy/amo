@@ -2,92 +2,81 @@
 (function initEmbeddedReadme(){
   const markdown = String.raw`# Architecture Management Office
 
-Architecture Management Office manages Defined Demand, Work Packages, People, capacity, allocations, imported Oracle Actuals, roadmap planning and Status Reporting.
+AMO manages Defined Demand, Work Packages, People/capacity, Work Package Resource Plans, imported Oracle Actuals, roadmap planning and Status Reporting.
 
-## System responsibilities
+## Planning model
 
-- **SharePoint Front Door** owns Raw Demand / intake.
-- **Azure DevOps** owns triage/backlog execution, detailed Work Package scope, acceptance criteria and delivery tracking.
-- **AMO** owns Defined Demand, Work Package portfolio metadata, People/capacity, Allocations, reporting and Actuals reconciliation.
-- **Architecture repositories** own formal Architecture knowledge and approved artefacts.
+AMO keeps each planning measure distinct:
+
+Initial ROM → Budget Forecast → Work Package Estimate → Work Package Resource Plan → Actual / Projected
+
+**Budget Forecast** is the current effort forecast for budgetary and portfolio-planning purposes. It is not an approved financial budget or authorisation to spend.
+
+**Work Package Estimate** is the delivery estimate for an individual package. Demand WP Estimate is the sum of populated child estimates, with estimate coverage retained.
+
+**Resource Plan** is named-person capacity planned against Work Packages. New allocations are Person × Work Package × Month; Demand totals are derived roll-ups.
+
+Existing records without Work Package identity remain explicit legacy / undecomposed allocations until a user assigns them to a valid child Work Package. AMO never guesses the relationship.
+
+## Actuals and projected effort
+
+Oracle Actuals reconcile through Staff Number and Demand Project Number. They remain Demand/Project-level facts and AMO does not invent Work-Package-level Actuals.
+
+For imported periods, Actuals are reported; otherwise Allocation Forecast is reported. Across the horizon:
+
+Actual to date + remaining Allocation Forecast = Projected effort / cost
+
+Projected effort is compared with Budget Forecast using wording such as **above Budget Forecast**, not “over budget”.
 
 ## Defined Demand
 
-A new Defined Demand requires only Title and Business Area. Initiative, Owning Team, Priority, Initial Size, Architecture Owner, Project Number, Health and Summary / Context can be added as the work matures.
-
-Defined Demand does not own current Service, delivery dates, refined delivery estimate or Azure DevOps work item. Those delivery concerns belong to child Work Packages.
-
-Project Number is optional and is the Oracle accounting/reconciliation reference. Legacy Cost Centre / Project Code is retired.
+Defined Demand is the parent portfolio boundary. It may hold Initial ROM, Budget Forecast, Project Number, ownership and portfolio context. Service, delivery dates and detailed delivery definition belong to child Work Packages.
 
 ## Work Packages
 
-Work Packages are nested beneath Defined Demand and store Title, Architecture Service, Status, Estimated Effort, Target Start / End and Azure DevOps Work Item Reference.
+Work Packages hold title, Architecture Service, delivery Status, Estimated Effort, Target Start / End and backlog work-item reference. Detailed scope and acceptance criteria remain in the authoritative delivery backlog.
 
-Detailed description/scope and acceptance criteria remain in the authoritative delivery backlog and are not duplicated in AMO.
+## Resource planning
 
-## Reporting progression
+The canonical path is:
 
-AMO deliberately keeps four stages of knowledge distinct:
+Demand → Work Package → Person → Monthly allocation
 
-Initial Demand ROM → Work Package Estimate → Allocation Forecast → Actual Effort / Cost
+Allocation percentage is a fraction of Person available FTE. Forecast days/cost use canonical ReportingModel calculations and Person Role rates with blended/default fallback.
 
-Initial ROM preserves the early assessment expectation. Work Package Estimate is the current delivery decomposition and reports estimate coverage. Allocation Forecast is the named resource plan. Actuals are observed Oracle facts.
+## Reporting
 
-Across a reporting horizon, Projected effort/cost is Actual to date plus remaining Allocation Forecast. Projected resource effort is not the same as Work Package Estimate.
+Demand reporting shows ROM, Budget Forecast, WP Estimate, Resource Plan, Actual to date and Projected effort together without conflating them.
 
-## Allocation FTE
+Resource Plan remains the capacity/resource-owner view and adds Demand planning position plus Work-Package-aware allocation detail. In Actual periods, Work Package detail retains the plan while stating that Actuals are held at parent Demand.
 
-Allocation percentages are fractions of the Person's available FTE. A 100% allocation for a 0.8 FTE Person therefore contributes 0.8 FTE, not 1.0 FTE.
+Dashboard adds material planning variance and undecomposed-allocation items to Attention Required.
 
-Forecast days are Forecast FTE multiplied by working days in the month. Forecast cost uses the Person's configured Role day rate, falling back to the configured Default / blended day rate where necessary.
+Roadmap uses Work Package dates for delivery windows and the roll-up of Work Package Resource Plan allocations for the parent Demand resource line.
 
-## Actuals and cost
+Status Reporting remains narrative/Health focused. Preview/Published snapshots persist report-time planning context so historical reports do not read live current values later.
 
-Import Oracle Actuals through Admin → Actuals. Staff Number matches Oracle People # / Person # and Project Number reconciles Actuals to Defined Demand.
+## Management signals
 
-Imported Actual hours and Cost in GBP are authoritative. Actual days/FTE are derived from hours using Standard working hours per day. AMO never recalculates imported Actual cost from Role rates.
+AMO can surface missing Budget Forecast, incomplete WP estimate coverage, material WP/Resource/Projected variance against Budget Forecast and legacy undecomposed allocations. These are management prompts, not accounting assertions.
 
-A loaded Actuals period uses Actuals as the reported value for that month; Allocation remains the planning baseline for variance and remains the reported source for future/non-imported months.
+## System responsibilities
 
-AMO does not invent Work-Package-level Actuals.
-
-## Reporting assumptions
-
-Config includes Standard working hours per day and Default / blended day rate. The blended rate values Initial ROM and Work Package estimates and is the fallback for missing Role rates. ROM/WP £ values are indicative; imported Oracle Actual £ remains authoritative.
-
-## Resource Plan
-
-Resource Plan is the primary capacity/resource-owner view. It shows FTE with days/£ context, Actual/Forecast effort, utilisation, Person variance, allocation percentage plus equivalent FTE, capacity value and recovery context.
-
-## Dashboard
-
-Dashboard remains concise. Capacity and attention measures use the same canonical Reporting Model as Resource Plan, including Person-FTE scaling.
-
-## Roadmap
-
-Roadmap is temporal. Delivery windows come from Work Package Target Start / End. Resource windows come from Demand-level Allocations. Retired Demand delivery dates are not operationalised.
-
-## Status Reporting
-
-The live Status Report is a narrative/Health authoring surface, not another Dashboard. New snapshots store Work Package-derived service context as a services list. Older immutable reports with a legacy singular service value remain readable.
-
-Published/Preview output keeps concise portfolio/capacity context plus Demand effort signals and narrative; it does not recreate detailed Resource Plan financial tables.
-
-## Workspace
-
-AMO uses folder-backed JSON with Local and Remote workspace adapters, dirty tracking, autosave, safety backups and cooperative edit/concurrency controls. Multiple users may read a workspace; write operations use the appropriate locking/conflict controls.
+- **SharePoint Front Door** owns intake.
+- **Azure DevOps / Jira** owns detailed delivery backlog content.
+- **AMO** owns Defined Demand, Work Package portfolio metadata, Budget Forecast, Work Package Resource Plan, reporting and Actuals reconciliation.
+- **Architecture repositories** own formal Architecture knowledge and approved artefacts.
 
 ## Operating sequence
 
-1. Receive Raw Demand through the Front Door.
-2. Triage fit, priority and whether the request belongs to existing Defined Demand.
-3. Create/amend Defined Demand.
-4. Define Work Packages and link Azure DevOps delivery work.
-5. Plan People capacity using Demand-level Allocations.
-6. Use Dashboard, Resource Plan and Roadmap to manage portfolio/capacity/schedule.
-7. Import Oracle Actuals and reconcile through Staff Number + Project Number.
-8. Review ROM, WP Estimate, Forecast and Actual/Projected position without conflating them.
-9. Maintain and publish Status Reporting narrative/Health.
+1. Receive and triage Raw Demand.
+2. Create or amend Defined Demand.
+3. Establish ROM and maintain Budget Forecast as understanding matures.
+4. Decompose delivery into Work Packages and estimate them.
+5. Allocate named People to Work Packages by month.
+6. Compare Budget Forecast → WP Estimate → Resource Plan.
+7. Import Oracle Actuals and review Actual + remaining plan = Projected position.
+8. Maintain and publish Status Reporting narrative/Health.
 `;
 
   window.AMO_README_MARKDOWN = markdown;
