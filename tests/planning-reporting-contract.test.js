@@ -1,0 +1,26 @@
+const fs=require('fs'),assert=require('assert');
+const model=fs.readFileSync('src/app-planning-reporting.js','utf8');
+const ui=fs.readFileSync('src/app-planning-reporting-ui.js','utf8');
+const hooks=fs.readFileSync('src/app-planning-reporting-hooks.js','utf8');
+const loader=fs.readFileSync('src/app-defined-demand-reporting.js','utf8');
+
+assert.match(model,/ROM -> Budget Forecast -> WP Estimate -> Resource Plan -> Actual\/Projected/);
+assert.match(model,/function demandContext\(demandId\)/);
+assert.match(model,/function workPackageContext\(workPackageId\)/);
+assert.match(model,/projectedVsBudget/);
+assert.match(model,/resourceVsBudget/);
+assert.match(model,/legacyAllocationCount/);
+assert.match(model,/Budget Forecast not set/);
+assert.match(model,/not assigned to a Work Package/);
+assert.match(ui,/Demand planning position/);
+assert.match(ui,/Work Package resource detail/);
+assert.match(ui,/Actual held at Demand/,'Resource detail must not infer WP Actuals');
+assert.match(ui,/planning:planningSnapshot/,'Status snapshots must persist report-time planning context');
+assert.match(ui,/Planning position/);
+assert.match(ui,/not an approved financial budget/);
+assert.doesNotMatch(ui,/renderResource\s*=\s*function|function\s+renderResource\s*\(/,'Planning integration must not replace Resource Plan renderer');
+assert.doesNotMatch(hooks,/renderResource\s*=\s*function|function\s+renderResource\s*\(/,'Late hooks must not replace Resource Plan renderer');
+assert.match(loader,/app-planning-reporting\.js/);
+assert.match(loader,/app-planning-reporting-ui\.js/);
+assert.match(loader,/app-planning-reporting-hooks\.js/);
+console.log('Planning reporting contract tests passed');

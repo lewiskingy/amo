@@ -1,46 +1,51 @@
-# Reporting Refinement — Implemented Semantics
-
-Status: implemented for Issue #121 Step 5.
+# Reporting Refinement — Current Semantics
 
 ## Purpose
 
-AMO reporting uses one canonical semantic model across Dashboard, Resource Plan, Defined Demand and Status Reporting. The application deliberately keeps four different measures because they answer different questions:
+AMO reporting keeps planning, delivery and observed effort as separate measures and presents them as one management progression:
 
 ```text
 Initial Demand ROM
         ↓
-Work Package Estimated Effort
+Demand Budget Forecast
+        ↓ compare
+Work Package Estimate
+        ↓ compare
+Work Package Resource Plan
         ↓
-Allocation Forecast
-        ↓
-Actual Effort / Cost
+Actual to date + remaining Resource Plan
+        = Projected effort
 ```
 
-These values must not be silently substituted for one another.
+These values answer different questions and must never overwrite one another.
 
 ## Canonical measures
 
 ### Initial ROM
 
-Initial Size and snapshotted Initial ROM days preserve the assessment-time expectation for Defined Demand. Later Work Package estimates do not overwrite this baseline.
+The assessment-time baseline held on `Demand.initialEstimate`. It remains separately reportable after later estimates and forecasts change.
 
-Financial display is indicative:
+### Demand Budget Forecast
 
-```text
-Initial ROM days × configured default/blended day rate
-```
+The current forecast of expected Demand effort for budgetary and portfolio-planning purposes. It is **not** an approved financial budget, authorisation to spend, or named-person resource allocation.
+
+Budget Forecast may change as understanding improves. Changing it does not automatically change Work Package estimates or allocations.
 
 ### Work Package Estimate
 
-Current delivery estimate is the sum of populated child `estimatedEffortDays`. Reporting always retains estimate coverage (for example 3/5 Work Packages estimated) so incomplete decomposition is not presented as a complete estimate.
+The current delivery estimate is the sum of populated child `estimatedEffortDays`. Reporting also retains estimate coverage so partially estimated decomposition is never presented as complete.
 
-Financial display is indicative and uses the configured default/blended day rate because the estimate does not identify the eventual person/Role mix.
+### Work Package Resource Plan
 
-### Allocation Forecast
+Steady-state allocations are:
 
-Allocation is the resource plan at Person × Defined Demand × Month.
+```text
+Person × Work Package × Month
+```
 
-An allocation value is a fraction of the person's available FTE, therefore:
+`demandId` is retained as parent context and Demand Resource Plan totals are derived by rolling up child Work Package allocations. Existing Demand-only allocations are supported only as explicit legacy/undecomposed transition records.
+
+Allocation values are fractions of the Person's available FTE:
 
 ```text
 Forecast FTE = allocation fraction × Person FTE
@@ -48,34 +53,17 @@ Forecast days = Forecast FTE × working days in month
 Forecast cost = Forecast days × Person Role day rate
 ```
 
-If the Role has no configured rate, the default/blended day rate is the fallback.
-
-This correction is important for part-time People: a 100% allocation for a 0.8 FTE Person contributes 0.8 FTE, not 1.0 FTE.
-
 ### Actual Effort / Cost
 
-Oracle Actuals remain authoritative observations.
+Oracle Actuals remain authoritative observations at Demand/Project level:
 
 ```text
-Actual days = imported Actual hours ÷ standard hours per day
-Actual FTE = imported Actual hours ÷ full-time working hours for the month
-Actual cost/recovery = imported Oracle Cost in GBP
+Person × Project Number × Month
+        ↓
+Demand.projectNumber
 ```
 
-AMO never recalculates imported Actual cost from Role rates.
-
-Actuals reconcile dynamically to Defined Demand through `Demand.projectNumber` and to People through Staff Number. AMO does not manufacture Work-Package-level Actuals.
-
-### Reported effort
-
-For one month:
-
-```text
-Actual effort/cost when the Actuals period exists
-otherwise Allocation Forecast effort/cost
-```
-
-Allocation remains visible as the plan when Actuals exist so variance can still be understood.
+AMO does not infer Work-Package-level Actuals. In Work Package detail, Actual periods therefore retain the WP plan but explicitly state that Actuals are held at the parent Demand.
 
 ### Projected effort / cost
 
@@ -83,133 +71,105 @@ Across the reporting horizon:
 
 ```text
 Actual to date
-+ Allocation Forecast for non-actualised periods
++ remaining Allocation Forecast for non-actualised periods
 = Projected total
 ```
 
-Projected resource effort is not the same thing as Work Package Estimate.
+Projected effort is compared with Demand Budget Forecast. It is not described as being “over budget”; the correct language is **above Budget Forecast**.
 
-## Capacity and recovery
+## Canonical planning context
 
-Available capacity is derived from active People:
+`src/app-planning-reporting.js` composes the cross-domain management context while `src/app-reporting-model.js` remains authoritative for quantitative Actual/Forecast arithmetic.
 
-```text
-Available FTE = Person FTE
-Available days = Person FTE × working days
-Capacity value = available days × Role day rate
-```
+The canonical Demand context contains:
 
-A missing Role rate falls back to the configured blended/default rate.
+- ROM days;
+- Budget Forecast days;
+- Work Package Estimate days + estimate coverage;
+- Resource Plan days;
+- Actual days to date;
+- remaining Resource Plan;
+- Projected days;
+- ROM → Budget Forecast comparison;
+- WP Estimate → Budget Forecast comparison;
+- Resource Plan → Budget Forecast comparison;
+- Resource Plan → WP Estimate comparison;
+- Projected → Budget Forecast comparison;
+- legacy undecomposed allocation count.
 
-Project Number is the current cross-charge/reconciliation indicator; there is no separate Demand-level recoverable flag.
+The canonical Work Package context contains:
 
-- **Forecast recovery** — forecast allocation value on Project-backed Defined Demand.
-- **Actual recovery** — imported Oracle cost on Project-backed Defined Demand.
-- **Billable capacity value** — theoretical value of available People capacity.
+- Work Package Estimate;
+- Work Package Resource Plan;
+- Resource Plan → Estimate comparison.
 
-The same imported monetary fact may be labelled **Actual cost** at Demand level and **Actual recovery** from the resource-owner viewpoint. It is not duplicated or recalculated.
+## Management signals
 
-## Canonical implementation
+Planning signals use the shared material-variance threshold from ReportingModel. Initial management classifications include:
 
-`src/app-reporting-model.js` owns the quantitative reporting calculations. Views and business-classification modules must consume it rather than recreate formulas.
+- Budget Forecast not set;
+- Budget Forecast exists but no Work Packages are defined;
+- incomplete Work Package estimate coverage;
+- WP Estimate materially above/below Budget Forecast;
+- Resource Plan materially above/below Budget Forecast;
+- Projected effort materially above/below Budget Forecast;
+- legacy allocation not assigned to a Work Package.
 
-It owns:
+These are management prompts, not accounting assertions.
 
-- period Actual/Forecast basis;
-- FTE-scaled Allocation Forecast;
-- working-day and effort-day conversion;
-- Role/default-rate lookup and forecast valuation;
-- imported Actual hours/cost;
-- capacity FTE/days/value;
-- Initial ROM and Work Package estimate valuation/coverage;
-- Demand Actual-to-date, remaining plan and projected total;
-- management/variance signals;
-- portfolio capacity/recovery aggregation.
-
-`src/app-estimates-funding.js` owns the current Defined Demand planning/funding lifecycle and funding-status semantics. It may consume ReportingModel values but does not own resource-reporting arithmetic.
-
-`src/app-resource-plan.js` is the sole Resource Plan presentation/controller. It renders month basis, capacity, reported effort, individual utilisation, Actual-versus-plan detail and resource-owner financial context from the canonical models. Other modules must not wrap or post-render mutate `renderResource`.
-
-`src/app-4.js` is retained only as a compatibility loader for older cached/local shells and contains no Resource Plan implementation.
-
-The former `src/app-financial-planning.js` implementation is retired as a load-safe compatibility file. It represented an older Demand/funding model (`triage`, legacy Work Package estimate fields and older funding states), independently recalculated working days/allocation value, and wrapped Resource Plan/Dashboard rendering. Those responsibilities are now split deliberately between the current planning/funding model, ReportingModel, and canonical view renderers.
-
-`src/app-organization-hierarchy-compat.js` uses the canonical allocation-FTE helper for scoped Dashboard capacity rather than summing raw allocation percentages.
-
-## User-facing surfaces
-
-### Resource Plan
-
-Primary capacity/resource-owner surface. It shows:
-
-- an explicit **ACTUAL** or **FORECAST** basis in every visible month;
-- available capacity in FTE with days/£ context;
-- reported Actual/Forecast effort in FTE, days and £;
-- utilisation and over-capacity periods;
-- Person-level Actual vs plan using canonical FTE scaling;
-- allocation detail that distinguishes allocation percentage from equivalent FTE and, for Actual periods, observed FTE versus the retained plan;
-- capacity value, forecast recovery and Actual recovery.
-
-An imported month must never be visually indistinguishable from a forecast month. When July Actuals exist, July uses observed hours/Oracle cost throughout these reporting rows while later non-imported periods remain Forecast.
+## Reporting surfaces
 
 ### Defined Demand
 
-Primary sponsor surface. The Demand effort/cost outlook presents:
+The Demand record view shows the complete planning progression and any material planning signals. Budget Forecast is explicitly described as a planning forecast rather than an approved budget.
 
-```text
-Initial ROM
-WP Estimate + coverage
-Actual to date
-Remaining Allocation Forecast
-Projected total
-```
+### Resource Plan
 
-ROM/WP £ values are marked as indicative by their semantics; Actual £ is imported Oracle cost.
+`src/app-resource-plan.js` remains the sole Resource Plan renderer and owner of capacity/Actual/Forecast presentation. The planning-reporting integration adds a Demand planning-position table and a Work-Package-aware resource detail using canonical PlanningReporting contexts.
+
+Work Package resource detail does not repeat parent Demand Actuals as though they were WP Actuals. For imported periods, the retained allocation plan is shown with the statement that Actuals are held at Demand.
 
 ### Dashboard
 
-Remains a concise portfolio/attention surface. Scoped capacity calculation uses the same FTE-scaled allocation semantics as Resource Plan.
+Dashboard remains concise. Material above-Budget-Forecast signals and legacy allocation-decomposition signals are added to the existing attention surface.
+
+### Status Report
+
+Status authoring remains narrative/Health focused, with concise planning position shown alongside each Demand. Preview/Published snapshots persist report-time planning context so historical reports do not read live current planning values later.
 
 ### Roadmap
 
-Remains temporal. Work Package dates define delivery windows and Demand allocations define resource windows. Step 5 does not turn Roadmap into a finance report.
+Roadmap remains temporal. Work Package dates define the delivery window. The resource line is the roll-up of Work Package Resource Plan allocations to parent Demand; legacy undecomposed allocations remain transitional only.
 
-### Status Reporting
+## Financial semantics
 
-Status authoring remains narrative/Health focused rather than another Dashboard. Published/Preview report snapshots retain immutable portfolio context and Work Package-derived service context. No Demand-level Service is reintroduced as a domain field.
+- Initial ROM, Budget Forecast and Work Package Estimate may use the configured blended/default day rate for indicative valuation.
+- Named Resource Plan Forecast uses Person Role rates, falling back to the blended/default rate.
+- Imported Oracle Actual cost remains authoritative.
 
-## Deployment asset consistency
+An indicative Budget Forecast value must never be presented as an approved accounting budget.
 
-Hosted application shells rewrite local JavaScript asset query versions to the current Cloudflare deployment build ID. This prevents a newly deployed HTML shell or canonical renderer from being combined with an older cached compatibility module. Dynamically loaded modules use the same build identity.
+## Ownership and implementation
 
-## Configuration
-
-Current reporting assumptions live under `settings.reporting`:
-
-```json
-{
-  "standardHoursPerDay": 7.5,
-  "defaultDayRate": 700
-}
-```
-
-`standardHoursPerDay` converts imported Actual hours into comparable effort days/FTE.
-
-`defaultDayRate` is the current blended estimate/fallback rate. It is not the retired legacy `financialPlanning.defaultDayRate` and does not restore the old Role-rate map.
+- `src/app-reporting-model.js` — Actual/Forecast arithmetic, FTE, days, cost, capacity, Actual-period precedence and existing variance signals.
+- `src/app-planning-reporting.js` — canonical planning progression, cross-measure comparisons and planning management signals.
+- `src/app-resource-plan.js` — sole Resource Plan renderer.
+- `src/app-planning-reporting-ui.js` — shared presentation helpers for the planning progression across Demand, Resource Plan and Status Reporting; it does not replace `renderResource`.
+- `src/app-planning-reporting-hooks.js` — lifecycle/late-load integration and Dashboard attention enrichment; it does not define reporting arithmetic.
 
 ## Regression invariants
 
 Tests must protect these rules:
 
+- ROM, Budget Forecast, WP Estimate and Resource Plan remain independent facts;
+- Budget Forecast is never labelled as approved budget;
+- new allocations target Work Packages;
+- Demand resource totals are roll-ups, with legacy Demand-only allocation supported only during transition;
 - allocation percentage is multiplied by Person FTE;
-- a missing Role rate uses the default/blended rate;
-- imported Actual cost is never recalculated;
-- ROM and WP estimate remain distinct;
-- WP estimate coverage is retained;
 - Actual-period-wins semantics remain intact;
 - projected total is Actual + remaining forecast;
 - no Work Package Actuals are inferred;
 - Project Number remains the Actuals/recovery reconciliation boundary;
-- `app-resource-plan.js` is the sole owner of Resource Plan rendering;
-- compatibility/financial modules do not wrap `renderResource` or recreate reporting arithmetic;
-- hosted shells version application JavaScript against the current deployment build.
+- Status snapshots persist report-time planning context;
+- `app-resource-plan.js` remains the sole owner of `renderResource`;
+- planning integration modules consume canonical models rather than recreating quantitative formulas.
