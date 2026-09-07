@@ -28,3 +28,4 @@ assert.doesNotMatch(app3,/addAllocationForDemand|makeBlankAllocation|New Allocat
 assert.match(app3,/app-work-package-resource-planning\.js/);
 console.log('Work Package resource planning tests passed');
 require('./planning-reporting.test.js');
+require('./planning-reporting-contract.test.js');
