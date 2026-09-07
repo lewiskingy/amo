@@ -90,7 +90,7 @@ assert.match(compat,/compatibility bridge/i);
 assert.doesNotMatch(compat,/function validateDemand|function saveDemandGrid|renderDemandModal=function\(r\)\{/);
 assert.doesNotMatch(scopeClarity,/saveDefinedDemandGrid|Demand list persistence is owned here/);
 
-// Sample Demand uses only the current model; no old delivery fields remain operational.
+// Sample Demand uses only the current persisted shape; no old delivery fields remain operational.
 for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWith('.json'))){
   const d=JSON.parse(fs.readFileSync(path.join('data/sample/demand',file),'utf8'));
   assert.equal(d.demandModelVersion,2,`${file} is not model v2`);
@@ -98,8 +98,15 @@ for(const file of fs.readdirSync('data/sample/demand').filter(name=>name.endsWit
   assert(['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled'].includes(d.status),`${file} has non-canonical Demand State ${d.status}`);
 }
 
-// Allocation / Actuals boundaries remain at Defined Demand while their reporting semantics are refined.
-assert.match(schema.recordTypes.allocation.semantics,/Person × Defined Demand × Month/);
+// Planning domain: Demand owns ROM/Budget Forecast and project Actuals identity; resource allocations target Work Packages.
+assert.equal(schema.demandModelVersion,3);
+assert.equal(schema.allocationModelVersion,1);
+assert.match(schema.recordTypes.demand.budgetForecast.semantics,/budgetary and portfolio-planning purposes/);
+assert.match(schema.recordTypes.demand.budgetForecast.semantics,/distinct from.*approved financial budget/);
+assert.match(schema.recordTypes.allocation.semantics,/Person × Work Package × Month/);
+assert.match(schema.recordTypes.allocation.semantics,/demandId remains required parent context/);
+assert.match(schema.recordTypes.allocation.legacyCompatibility,/Demand-only allocation records/);
+assert.match(schema.recordTypes.allocation.legacyCompatibility,/never silently assigned to a Work Package/);
 assert.match(schema.reportingInvariants.actuals,/Demand\.projectNumber/);
 assert.match(schema.reportingInvariants.workPackageActuals,/No Work Package Actuals/);
 
