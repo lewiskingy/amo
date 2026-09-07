@@ -1,5 +1,6 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const code=fs.readFileSync('src/app-reporting-model.js','utf8');
+const demandPlanning=fs.readFileSync('src/app-estimates-funding.js','utf8');
 const periods={'2026-07':{schemaVersion:1,month:'2026-07',facts:[
   {teamMemberId:'USR-1',demandId:'DEM-1',actualHours:82.5,actualCostGbp:8000},
   {teamMemberId:'USR-1',demandId:null,actualHours:16.5,actualCostGbp:1200},
@@ -43,6 +44,14 @@ const context={
   unresolvedWithoutAllocation:()=>[],isOpenDemand:()=>true,planningPeriods:()=>['2026-07-01','2026-08-01'],monthLabel:x=>x,escHtml:x=>String(x)
 };
 vm.createContext(context);vm.runInContext(code,context);const rm=context.window.ReportingModel;
+
+// Demand Planning must consume the canonical ReportingModel rather than maintaining a parallel day-rate calculation.
+assert.match(demandPlanning,/window\.ReportingModel/);
+assert.match(demandPlanning,/estimateForDemand/);
+assert.match(demandPlanning,/forecastDays/);
+assert.match(demandPlanning,/forecastCost/);
+assert.doesNotMatch(demandPlanning,/architectureDayRate|DEFAULT_DAY_RATE|workingDaysPerMonth/);
+
 (async()=>{
   assert.equal(rm.loadState().loaded,false);await rm.load();assert.equal(rm.loadState().loaded,true);
   assert.deepEqual(Array.from(rm.loadState().months),['2026-07']);
