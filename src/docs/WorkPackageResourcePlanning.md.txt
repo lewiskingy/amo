@@ -1,0 +1,55 @@
+# Work Package Resource Planning
+
+## Purpose
+
+Named-person resource planning is performed against Work Packages, not directly against Defined Demand.
+
+```text
+Demand
+  ROM Estimate
+  Budget Forecast
+  Project Number / Actuals identity
+
+  Work Package
+    WP Estimate
+    Person × Month allocations
+```
+
+Demand remains the roll-up boundary for portfolio reporting and Actuals reconciliation. Work Packages are the delivery decomposition and resource-planning boundary.
+
+## Allocation UX
+
+The Allocations view is hierarchical:
+
+```text
+Demand
+  Work Package
+    Person allocation
+```
+
+Demand rows show planning context:
+
+- ROM Estimate;
+- Budget Forecast — current forecast for budgetary/planning purposes, not an approved budget;
+- summed Work Package Estimate;
+- Resource Plan — allocation-derived effort days across the planning window.
+
+Work Package rows show their own Estimate and Resource Plan roll-up. New named-person allocations can only be created from a Work Package.
+
+## Legacy Demand-only allocations
+
+Existing allocation records without `workPackageId` remain readable and additive to the parent Demand resource plan during transition. They are shown under **Legacy / unassigned to Work Package** and are clearly counted as undecomposed.
+
+When editing, the user can explicitly assign each legacy allocation to one of the Demand's Work Packages. AMO does not guess or automatically distribute legacy allocations. Assignment preserves the existing person and monthly forecast values and adds only the selected `workPackageId`.
+
+A legacy allocation may remain undecomposed until the delivery structure is understood. A newly created allocation may not be saved without a Work Package.
+
+## Reporting semantics
+
+Work Package resource-plan days are derived from the same allocation fractions, Person FTE and working-day calendar used by AMO reporting. Demand Resource Plan is the sum of all child Work Package allocations plus any still-undecomposed legacy allocations during transition.
+
+Actuals remain reconciled at Demand through Project Number. AMO does not infer or fabricate Work Package Actuals.
+
+## Follow-on reporting
+
+The resource-planning module exposes canonical `planningSummary(demand)` and `packageSummary(workPackage)` helpers so Demand, Resource Plan and later management/reporting surfaces can consume the same planning context rather than recreating roll-up calculations.
