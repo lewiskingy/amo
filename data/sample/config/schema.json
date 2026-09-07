@@ -1,17 +1,22 @@
 {
   "schemaVersion": 3,
-  "demandModelVersion": 2,
+  "demandModelVersion": 3,
+  "allocationModelVersion": 1,
   "recordTypes": {
     "demand": {
       "idPrefix": "DEM-",
       "concept": "Defined Demand",
       "required": ["id", "title", "businessArea", "status"],
-      "optional": ["initiative", "teamId", "priority", "ownerId", "initialEstimate", "projectNumber", "health", "context", "source", "funding", "fundingHistory", "legacy"],
-      "creationSemantics": "Only Title and Business Area are user-mandatory at initial creation; Demand State is defaulted. Owning Team, priority, initial size, owner, Project Number, health and context may be added as the demand matures.",
+      "optional": ["initiative", "teamId", "priority", "ownerId", "initialEstimate", "budgetForecast", "projectNumber", "health", "context", "source", "funding", "fundingHistory", "legacy"],
+      "creationSemantics": "Only Title and Business Area are user-mandatory at initial creation; Demand State is defaulted. Owning Team, priority, initial size, owner, Budget Forecast, Project Number, health and context may be added as the demand matures.",
       "initialEstimate": {
         "fields": ["size", "estimatedDays"],
         "sizes": ["XS", "S", "M", "L", "XL"],
-        "semantics": "The configured T-shirt-size day value is snapshotted onto the Demand when selected. This preserves the early ROM baseline and is not replaced by Work Package estimates or resource forecast."
+        "semantics": "The configured T-shirt-size day value is snapshotted onto the Demand when selected. This preserves the early ROM baseline and is not replaced by Budget Forecast, Work Package estimates or resource forecast."
+      },
+      "budgetForecast": {
+        "fields": ["estimatedDays"],
+        "semantics": "Current forecast of effort expected for budgetary and portfolio-planning purposes. It is deliberately distinct from the immutable ROM, Work Package delivery estimates, named-resource allocations and any approved financial budget."
       },
       "projectNumberSemantics": "Optional Oracle Project Number used to reconcile Actuals and identify Project-backed/cross-charge Demand. Legacy Cost Centre / Project Code values are never promoted automatically.",
       "deliverySemantics": "Delivery service, status, dates, refined estimate and backlog linkage belong to child Work Packages. Detailed backlog description and acceptance criteria remain in the delivery backlog rather than being duplicated in AMO.",
@@ -34,7 +39,9 @@
     "allocation": {
       "idPrefix": "ALLOC-",
       "required": ["id", "demandId", "teamMemberId", "forecast"],
-      "semantics": "Allocation remains Person × Defined Demand × Month. forecast values are fractions of the Person's available FTE, so forecast FTE = allocation fraction × Person FTE."
+      "optional": ["workPackageId"],
+      "semantics": "Steady-state Allocation is Person × Work Package × Month. demandId remains required parent context and workPackageId, when populated, must identify a Work Package belonging to that Demand. forecast values are fractions of the Person's available FTE, so forecast FTE = allocation fraction × Person FTE.",
+      "legacyCompatibility": "Existing Demand-only allocation records with no workPackageId remain readable as legacy undecomposed resource plan. New allocation UX will require a Work Package and provide an explicit transition path; legacy records are never silently assigned to a Work Package."
     },
     "idea": {"idPrefix": "IDEA-", "required": ["id", "raisedBy", "raisedDate", "title", "description", "status"]},
     "statusReport": {
@@ -49,12 +56,14 @@
     }
   },
   "reportingInvariants": {
-    "allocations": "Person × Defined Demand × Month; allocation fraction × Person FTE gives forecast FTE",
+    "romEstimate": "Demand.initialEstimate is the immutable early ROM baseline.",
+    "budgetForecast": "Demand.budgetForecast is the current effort forecast for budgetary/planning purposes and is not an approved budget.",
+    "allocations": "Steady-state Person × Work Package × Month; Demand resource forecast is the roll-up of child Work Package allocations. Legacy Demand-only allocations remain additive until explicitly decomposed.",
     "actuals": "Person × Project Number × Month reconciled through Demand.projectNumber",
     "reportedEffort": "Actuals for imported periods; Allocation Forecast elsewhere/future",
     "actualCost": "Imported Oracle actualCostGbp is authoritative and is never recalculated from AMO Role rates",
     "forecastCost": "Forecast days × Person Role day rate, falling back to reporting.defaultDayRate",
-    "estimateCost": "Initial ROM and Work Package Estimate use reporting.defaultDayRate because named resource mix is not known",
+    "estimateCost": "Initial ROM, Budget Forecast and Work Package Estimate use reporting.defaultDayRate because named resource mix is not known",
     "projected": "Actual to date + Allocation Forecast for non-actualised periods",
     "workPackageActuals": "No Work Package Actuals are inferred from Project-level Actuals."
   },
@@ -70,7 +79,7 @@
     "reporting": {
       "optional": ["standardHoursPerDay", "defaultDayRate"],
       "standardHoursPerDaySemantics": "Converts imported Actual hours into comparable effort days and monthly FTE.",
-      "defaultDayRateSemantics": "Current blended estimate/fallback rate used for ROM/WP valuation and where a named Person's Role has no rate. This is distinct from retired legacy financialPlanning settings."
+      "defaultDayRateSemantics": "Current blended estimate/fallback rate used for ROM/Budget Forecast/WP valuation and where a named Person's Role has no rate. This is distinct from retired legacy financialPlanning settings."
     },
     "statusesSemantics": "Portfolio lifecycle states for Defined Demand.",
     "workPackageStatusesSemantics": "Delivery states for Work Packages.",
