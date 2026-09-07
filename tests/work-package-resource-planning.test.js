@@ -27,3 +27,4 @@ assert.match(app3,/Canonical allocation UI and persistence now live in app-work-
 assert.doesNotMatch(app3,/addAllocationForDemand|makeBlankAllocation|New Allocation/,'Legacy Demand-level allocation creation path must be retired');
 assert.match(app3,/app-work-package-resource-planning\.js/);
 console.log('Work Package resource planning tests passed');
+require('./planning-reporting.test.js');
