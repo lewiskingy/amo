@@ -4,6 +4,7 @@ const context={window:{},structuredClone};vm.createContext(context);vm.runInCont
 const model=context.window.DefinedDemandModel;
 
 assert(model,'DefinedDemandModel should load');
+assert.equal(model.MODEL_VERSION,3);
 assert.deepEqual(Array.from(model.DEMAND_STATES),['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled']);
 assert.deepEqual({...model.DEFAULT_SIZE_DAYS},{XS:2,S:5,M:10,L:20,XL:40});
 assert.equal(model.canonicalState('Triage'),'Assessing');
@@ -28,6 +29,7 @@ const demand=[{
 }];
 const result=model.migrateWorkspace(settings,demand),d=demand[0];
 assert.equal(result.changed,true);
+assert.equal(settings.demandModelVersion,3);
 assert.deepEqual(Array.from(settings.statuses),['Assessing','Defined','Planned','In Progress','On Hold','Complete','Cancelled']);
 assert.deepEqual(Array.from(settings.services),['Consultancy','Design']);
 assert.deepEqual(Array.from(settings.workPackageStatuses),['Planned','Ready','In Progress','Blocked','Complete','Cancelled']);
@@ -36,6 +38,8 @@ assert.equal(d.status,'In Progress');
 assert.equal(d.ownerId,'USR-1');
 assert.equal(d.initialEstimate.size,'L');
 assert.equal(d.initialEstimate.estimatedDays,22,'Legacy ROM days are preserved as the initial estimate snapshot');
+assert.deepEqual({...d.budgetForecast},{estimatedDays:null},'Legacy Demand gains an empty Budget Forecast without copying ROM');
+assert.equal(model.budgetForecastDays(d),null);
 assert.match(d.context,/Initial architecture request/);
 assert.match(d.context,/Define target architecture/);
 assert.match(d.context,/Identity and integration/);
@@ -50,16 +54,20 @@ assert.equal(d.legacy.triage.romDays,22);
 assert.equal(d.legacy.demandWorkPackage.targetStart,'2026-10-01');
 assert.equal(d.legacy.deliverables[0].id,'DEL-1');
 
-const clean=model.cleanForSave({...d,costCentreOrProjectCode:undefined},settings);
+const clean=model.cleanForSave({...d,budgetForecast:{estimatedDays:'35'},costCentreOrProjectCode:undefined},settings);
 assert.equal(clean.service,undefined);
 assert.equal(clean.workPackage,undefined);
+assert.equal(clean.budgetForecast.estimatedDays,35);
+assert.equal(model.budgetForecastDays(clean),35);
+assert.equal(clean.initialEstimate.estimatedDays,22,'Budget Forecast must never overwrite ROM');
 assert.equal(model.isOpen(clean),true);
 assert.equal(model.isOpen({status:'Complete'}),false);
 
-const fresh={id:'DEM-2',title:'New',businessArea:'Group',status:'Assessing',initialEstimate:{size:'M',estimatedDays:9}};
+const fresh={id:'DEM-2',title:'New',businessArea:'Group',status:'Assessing',initialEstimate:{size:'M',estimatedDays:9},budgetForecast:{estimatedDays:12}};
 model.normalizeDemand(fresh,settings);
 assert.equal(fresh.initialEstimate.size,'M');
 assert.equal(fresh.initialEstimate.estimatedDays,9);
+assert.equal(fresh.budgetForecast.estimatedDays,12);
 assert.equal(fresh.context,'');
 assert.equal(fresh.ownerId,null);
 
