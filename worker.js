@@ -14,12 +14,17 @@ function environmentConfig(env,url){
   }
 }
 
+function versionApplicationScripts(html,buildId){
+  const version=encodeURIComponent(String(buildId||'local'));
+  return html.replace(/(<script\b[^>]*\bsrc=")(?!https?:\/\/|\/\/)([^"?]+\.js)(?:\?[^" ]*)?("[^>]*>)/g,`$1$2?v=${version}$3`)
+}
+
 async function applicationShell(request,env,url,path){
   const assetUrl=new URL(path,url);
   const response=await env.ASSETS.fetch(new Request(assetUrl,request));
   if(!response.ok)return response;
   const config=environmentConfig(env,url);
-  const html=await response.text();
+  const html=versionApplicationScripts(await response.text(),config.buildId);
   const script=`<script>window.AMO_CONFIG=Object.assign({},window.AMO_CONFIG||{},${JSON.stringify(config)});window.AMO_ASSET_VERSION=${JSON.stringify(config.buildId)};</script>`;
   return new Response(html.replace('</head>',`${script}</head>`),{
     status:response.status,
