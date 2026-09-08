@@ -1,6 +1,7 @@
 const fs=require('fs'),assert=require('assert');
 const ui=fs.readFileSync('src/app-work-package-resource-planning.js','utf8');
 const app3=fs.readFileSync('src/app-3.js','utf8');
+const filterToolbar=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
 const allocationModel=fs.readFileSync('src/app-allocation-model.js','utf8');
 
 assert.match(ui,/Demand provides planning context/);
@@ -23,9 +24,16 @@ assert.match(ui,/window\.AllocationModel\?\.validate/);
 assert.match(ui,/allowLegacy:true/,'Legacy Demand-only allocations remain editable during migration');
 assert.doesNotMatch(ui,/Actual.*workPackageId|workPackage.*Actual/i,'WP resource planning must not invent WP Actuals');
 assert.match(allocationModel,/Legacy allocation is not yet assigned to a Work Package/);
-assert.match(app3,/Canonical allocation UI and persistence now live in app-work-package-resource-planning\.js/);
+
+// app-3 is the single load boundary for the canonical allocation UI. It must use the deployment
+// build identity so a release cannot mix the current shell with a cached resource-planning module.
+assert.match(app3,/Canonical allocation UI and persistence live in app-work-package-resource-planning\.js/);
 assert.doesNotMatch(app3,/addAllocationForDemand|makeBlankAllocation|New Allocation/,'Legacy Demand-level allocation creation path must be retired');
-assert.match(app3,/app-work-package-resource-planning\.js/);
+assert.match(app3,/AMO_ASSET_VERSION\|\|window\.AMO_CONFIG\?\.buildId/);
+assert.match(app3,/app-work-package-resource-planning\.js\?v=\$\{encodeURIComponent\(build\)\}/);
+assert.doesNotMatch(app3,/app-work-package-resource-planning\.js\?v=20\d{6}/,'Canonical dynamic asset must not use a hard-coded release query');
+assert.doesNotMatch(filterToolbar,/createElement\('script'\)|app-work-package-resource-planning\.js/,'Filter toolbar must not own a second resource-planning loader');
+
 console.log('Work Package resource planning tests passed');
 require('./planning-reporting.test.js');
 require('./planning-reporting-contract.test.js');
