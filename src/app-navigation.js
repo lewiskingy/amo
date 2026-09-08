@@ -168,6 +168,7 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
 (function loadStatusReporting(){
   const modules=[
     ['app-status-rag-sync.js','amoStatusRagSync'],
+    ['app-status-report-publication.js','amoStatusReportPublication'],
     ['app-status-report-collaboration.js','amoStatusReportCollaboration'],
     ['app-organization-hierarchy.js','amoOrganizationHierarchy'],
     ['app-organization-hierarchy-compat.js','amoOrganizationHierarchyCompat'],

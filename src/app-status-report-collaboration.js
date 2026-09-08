@@ -95,19 +95,33 @@
   function replaceReportInMemory(report){const i=statusReports.findIndex(r=>r.id===report.id);if(i>=0)statusReports.splice(i,1,report);else statusReports.unshift(report);statusReports.sort((a,b)=>clean(b.publishedAt||b.finalizedAt).localeCompare(clean(a.publishedAt||a.finalizedAt)))}
 
   publishStatusReport=async function(){
+    const publication=window.AmoStatusReportPublication,mode=window.workspaceRepository?.mode||'local';let publicationTarget=null;
+    if(mode==='local'){
+      if(!publication){alert('Local Status Report publication is unavailable. Reload AMO and try again.');return}
+      try{publicationTarget=await publication.prepareLocalTarget()}catch(e){alert(`Could not prepare Status Report publication: ${e.message}`);return}
+    }
     if(statusReportState.editing){const ok=await saveDraftCollaboratively();if(!ok)return}
-    let lock=null;try{
+    let lock=null,localPublication=null;try{
       lock=await acquireDraftLock();const draft=await readLatestDraft();if(draft.status==='Published'){alert('This reporting cycle is already published.');return}
       const preview=buildReportFromDraft(draft,draft.publishedReportId||statusReportId(),'Published');if(!preview.entries.length){alert('Add at least one Status Update, Achievement, Issue or Health change before publishing.');return}
       if(!confirm(`Publish the latest committed draft with ${preview.entries.length} reported demand item${preview.entries.length===1?'':'s'}? You can Unpublish it for correction until New Draft is chosen.`))return;
-      applyPublishedHealth(draft);const existing=draft.publishedReportId?statusReports.find(r=>r.id===draft.publishedReportId):null,u=actor(),publishedAt=nowIso();const report={...preview,id:draft.publishedReportId||preview.id,status:'Published',revision:(Number(existing?.revision)||0)+1,publishedAt,publishedBy:u.name,finalizedAt:null,finalizedBy:null,unpublishedAt:null,unpublishedBy:null};
-      const cycle={...draft,status:'Published',publishedReportId:report.id,publishedAt,publishedBy:u.name,revision:report.revision,modifiedAt:publishedAt,modifiedBy:u.name};await writeReport(report);await writeDraft(cycle);replaceReportInMemory(report);statusReportDraft=cycle;statusReportState.draftDirty=false;requestAutosave?.();renderStatusReporting();renderStatusHistory();openStatusReportModal(report)
+      applyPublishedHealth(draft);const existing=draft.publishedReportId?statusReports.find(r=>r.id===draft.publishedReportId):null,u=actor(),publishedAt=nowIso();let report={...preview,id:draft.publishedReportId||preview.id,status:'Published',revision:(Number(existing?.revision)||0)+1,publishedAt,publishedBy:u.name,finalizedAt:null,finalizedBy:null,unpublishedAt:null,unpublishedBy:null};
+      if(mode==='local'){
+        const history=[...(existing?.publicationHistory||[])];if(existing?.publication)history.push(existing.publication);
+        report={...report,publication:publication.metadataFor(report,publicationTarget),publicationHistory:history};localPublication=await publication.publishLocal(report,publicationTarget)
+      }
+      const cycle={...draft,status:'Published',publishedReportId:report.id,publishedAt,publishedBy:u.name,revision:report.revision,modifiedAt:publishedAt,modifiedBy:u.name};
+      try{await writeReport(report);await writeDraft(cycle)}catch(e){if(mode==='local'&&localPublication)await publication.removeLocal(localPublication,publicationTarget);throw e}
+      replaceReportInMemory(report);statusReportDraft=cycle;statusReportState.draftDirty=false;requestAutosave?.();renderStatusReporting();renderStatusHistory();
+      if(mode==='remote')alert(publication?.remotePublicationNotice?.()||'Status Report published and its JSON snapshot has been saved to the Remote Workspace. Remote PDF publication is not enabled yet.');
+      else log?.(`Published ${report.id} revision ${report.revision} to ${report.publication?.targetName||'the selected folder'} as ${report.publication?.fileName||'HTML'}.`);
+      openStatusReportModal(report)
     }catch(e){alert(`Could not publish Status Report: ${e.message}`)}finally{await releaseDraftLock(lock)}
   };
 
   async function unpublishStatusReport(){
-    if(currentCycleStatus()!=='Published')return;if(!confirm('Unpublish the current report and reopen it as the editable draft?'))return;let lock=null;
-    try{lock=await acquireDraftLock();const draft=await readLatestDraft();if(draft.status!=='Published')throw new Error('The current reporting cycle is no longer Published.');const report=statusReports.find(r=>r.id===draft.publishedReportId)||await window.workspaceRepository.getStatusReport(draft.publishedReportId),u=actor(),when=nowIso();const unpublished={...report,status:'Unpublished',unpublishedAt:when,unpublishedBy:u.name},reopened={...draft,status:'Draft',modifiedAt:when,modifiedBy:u.name};await writeReport(unpublished);await writeDraft(reopened);replaceReportInMemory(unpublished);statusReportDraft=reopened;statusReportState.draftDirty=false;renderStatusReporting();renderStatusHistory();log?.(`Unpublished status report ${report.id}.`)}catch(e){alert(`Could not unpublish Status Report: ${e.message}`)}finally{await releaseDraftLock(lock)}
+    if(currentCycleStatus()!=='Published')return;if(!confirm('Unpublish the current report and reopen it as the editable draft? Previously published files are retained.'))return;let lock=null;
+    try{lock=await acquireDraftLock();const draft=await readLatestDraft();if(draft.status!=='Published')throw new Error('The current reporting cycle is no longer Published.');const report=statusReports.find(r=>r.id===draft.publishedReportId)||await window.workspaceRepository.getStatusReport(draft.publishedReportId),u=actor(),when=nowIso();const publication=report.publication?{...report.publication,status:'withdrawn',withdrawnAt:when,withdrawnBy:u.name}:report.publication,unpublished={...report,status:'Unpublished',unpublishedAt:when,unpublishedBy:u.name,publication},reopened={...draft,status:'Draft',modifiedAt:when,modifiedBy:u.name};await writeReport(unpublished);await writeDraft(reopened);replaceReportInMemory(unpublished);statusReportDraft=reopened;statusReportState.draftDirty=false;renderStatusReporting();renderStatusHistory();log?.(`Unpublished status report ${report.id}. Published artefacts were retained.`)}catch(e){alert(`Could not unpublish Status Report: ${e.message}`)}finally{await releaseDraftLock(lock)}
   }
 
   async function startNewDraft(){
