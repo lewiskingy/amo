@@ -26,6 +26,15 @@ assert.match(ui,/allowLegacy:true/,'Legacy Demand-only allocations remain editab
 assert.doesNotMatch(ui,/Actual.*workPackageId|workPackage.*Actual/i,'WP resource planning must not invent WP Actuals');
 assert.match(allocationModel,/Legacy allocation is not yet assigned to a Work Package/);
 
+// The canonical renderer now also owns the rich Person × Month editing experience. This keeps the
+// old usability without restoring any Demand-level renderer or patch-on-patch interaction modules.
+assert.match(ui,/direct percentage entry, snapped vertical drag and directional fill/);
+assert.match(ui,/alloc-pct-text/);
+assert.match(ui,/alloc-level-handle/);
+assert.match(ui,/alloc-fill-handle/);
+assert.match(ui,/totalResourceFraction/);
+assert.match(ui,/capacityState/);
+
 // app-3 is the single load boundary for the canonical allocation UI. It must use the deployment
 // build identity so a release cannot mix the current shell with a cached resource-planning module.
 assert.match(app3,/Canonical allocation UI and persistence live in app-work-package-resource-planning\.js/);
@@ -35,16 +44,15 @@ assert.match(app3,/app-work-package-resource-planning\.js\?v=\$\{encodeURICompon
 assert.doesNotMatch(app3,/app-work-package-resource-planning\.js\?v=20\d{6}/,'Canonical dynamic asset must not use a hard-coded release query');
 assert.doesNotMatch(filterToolbar,/loadWorkPackageResourcePlanning|createElement\(['"]script['"]\)|script\.src\s*=|appendChild\(script\)/,'Filter toolbar must not own a second resource-planning loader');
 
-// app-navigation previously loaded app-allocation-interactions after app-3. That module defines its
-// own Demand-level renderAllocations and '+ New Allocation' path, so loading it silently replaced the
-// canonical Work Package renderer at runtime. The shell may load DOM enhancements, never a second
-// allocation renderer.
+// app-navigation must never load another allocation renderer or interaction override. The rich
+// editing behaviour is part of the canonical Work Package implementation.
 assert.match(navigation,/sole allocation renderer\/save/);
 assert.match(navigation,/app-allocation-filter-toolbar\.js/);
 assert.doesNotMatch(navigation,/app-allocation-interactions\.js/,'Retired Demand-level renderer must not be loaded by the application shell');
-assert.doesNotMatch(navigation,/app-allocation-fill-polish\.js|app-allocation-drag-wins\.js/,'Interaction modules tied to the retired renderer must not be loaded');
+assert.doesNotMatch(navigation,/app-allocation-fill-polish\.js|app-allocation-drag-wins\.js/,'Retired interaction overrides must not be loaded');
 
 console.log('Work Package resource planning tests passed');
 require('./allocation-runtime-ownership.test.js');
+require('./work-package-allocation-editor.test.js');
 require('./planning-reporting.test.js');
 require('./planning-reporting-contract.test.js');
