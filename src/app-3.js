@@ -7,12 +7,19 @@ function allocatedTotal(month){return db.allocations.reduce((n,a)=>n+(Number(a.f
 function unresolvedWithoutAllocation(){return db.demand.filter(isOpenDemand).filter(d=>!db.allocations.some(a=>a.demandId===d.id&&a.teamMemberId))}
 
 /* Load exactly one canonical implementation. Dynamic assets use the same deployment build identity
-   as the application shell so a release cannot combine a new shell with a cached allocation UI. */
+   as the application shell so a release cannot combine a new shell with cached resource-planning assets. */
 (function loadWorkPackageResourcePlanning(){
+  const build=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  if(!document.querySelector('link[data-amo-work-package-resource-planning]')){
+    const style=document.createElement('link');style.rel='stylesheet';
+    style.href=build?`app-work-package-resource-planning.css?v=${encodeURIComponent(build)}`:'app-work-package-resource-planning.css';
+    style.dataset.amoWorkPackageResourcePlanning='true';
+    document.head.appendChild(style)
+  }
   if(window.WorkPackageResourcePlanning){if(typeof renderAllocations==='function')renderAllocations();return}
   if(window.__amoWorkPackageResourcePlanningLoading)return;
   window.__amoWorkPackageResourcePlanningLoading=true;
-  const script=document.createElement('script'),build=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  const script=document.createElement('script');
   script.src=build?`app-work-package-resource-planning.js?v=${encodeURIComponent(build)}`:'app-work-package-resource-planning.js';
   script.dataset.amoWorkPackageResourcePlanning='true';
   script.async=false;
