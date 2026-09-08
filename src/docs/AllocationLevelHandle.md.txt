@@ -1,7 +1,0 @@
-# Allocation level drag handle
-
-The Work Package allocation editor exposes a circular vertical drag handle at the top edge of each editable Person × Month allocation fill.
-
-Dragging the circle up or down updates the allocation using the agreed working-week increments: `0, 10, 20, 40, 60, 80, 100` percent. These correspond approximately to no allocation, half a day, one day, then two, three, four and five days per week.
-
-The handle position follows the cell's `--alloc-pct` value, so the control remains visually attached to the current allocation level. The underlying interaction continues to mutate `allocationState.draft`; this is a presentation affordance within the canonical Work Package resource-planning component rather than a second allocation editor or renderer.
