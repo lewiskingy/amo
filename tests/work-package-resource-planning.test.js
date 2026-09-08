@@ -45,5 +45,6 @@ assert.doesNotMatch(navigation,/app-allocation-interactions\.js/,'Retired Demand
 assert.doesNotMatch(navigation,/app-allocation-fill-polish\.js|app-allocation-drag-wins\.js/,'Interaction modules tied to the retired renderer must not be loaded');
 
 console.log('Work Package resource planning tests passed');
+require('./allocation-runtime-ownership.test.js');
 require('./planning-reporting.test.js');
 require('./planning-reporting-contract.test.js');
