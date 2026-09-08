@@ -4,6 +4,7 @@
 (function initPlanningReportingUi(){
   const pr=()=>window.PlanningReporting;
   const rm=()=>window.ReportingModel;
+  const periodPresentation=()=>window.ReportingPeriodPresentation;
   const esc=v=>typeof escHtml==='function'?escHtml(String(v??'')):String(v??'');
   const money=v=>(Number(v)||0).toLocaleString(undefined,{style:'currency',currency:'GBP',maximumFractionDigits:0});
   const periods=()=>typeof planningPeriods==='function'?planningPeriods():[];
@@ -39,10 +40,11 @@
   }
 
   function enhanceResource(){
-    const view=document.getElementById('resource'),detail=document.getElementById('resourceAllocationDetail');if(!view||!detail||!pr())return;
-    let section=document.getElementById('resourceDemandPlanningSection');if(!section){section=document.createElement('div');section.id='resourceDemandPlanningSection';section.innerHTML='<div class="section-title"><h2>Demand planning position</h2><span class="muted">Budget Forecast → Work Package Estimate → Resource Plan → Actual / Projected</span></div><div class="table-wrap"><table id="resourceDemandPlanningTable"></table></div>';detail.closest('.table-wrap')?.before(section)}
-    const table=document.getElementById('resourceDemandPlanningTable');if(table)table.innerHTML=resourcePlanningTable();detail.innerHTML=resourceAllocationDetail();const title=detail.closest('.table-wrap')?.previousElementSibling;if(title?.querySelector('h2')){title.querySelector('h2').textContent='Work Package resource detail';const sub=title.querySelector('.muted');if(sub)sub.textContent='Plan is attributed to Work Packages; imported Actuals remain at parent Demand / Project Number.'}
-    const portfolio=pr().portfolioSignals(scopeDemandRows()),signals=document.getElementById('resourceSignals');if(signals&&!signals.querySelector('[data-planning-resource-signals]'))signals.insertAdjacentHTML('beforeend',`<div data-planning-resource-signals><div class="mini-stat"><span>Above Budget Forecast<br><small class="muted">material planning variance</small></span><strong>${portfolio.aboveBudgetForecast.length}</strong></div><div class="mini-stat"><span>Undecomposed allocation<br><small class="muted">not yet assigned to WP</small></span><strong>${portfolio.legacyAllocations.length}</strong></div></div>`)
+    const view=document.getElementById('resource'),detail=document.getElementById('resourceAllocationDetail'),detailHeading=document.getElementById('resourceAllocationDetailHeading');if(!view||!detail||!pr())return;
+    let section=document.getElementById('resourceDemandPlanningSection');if(!section){section=document.createElement('div');section.id='resourceDemandPlanningSection';section.innerHTML='<div class="section-title"><h2>Demand planning position</h2><span class="muted">Budget Forecast → Work Package Estimate → Resource Plan → Actual / Projected</span></div><div class="table-wrap"><table id="resourceDemandPlanningTable"></table></div>';(detailHeading||detail.closest('.table-wrap'))?.before(section)}
+    const table=document.getElementById('resourceDemandPlanningTable');if(table)table.innerHTML=resourcePlanningTable();detail.innerHTML=resourceAllocationDetail();periodPresentation()?.decorateTable?.(detail,periods(),3);
+    if(detailHeading){const heading=detailHeading.querySelector('h2'),sub=detailHeading.querySelector('.muted');if(heading)heading.textContent='Work Package resource detail';if(sub)sub.textContent='Plan is attributed to Work Packages; imported Actuals remain at parent Demand / Project Number.'}
+    const portfolio=pr().portfolioSignals(scopeDemandRows()),signals=document.getElementById('resourceSignals');if(signals&&!signals.querySelector('[data-planning-resource-signals]'))signals.insertAdjacentHTML('beforeend',`<div data-planning-resource-signals><div class="mini-stat${portfolio.aboveBudgetForecast.length?' has-exception':' is-quiet'}"><span>Above Budget Forecast<br><small class="muted">material planning variance</small></span><strong>${portfolio.aboveBudgetForecast.length}</strong></div><div class="mini-stat${portfolio.legacyAllocations.length?' has-exception':' is-quiet'}"><span>Undecomposed allocation<br><small class="muted">not yet assigned to WP</small></span><strong>${portfolio.legacyAllocations.length}</strong></div></div>`)
   }
 
   function planningSnapshot(demandId){const c=pr()?.demandContext?.(demandId);if(!c)return null;return{romDays:c.romDays,budgetForecastDays:c.budgetForecastDays,wpEstimateDays:c.wpEstimateDays,resourcePlanDays:c.resourcePlanDays,actualDaysToDate:c.actualDaysToDate,projectedDays:c.projectedDays,projectedVsBudget:c.projectedVsBudget?{delta:c.projectedVsBudget.delta,ratio:c.projectedVsBudget.ratio,material:c.projectedVsBudget.material}:null,legacyAllocationCount:c.legacyAllocationCount}}
