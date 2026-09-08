@@ -64,14 +64,19 @@ assert.match(config,/demandSizeDays/);
 assert.match(roadmap,/summaryForDemand/);
 assert.doesNotMatch(roadmap,/legacyDeliveryWindow|Legacy Demand dates/);
 
-// Status Reporting natively snapshots Work Package services; no Demand.service column or post-render mutation remains.
+// Status Reporting natively snapshots Work Package context; no Demand.service column or post-render mutation remains.
 assert.match(statusReport,/const services=window\.WorkPackages\?\.summaryForDemand/);
 assert.match(statusReport,/services:\[\.\.\.services\]/);
+assert.match(statusReport,/function activeStatusWorkPackages/);
+assert.match(statusReport,/workPackages=activeStatusWorkPackages/);
+assert.match(statusReport,/!\['Complete','Cancelled'\]\.includes/);
 assert.doesNotMatch(statusReport,/filters:\{[^}]*service/);
 assert.doesNotMatch(statusReport,/th\('service','Service'\)|d\.service===f\.service/);
 assert.doesNotMatch(reporting,/removeObsoleteDemandServiceColumn|snapshotStatusEntry=function|entry\.service=/);
 assert.match(reportRenderer,/Array\.isArray\(entry\?\.services\)/);
 assert.match(reportRenderer,/entry\?\.service/,'Historical report snapshots with legacy service remain readable');
+assert.match(reportRenderer,/function workPackageContext/);
+assert.match(reportRenderer,/Active Work Packages/);
 assert.match(index,/app-defined-demand-reporting\.js\?v=20260905-1/);
 
 // Step 5 reporting has one canonical model for FTE scaling and financial semantics.
