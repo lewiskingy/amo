@@ -2,6 +2,7 @@ const fs=require('fs'),assert=require('assert');
 const ui=fs.readFileSync('src/app-work-package-resource-planning.js','utf8');
 const app3=fs.readFileSync('src/app-3.js','utf8');
 const filterToolbar=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
+const navigation=fs.readFileSync('src/app-navigation.js','utf8');
 const allocationModel=fs.readFileSync('src/app-allocation-model.js','utf8');
 
 assert.match(ui,/Demand provides planning context/);
@@ -33,6 +34,15 @@ assert.match(app3,/AMO_ASSET_VERSION\|\|window\.AMO_CONFIG\?\.buildId/);
 assert.match(app3,/app-work-package-resource-planning\.js\?v=\$\{encodeURIComponent\(build\)\}/);
 assert.doesNotMatch(app3,/app-work-package-resource-planning\.js\?v=20\d{6}/,'Canonical dynamic asset must not use a hard-coded release query');
 assert.doesNotMatch(filterToolbar,/createElement\('script'\)|app-work-package-resource-planning\.js/,'Filter toolbar must not own a second resource-planning loader');
+
+// app-navigation previously loaded app-allocation-interactions after app-3. That module defines its
+// own Demand-level renderAllocations and '+ New Allocation' path, so loading it silently replaced the
+// canonical Work Package renderer at runtime. The shell may load DOM enhancements, never a second
+// allocation renderer.
+assert.match(navigation,/sole allocation renderer\/save/);
+assert.match(navigation,/app-allocation-filter-toolbar\.js/);
+assert.doesNotMatch(navigation,/app-allocation-interactions\.js/,'Retired Demand-level renderer must not be loaded by the application shell');
+assert.doesNotMatch(navigation,/app-allocation-fill-polish\.js|app-allocation-drag-wins\.js/,'Interaction modules tied to the retired renderer must not be loaded');
 
 console.log('Work Package resource planning tests passed');
 require('./planning-reporting.test.js');
