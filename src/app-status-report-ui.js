@@ -96,16 +96,36 @@
       const context=document.createElement('div');context.className='status-effort-context';context.innerHTML=`<span class="muted">Actual ${Number(c.actualToDateFte||0).toFixed(1)} vs plan ${Number(c.historicalForecastFte||0).toFixed(1)} FTE-mo</span>${message?`<br><span class="status-effort-message">${escHtml(message)}</span>`:''}`;cell.appendChild(context)
     })
   }
+  function previousEntryFor(demandId){return(statusReportDraft?.previousEntries||[]).find(e=>e.demandId===demandId)||null}
+  function previousReportLabel(){
+    const id=statusReportDraft?.previousReportId;if(!id)return'Previous report';const report=(statusReports||[]).find(r=>r.id===id),date=report?.reportingDate;return date?`Previous report · ${date}`:`Previous report · ${id}`
+  }
+  function liveActiveWorkPackages(demandId){const rows=window.WorkPackages?.forDemand?.(demandId)||window.WorkPackages?.state?.rows?.filter(w=>w.demandId===demandId)||[];return rows.filter(w=>!['Complete','Cancelled'].includes(String(w.status||'')))}
+  function decorateAuthoringContext(){
+    if(!statusReportState?.editing)return;
+    const previousLabel=previousReportLabel();
+    document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{
+      const demandId=tr.dataset.statusDemand,previous=previousEntryFor(demandId),first=tr.children?.[0];
+      if(first&&!first.querySelector('.status-work-package-context')){
+        const rows=liveActiveWorkPackages(demandId),box=document.createElement('div');box.className='status-work-package-context';
+        box.innerHTML=`<div class="status-context-label">Active Work Packages</div>${rows.length?rows.map(w=>`<div class="status-work-package-row"><strong>${escHtml(w.id||'')}</strong><span>${escHtml(w.title||'')}</span><span class="pill blue">${escHtml(w.status||'')}</span>${w.targetEnd?`<span class="muted">to ${escHtml(w.targetEnd)}</span>`:''}</div>`).join(''):'<div class="muted">No active Work Packages.</div>'}`;first.appendChild(box)
+      }
+      tr.querySelectorAll('textarea[data-status-field]').forEach(textarea=>{
+        const field=textarea.dataset.statusField;if(!['statusUpdate','achievements','issues'].includes(field)||!previous?.[field])return;const cell=textarea.closest('td');if(!cell||cell.querySelector(`.status-previous-context[data-field="${field}"]`))return;
+        const box=document.createElement('div');box.className='status-previous-context';box.dataset.field=field;box.innerHTML=`<div class="status-context-label">${escHtml(previousLabel)}</div><div class="status-previous-text">${escHtml(previous[field])}</div>`;cell.insertBefore(box,textarea)
+      })
+    })
+  }
   function focusAuthoringPage(){
     const section=$('status-report');if(!section)return;
     $('statusDashboardSnapshot')?.remove();
     [...section.querySelectorAll(':scope > .section-title')].forEach(x=>{const h=x.querySelector('h2')?.textContent.trim();if(h==='Portfolio Snapshot'||h==='Demand highlights'||h==='Capacity outlook'||h==='Portfolio forecast'||h==='Allocation outlook')x.remove()});
     const current=[...section.querySelectorAll('.section-title h2')].find(h=>h.textContent.trim()==='Current Draft');if(current)current.textContent='Architecture Status Report';
     const hero=section.querySelector(':scope > .hero p');if(hero)hero.textContent='Prepare and manage the current Architecture Status Report, then publish it for readers.';
-    decorateActualsEffort();renderLatestReportCard()
+    decorateActualsEffort();decorateAuthoringContext();renderLatestReportCard()
   }
   if(typeof renderStatusReporting==='function'){const base=renderStatusReporting;renderStatusReporting=function(){const r=base();focusAuthoringPage();return r}}
 
   ensureRendererStyles();focusAuthoringPage();
-  const css=document.createElement('style');css.id='status-report-ui-styles';css.textContent=`.status-modal{width:min(1180px,96vw)}.status-modal-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:10px 0 14px;background:var(--panel);border-bottom:1px solid var(--line);margin-bottom:14px}.status-scope-controls{display:flex;gap:10px;flex-wrap:wrap}.status-scope-controls label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;font-weight:700;color:var(--muted)}.status-scope-controls select{min-width:210px;border:1px solid var(--line);border-radius:8px;padding:7px 28px 7px 9px;background:var(--panel);color:var(--ink)}.latest-status-report-card .toolbar{margin:0}.status-effort-context{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:.76rem;line-height:1.35}.status-effort-message{color:var(--muted);font-weight:700}@media(max-width:760px){.status-modal-toolbar{align-items:stretch;flex-direction:column}.status-scope-controls{display:grid;grid-template-columns:1fr}.status-scope-controls select{width:100%;min-width:0}}`;document.head.appendChild(css)
+  const css=document.createElement('style');css.id='status-report-ui-styles';css.textContent=`.status-modal{width:min(1180px,96vw)}.status-modal-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:10px 0 14px;background:var(--panel);border-bottom:1px solid var(--line);margin-bottom:14px}.status-scope-controls{display:flex;gap:10px;flex-wrap:wrap}.status-scope-controls label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;font-weight:700;color:var(--muted)}.status-scope-controls select{min-width:210px;border:1px solid var(--line);border-radius:8px;padding:7px 28px 7px 9px;background:var(--panel);color:var(--ink)}.latest-status-report-card .toolbar{margin:0}.status-effort-context{margin-top:7px;padding-top:7px;border-top:1px solid var(--line);font-size:.76rem;line-height:1.35}.status-effort-message{color:var(--muted);font-weight:700}.status-context-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:5px}.status-previous-context{margin:0 0 8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}.status-previous-text{white-space:pre-wrap;font-size:.78rem;line-height:1.4;color:var(--ink)}.status-work-package-context{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);display:grid;gap:5px}.status-work-package-row{display:grid;grid-template-columns:auto minmax(120px,1fr) auto;gap:6px;align-items:center;font-size:.72rem}.status-work-package-row .muted{grid-column:2/-1}.status-report-table .previous-report-detail,.status-report-table .previous-copy-all{display:none!important}@media(max-width:760px){.status-modal-toolbar{align-items:stretch;flex-direction:column}.status-scope-controls{display:grid;grid-template-columns:1fr}.status-scope-controls select{width:100%;min-width:0}.status-work-package-row{grid-template-columns:1fr}}`;document.head.appendChild(css)
 })();
