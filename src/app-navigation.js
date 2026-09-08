@@ -141,17 +141,12 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
 
 (function loadUxFixes(){if(document.querySelector('script[data-amo-ux-fixes]'))return;const s=document.createElement('script');s.src=amoAsset('app-ux-fixes.js');s.dataset.amoUxFixes='true';document.head.appendChild(s)})();
 
-/* Allocation modules are deliberately ordered. The filter toolbar wraps the rich
-   renderAllocations installed by app-allocation-interactions, so it MUST load afterwards. */
-(function loadAllocationInteractions(){
-  if(document.querySelector('script[data-amo-allocation-interactions]'))return;
-  const s=document.createElement('script');s.src=amoAsset('app-allocation-interactions.js');s.dataset.amoAllocationInteractions='true';
-  s.onload=()=>{
-    if(!document.querySelector('script[data-amo-allocation-fill-polish]')){const p=document.createElement('script');p.src=amoAsset('app-allocation-fill-polish.js');p.dataset.amoAllocationFillPolish='true';document.head.appendChild(p)}
-    if(!document.querySelector('script[data-amo-allocation-drag-wins]')){const d=document.createElement('script');d.src=amoAsset('app-allocation-drag-wins.js');d.dataset.amoAllocationDragWins='true';document.head.appendChild(d)}
-    if(!document.querySelector('script[data-amo-allocation-filter-toolbar]')){const f=document.createElement('script');f.src=amoAsset('app-allocation-filter-toolbar.js');f.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(f)}
-  };
-  document.head.appendChild(s)
+/* The Work Package resource-planning module loaded by app-3 is the sole allocation renderer/save
+   path. Retired Demand-level interaction modules used to replace renderAllocations after startup,
+   recreating the old '+ New Allocation' UI. Keep only the filter toolbar as a DOM enhancement. */
+(function loadAllocationFilterToolbar(){
+  if(document.querySelector('script[data-amo-allocation-filter-toolbar]'))return;
+  const f=document.createElement('script');f.src=amoAsset('app-allocation-filter-toolbar.js');f.dataset.amoAllocationFilterToolbar='true';document.head.appendChild(f)
 })();
 
 (function loadLockAllocationGuards(){if(document.querySelector('script[data-amo-lock-allocation-guards]'))return;const s=document.createElement('script');s.src=amoAsset('app-lock-allocation-guards.js');s.dataset.amoLockAllocationGuards='true';document.head.appendChild(s)})();
