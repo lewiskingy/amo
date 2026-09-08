@@ -32,7 +32,7 @@ assert.match(resourcePlan,/basis=m=>reportingReady\?rm\?\.periodBasis\?\.\(m\)\|
 assert.match(resourcePlan,/decorateTable\?\.\(\$\('resourceSummaryTable'\),months,1\)/,'Resource Plan must apply the shared period presentation convention');
 assert.match(periodPresentation,/ACTUALS/);
 assert.match(periodPresentation,/FORECAST/);
-assert.match(periodPresentation,/colspan/,'Shared period presentation must group contiguous period bases with spanning headers');
+assert.match(periodPresentation,/colSpan=group\.count/,'Shared period presentation must group contiguous period bases with spanning headers');
 assert.match(resourceCompatibility,/app-resource-plan\.js/,'legacy app-4 path must load the canonical Resource Plan for cached/local shells');
 assert.ok(index.includes('app-reporting-model.js?v=20260903-2'),'ReportingModel is not loaded by the application shell.');
 assert.ok(index.indexOf('app-reporting-model.js?v=20260903-2')<index.indexOf('app-4.js?v=20260903-2'),'ReportingModel must load before the Resource Plan compatibility entrypoint.');
