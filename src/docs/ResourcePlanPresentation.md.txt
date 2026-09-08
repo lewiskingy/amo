@@ -14,9 +14,22 @@ The Resource Plan is a management view and should read in this order:
 
 `app-reporting-period-presentation.js` is the shared presentation convention for reporting tables with monthly periods. It maps `ReportingModel.periodBasis(month)` to neutral Actual bands and muted blue Forecast bands, with subtle alternating shades and a stronger boundary where basis changes. Green, amber and red remain reserved for semantic status and exception signals.
 
-Resource Plan tables should call `ReportingPeriodPresentation.decorateTable(...)` rather than implement basis colours independently. Dark-theme treatment is owned by the same shared module.
+Monthly reporting tables use a two-level header. A spanning `ACTUALS` or `FORECAST` header covers each contiguous run of months, with the individual month names beneath. The basis label is not repeated under every month. The span header uses a horizontal rule treatment rather than directional arrow characters.
+
+Resource Plan tables should call `ReportingPeriodPresentation.decorateTable(...)` rather than implement basis colours or grouped headers independently. Dark-theme treatment is owned by the same shared module.
 
 Actual-period presentation in Work Package Resource Detail must never imply Work Package-level Actual attribution. Imported Actuals remain reconciled at parent Demand / Project Number; Work Package rows retain the allocation plan and explicitly identify Demand-level Actual treatment.
+
+## Individual Utilisation
+
+Individual Utilisation is a row-grouped matrix rather than a dense mini-report in every month cell. Each Person occupies four rows with the Person cell spanning the group:
+
+- Utilisation — primary measure and RAG pill;
+- FTE — reported Actual or planned Forecast FTE for the month;
+- Days — the same reported/planned effort expressed in days;
+- Signal — exception-only interpretation such as No Actuals, Low overall, Redirected, Unplanned or Over capacity.
+
+The table deliberately omits £ values and routine plan/variance text from each Person-month cell. Financial/recovery context belongs in the consolidated Capacity & management insight panel. This keeps Individual Utilisation optimised for scanning People across time rather than repeating financial reporting.
 
 ## Responsive management insight
 

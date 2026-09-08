@@ -2,6 +2,7 @@ const fs=require('fs'),path=require('path'),assert=require('assert');
 const canonicalPath='src/app-resource-plan.js';
 const canonical=fs.readFileSync(canonicalPath,'utf8');
 const reportingModel=fs.readFileSync('src/app-reporting-model.js','utf8');
+const periodPresentation=fs.readFileSync('src/app-reporting-period-presentation.js','utf8');
 const financeCompat=fs.readFileSync('src/app-financial-planning.js','utf8');
 const legacyEntrypoint=fs.readFileSync('src/app-4.js','utf8');
 const department=fs.readFileSync('src/app-department.js','utf8');
@@ -13,15 +14,19 @@ assert.match(canonical,/ReportingModel/);
 /* Scoped Resource Plan totals intentionally aggregate ReportingModel.reportedFte over the
    selected Demand set. reportedTotalFte is whole-workspace only and would bypass scope. */
 assert.match(canonical,/reportedFte/);
-assert.match(canonical,/forecastFte/);
 assert.match(canonical,/reportedDays/);
 assert.match(canonical,/reportedCost/);
 assert.match(canonical,/scopedPeople/);
 assert.match(canonical,/scopedDemand/);
 assert.match(canonical,/scopedAllocations/);
-assert.match(canonical,/actual\(m\)\?'ACTUAL':'FORECAST'/,'month basis must be explicit');
+assert.match(canonical,/periodBasis/,'Resource Plan must consume canonical period basis semantics');
+assert.match(periodPresentation,/ReportingModel\?\.periodBasis/,'Actual/Forecast presentation must derive from ReportingModel');
 assert.match(canonical,/Actual at Demand · plan/,'allocation detail must distinguish observed Demand-level Actuals from the Work Package planning baseline');
 
+/* Forecast arithmetic remains owned by ReportingModel. The Resource Plan presentation may
+   consume reported values instead of calling forecastFte directly when no separate plan-vs-actual
+   measure is being rendered. */
+assert.match(reportingModel,/forecastFte/);
 assert.match(reportingModel,/allocationFte/);
 assert.match(reportingModel,/allocationCost/);
 assert.match(reportingModel,/actualCost/);
