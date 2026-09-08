@@ -1,12 +1,12 @@
 # Allocation Runtime Ownership
 
-The active Allocations view has one renderer and one save path: `app-work-package-resource-planning.js`.
+The active Allocations view has one renderer, one rich editing implementation and one save path: `app-work-package-resource-planning.js`.
 
 `app-3.js` is the compatibility/load boundary. It loads that canonical module once using the deployment build identity and provides load-safe stubs only until the module evaluates.
 
 `app-allocation-filter-toolbar.js` is a DOM enhancement only. It may add Demand/Resource filters and mirror toolbar actions, but it must not load or replace the allocation renderer.
 
-The former `app-allocation-interactions.js`, `app-allocation-fill-polish.js` and `app-allocation-drag-wins.js` modules belong to the retired Demand-level allocation UI. They must not be loaded by the active application shell because `app-allocation-interactions.js` defines its own `renderAllocations` and exposes the obsolete `+ New Allocation` action at Demand level.
+The former `app-allocation-interactions.js`, `app-allocation-fill-polish.js` and `app-allocation-drag-wins.js` modules have been removed. Their useful interaction behaviour is now implemented directly inside the canonical Work Package resource-planning module, without restoring their Demand-level renderer or event-handler override layers.
 
 Current steady-state creation is:
 
@@ -16,5 +16,16 @@ Demand
       -> Allocate Person
           -> monthly allocation
 ```
+
+For a Person allocation on a Work Package, each month supports:
+
+- direct percentage entry;
+- vertical drag with the defined snap values `0, 10, 20, 40, 60, 80, 100`;
+- directional left/right drag-fill from the selected month; and
+- live capacity colouring based on the Person's total allocation for that month across all Work Packages and Demand.
+
+The foreground fill represents the percentage on the allocation being edited. Capacity colour is deliberately calculated from the Person's aggregate monthly allocation so an edit immediately exposes under-allocation, approaching/full allocation and over-allocation elsewhere in the plan.
+
+All edit gestures mutate `allocationState.draft`. The DOM is presentation only. Save continues through the canonical `saveAllocations` path, including Work Package validation, dirty-record tracking, versioning and autosave.
 
 Legacy Demand-only allocations remain explicit transitional records and can be assigned to a Work Package. New allocations are never created directly against Demand.
