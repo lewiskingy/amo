@@ -41,7 +41,8 @@
       wpVsBudget:budgetForecastDays===null||wpEstimateDays===null?null:comparison(wpEstimateDays-budgetForecastDays,budgetForecastDays,'above-budget-forecast','below-budget-forecast'),
       resourceVsBudget:budgetForecastDays===null?null:comparison(resourcePlanDays-budgetForecastDays,budgetForecastDays,'above-budget-forecast','below-budget-forecast'),
       resourceVsWp:wpEstimateDays===null?null:comparison(resourcePlanDays-wpEstimateDays,wpEstimateDays,'above-wp-estimate','below-wp-estimate'),
-      projectedVsBudget:budgetForecastDays===null?null:comparison(projectedDays-budgetForecastDays,budgetForecastDays,'above-budget-forecast','below-budget-forecast')
+      projectedVsBudget:budgetForecastDays===null?null:comparison(projectedDays-budgetForecastDays,budgetForecastDays,'above-budget-forecast','below-budget-forecast'),
+      projectedVsWp:wpEstimateDays===null?null:comparison(projectedDays-wpEstimateDays,wpEstimateDays,'above-wp-estimate','below-wp-estimate')
     }
   }
 
@@ -59,13 +60,15 @@
     if(c.wpVsBudget?.material)out.push({code:'wp-vs-budget',severity:c.wpVsBudget.delta>0?'warning':'info',text:`WP Estimate ${c.wpVsBudget.label} vs Budget Forecast`});
     if(c.resourceVsBudget?.material)out.push({code:'resource-vs-budget',severity:c.resourceVsBudget.delta>0?'warning':'info',text:`Resource Plan ${c.resourceVsBudget.label} vs Budget Forecast`});
     if(c.projectedVsBudget?.material)out.push({code:'projected-vs-budget',severity:c.projectedVsBudget.delta>0?'warning':'info',text:`Projected effort ${c.projectedVsBudget.label} vs Budget Forecast`});
+    if(c.resourceVsWp?.material)out.push({code:'resource-vs-wp',severity:c.resourceVsWp.delta>0?'warning':'info',text:`Resource Plan ${c.resourceVsWp.label} vs WP Estimate`});
+    if(c.projectedVsWp?.material)out.push({code:'projected-vs-wp',severity:c.projectedVsWp.delta>0?'warning':'info',text:`Projected effort ${c.projectedVsWp.label} vs WP Estimate`});
     if(c.legacyAllocationCount)out.push({code:'legacy-allocation',severity:'warning',text:`${c.legacyAllocationCount} resource allocation${c.legacyAllocationCount===1?'':'s'} not assigned to a Work Package`});
     return out
   }
 
   function portfolioSignals(rows=null){
     const source=rows||demandRows().filter(d=>typeof isOpenDemand!=='function'||isOpenDemand(d)),contexts=source.map(d=>demandContext(d.id)).filter(Boolean),signals=contexts.flatMap(c=>demandSignals(c.demandId).map(s=>({...s,demandId:c.demandId,title:c.demand.title})));
-    return{contexts,signals,aboveBudgetForecast:signals.filter(s=>['wp-vs-budget','resource-vs-budget','projected-vs-budget'].includes(s.code)&&s.severity==='warning'),legacyAllocations:signals.filter(s=>s.code==='legacy-allocation'),missingBudgetForecast:signals.filter(s=>s.code==='budget-forecast-missing')}
+    return{contexts,signals,aboveBudgetForecast:signals.filter(s=>['wp-vs-budget','resource-vs-budget','projected-vs-budget'].includes(s.code)&&s.severity==='warning'),aboveDeliveryEstimate:signals.filter(s=>['resource-vs-wp','projected-vs-wp'].includes(s.code)&&s.severity==='warning'),legacyAllocations:signals.filter(s=>s.code==='legacy-allocation'),missingBudgetForecast:signals.filter(s=>s.code==='budget-forecast-missing')}
   }
 
   const fmtDays=v=>v===null||v===undefined?'—':`${round(v,1)}d`;
