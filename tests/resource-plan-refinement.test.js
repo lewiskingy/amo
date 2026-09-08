@@ -37,13 +37,25 @@ assert.match(planningUi,/signals\.find\(s=>s\.severity==='warning'\)\|\|signals\
 assert.match(planning,/resource-vs-wp/);
 assert.match(planning,/projected-vs-wp/);
 
-// Actual/Forecast banding is a shared reporting presentation convention driven by ReportingModel.
+// Individual utilisation is a row-grouped matrix: Person identity, then repeating measures across months.
+assert.match(resource,/<th>Team member<\/th><th>Measure<\/th>/);
+assert.match(resource,/rowspan="4"/,'Person identity should span the four utilisation measures');
+for(const measure of ['Utilisation','FTE','Days','Signal'])assert.match(resource,new RegExp(`util-measure\\">${measure}<`));
+assert.doesNotMatch(resource,/personForecast=/,'Routine Actual-vs-plan detail should not clutter every utilisation cell');
+assert.match(resource,/utilisationSignal/,'Exception information remains available in a dedicated Signal row');
+
+// Actual/Forecast banding and grouped span headers are shared reporting presentation conventions driven by ReportingModel.
 assert.match(periods,/ReportingModel\?\.periodBasis/);
-assert.match(periods,/function decorateTable\(table,periods,fixedColumns\)/);
+assert.match(periods,/function groups\(periods=\[\]\)/);
+assert.match(periods,/function addGroupedHeader\(table,periods,fixedColumns\)/);
+assert.match(periods,/ACTUALS/);
+assert.match(periods,/FORECAST/);
+assert.match(periods,/period-group-row/);
 assert.match(periods,/period-actual/);
 assert.match(periods,/period-forecast/);
 assert.match(periods,/period-basis-boundary/);
 assert.match(periods,/html\[data-theme="dark"\]/);
+assert.match(resource,/const monthHead=m=>monthLabel\(m\)/,'Month headers should not repeat Actual/Forecast wording');
 assert.match(resource,/decorateTable\?\.\(\$\('resourceSummaryTable'\),months,1\)/);
 assert.match(resource,/decorateTable\?\.\(\$\('resourceUtilTable'\),months,2\)/);
 assert.match(resource,/decorateTable\?\.\(\$\('resourceAllocationDetail'\),months,2\)/);
@@ -53,6 +65,7 @@ assert.match(planningUi,/resourceAllocationDetailHeading/);
 assert.match(planningUi,/\(detailHeading\|\|detail\.closest\('\.table-wrap'\)\)\?\.before\(section\)/);
 assert.doesNotMatch(planningUi,/previousElementSibling/,'Heading ownership must not depend on whichever section happens to precede the detail table');
 assert.match(planningUi,/decorateTable\?\.\(detail,periods\(\),3\)/);
+assert.doesNotMatch(planningUi,/ACTUAL AT DEMAND/,'Actual/Forecast wording should live in the shared spanning header, not repeat under every month');
 
 // Actual periods may present observed Demand Actuals, but never invent Work Package Actual attribution.
 assert.match(resource,/Actual at Demand/);
