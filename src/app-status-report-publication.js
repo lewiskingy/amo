@@ -36,12 +36,9 @@
       }catch(_e){permission='denied'}
       if(permission==='granted')return cachedHandle;
       await forgetHandle();
-      throw new Error('Access to the remembered publication folder is no longer available. Publish again to select the publication folder.')
+      throw new Error('Access to the remembered publication folder is no longer available. Publish again to select a publication folder.')
     }
-    if(!handleLoaded){
-      // Preserve the browser user gesture rather than waiting for IndexedDB during the click.
-      handleLoaded=true
-    }
+    if(!handleLoaded)handleLoaded=true;
     if(typeof window.showDirectoryPicker!=='function')throw new Error('Local HTML publication requires a browser that supports selecting a writable folder.');
     let handle;
     try{handle=await window.showDirectoryPicker({id:'amo-status-report-publication',mode:'readwrite'})}
