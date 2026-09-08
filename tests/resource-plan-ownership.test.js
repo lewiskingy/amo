@@ -14,7 +14,6 @@ assert.match(canonical,/ReportingModel/);
 /* Scoped Resource Plan totals intentionally aggregate ReportingModel.reportedFte over the
    selected Demand set. reportedTotalFte is whole-workspace only and would bypass scope. */
 assert.match(canonical,/reportedFte/);
-assert.match(canonical,/forecastFte/);
 assert.match(canonical,/reportedDays/);
 assert.match(canonical,/reportedCost/);
 assert.match(canonical,/scopedPeople/);
@@ -24,6 +23,10 @@ assert.match(canonical,/periodBasis/,'Resource Plan must consume canonical perio
 assert.match(periodPresentation,/ReportingModel\?\.periodBasis/,'Actual/Forecast presentation must derive from ReportingModel');
 assert.match(canonical,/Actual at Demand · plan/,'allocation detail must distinguish observed Demand-level Actuals from the Work Package planning baseline');
 
+/* Forecast arithmetic remains owned by ReportingModel. The Resource Plan presentation may
+   consume reported values instead of calling forecastFte directly when no separate plan-vs-actual
+   measure is being rendered. */
+assert.match(reportingModel,/forecastFte/);
 assert.match(reportingModel,/allocationFte/);
 assert.match(reportingModel,/allocationCost/);
 assert.match(reportingModel,/actualCost/);
