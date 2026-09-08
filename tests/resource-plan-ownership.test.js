@@ -20,7 +20,7 @@ assert.match(canonical,/scopedPeople/);
 assert.match(canonical,/scopedDemand/);
 assert.match(canonical,/scopedAllocations/);
 assert.match(canonical,/actual\(m\)\?'ACTUAL':'FORECAST'/,'month basis must be explicit');
-assert.match(canonical,/Actual · plan/,'allocation detail must distinguish observed effort from the planning baseline');
+assert.match(canonical,/Actual at Demand · plan/,'allocation detail must distinguish observed Demand-level Actuals from the Work Package planning baseline');
 
 assert.match(reportingModel,/allocationFte/);
 assert.match(reportingModel,/allocationCost/);
