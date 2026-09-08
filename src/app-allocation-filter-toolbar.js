@@ -1,7 +1,7 @@
 /* Allocations Demand/Resource combobox filters.
-   This module intentionally does not wrap renderAllocations. The allocation renderer has
-   several historical wrappers/overrides, so the controls are maintained as a DOM enhancement
-   and restored after every table render. Typing only narrows suggestions; selecting commits. */
+   This module intentionally does not wrap renderAllocations. The canonical allocation renderer lives
+   in app-work-package-resource-planning.js; these controls are maintained as a DOM enhancement and
+   restored after every table render. Typing only narrows suggestions; selecting commits. */
 (function initAllocationFilterToolbar(){
   if(window.__amoAllocationFilterToolbarInstalled)return;
   window.__amoAllocationFilterToolbarInstalled=true;
@@ -84,17 +84,4 @@
     @media(max-width:900px){#allocationTable .list-sticky-actions{overflow-x:auto!important}#allocationTable .allocation-header-filter>span{display:none}#allocationTable .allocation-filter-combobox{width:155px;min-width:135px}}
   `;document.head.appendChild(style)}
   start();
-})();
-
-/* Resource Planning is loaded here because this integration point runs after the legacy app-3
-   allocation implementation. The new module is the canonical renderer/save path for PR B while
-   the old functions remain load-safe for older cached clients. */
-(function loadWorkPackageResourcePlanning(){
-  if(window.__amoWorkPackageResourcePlanningLoading||window.WorkPackageResourcePlanning)return;
-  window.__amoWorkPackageResourcePlanningLoading=true;
-  const script=document.createElement('script');
-  script.src='app-work-package-resource-planning.js?v=20260907-1';
-  script.onload=()=>{window.__amoWorkPackageResourcePlanningLoading=false;if(typeof renderAllocations==='function')renderAllocations()};
-  script.onerror=()=>{window.__amoWorkPackageResourcePlanningLoading=false;console.warn('Could not load Work Package resource planning UI.')};
-  document.head.appendChild(script);
 })();
