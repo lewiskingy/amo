@@ -89,23 +89,8 @@
     return html
   };
 
-  publishStatusReport=function(){
-    const preview=buildPreviewReport();
-    if(!preview.entries.length){alert('Add at least one Status Update, Achievement, Issue or Health change before publishing.');return}
-    if(!confirm(`Publish this status report with ${preview.entries.length} reported demand item${preview.entries.length===1?'':'s'}? Published reports are immutable and any Health overrides will update the corresponding Demand items.`))return;
-    const source=statusReportState.editing?statusReportState.draftBuffer:statusReportDraft;
-    for(const e of source?.entries||[]){
-      const d=db.demand.find(x=>x.id===e.demandId);if(!d)continue;
-      const next=explicitEntryHealth(e);if(!next||next===demandHealth(d))continue;
-      d.health=next;d.version=(Number(d.version)||0)+1;d.modifiedAt=new Date().toISOString();markDirty('demand',d.id,`Updated ${d.id} Health to ${next} from published Status Report.`)
-    }
-    const finalPreview=clone(preview);
-    finalPreview.entries=(preview.entries||[]).map(e=>{const d=db.demand.find(x=>x.id===e.demandId),out={...e};delete out.rag;delete out.healthChanged;out.health=d?demandHealth(d):normalizeHealth(e.health);return out});
-    const report={...finalPreview,id:statusReportId(),status:'Published',publishedAt:new Date().toISOString(),publishedBy:'Workspace User'};
-    statusReports.unshift(report);markPublishedDirty(report.id,`Published status report ${report.id}.`);
-    statusReportDraft={id:'DRAFT',status:'Draft',reportingDate:todayIso(),entries:[]};statusReportState.draftDirty=true;statusReportState.editing=false;statusReportState.draftBuffer=null;
-    requestAutosave();renderStatusReporting();renderStatusHistory();openStatusReportModal(report)
-  };
+  /* Status Report lifecycle is owned by app-status-report-collaboration.js. Health sync deliberately
+     does not implement Publish/Unpublish/New Draft so persistence/publication semantics cannot diverge. */
 
   function applyHealthConfigSemantics(){
     const cards=[...document.querySelectorAll('#configContent .config-card')],card=cards.find(c=>c.querySelector('h2')?.textContent.trim()==='Health States');if(!card)return;
