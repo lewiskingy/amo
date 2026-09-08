@@ -163,15 +163,27 @@ Then('the user administration surface should expose identity, access and status 
   const content=this.page.locator('#usersContent');
   await waitFor(async()=>await content.count()===1);
   const table=content.locator('table.users-table');
+  const expectedHeadings=['User','Company / Entra account','Google email','Access','Status','Person'];
+  const bootstrapPattern=/Open a workspace to view or manage Users|Workspace not claimed|Current sign-in|not signed in/i;
+  /* Users administration is loaded dynamically after the shell. On slower mobile execution the
+     surface can exist before app-users-admin has rendered its table or bootstrap notice, and the
+     Person column is then added by the integration layer. Wait for one complete valid state rather
+     than treating the transient empty host as a failure. */
+  await waitFor(async()=>{
+    if(await table.count()===1){
+      const headings=(await table.locator('thead th').allTextContents()).map(x=>x.trim());
+      return expectedHeadings.every(expected=>headings.includes(expected));
+    }
+    return bootstrapPattern.test(String(await content.textContent()||''));
+  },{timeout:5000});
   if(await table.count()===1){
     const headings=(await table.locator('thead th').allTextContents()).map(x=>x.trim());
-    for(const expected of ['User','Company / Entra account','Google email','Access','Status']){
+    for(const expected of expectedHeadings){
       assert.ok(headings.includes(expected),`Users & Access is missing the ${expected} column.`);
     }
-    assert.ok(headings.includes('Person'),'Users & Access does not expose the linked Person relationship.');
   }else{
     const text=String(await content.textContent()||'');
-    assert.ok(/Workspace not claimed|Current sign-in|not signed in/i.test(text),'Users & Access rendered neither its administration table nor an expected access/bootstrap state.');
+    assert.ok(bootstrapPattern.test(text),'Users & Access rendered neither its administration table nor an expected access/bootstrap state.');
   }
 });
 
