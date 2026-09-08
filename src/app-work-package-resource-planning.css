@@ -1,0 +1,30 @@
+/* Canonical Work Package resource-planning component styles.
+   The vertical level handle sits on the top edge of the allocation fill so the percentage can be
+   adjusted by dragging the circle up or down. Its position follows --alloc-pct, while the editor
+   snaps the gesture to 0, 10, 20, 40, 60, 80 and 100 percent. */
+#allocationTable .alloc-month-cell.editable .alloc-level-handle{
+  position:absolute;
+  z-index:6;
+  left:50%;
+  bottom:clamp(6px,var(--alloc-pct,0%),calc(100% - 6px));
+  transform:translate(-50%,50%);
+  width:12px;
+  height:12px;
+  padding:0;
+  border:2px solid var(--accent);
+  border-radius:50%;
+  background:var(--panel);
+  box-shadow:0 1px 3px rgba(0,0,0,.18);
+  cursor:ns-resize;
+  opacity:1;
+  touch-action:none;
+}
+#allocationTable .alloc-month-cell.editable .alloc-level-handle:hover,
+#allocationTable .alloc-month-cell.editable .alloc-level-handle:focus-visible{
+  background:var(--accent);
+  outline:2px solid color-mix(in srgb,var(--accent) 30%,transparent);
+  outline-offset:2px;
+}
+#allocationTable .fill-dragging .alloc-level-handle{
+  transition:none;
+}
