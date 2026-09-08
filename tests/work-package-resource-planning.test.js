@@ -33,7 +33,7 @@ assert.doesNotMatch(app3,/addAllocationForDemand|makeBlankAllocation|New Allocat
 assert.match(app3,/AMO_ASSET_VERSION\|\|window\.AMO_CONFIG\?\.buildId/);
 assert.match(app3,/app-work-package-resource-planning\.js\?v=\$\{encodeURIComponent\(build\)\}/);
 assert.doesNotMatch(app3,/app-work-package-resource-planning\.js\?v=20\d{6}/,'Canonical dynamic asset must not use a hard-coded release query');
-assert.doesNotMatch(filterToolbar,/createElement\('script'\)|app-work-package-resource-planning\.js/,'Filter toolbar must not own a second resource-planning loader');
+assert.doesNotMatch(filterToolbar,/loadWorkPackageResourcePlanning|createElement\(['"]script['"]\)|script\.src\s*=|appendChild\(script\)/,'Filter toolbar must not own a second resource-planning loader');
 
 // app-navigation previously loaded app-allocation-interactions after app-3. That module defines its
 // own Demand-level renderAllocations and '+ New Allocation' path, so loading it silently replaced the
