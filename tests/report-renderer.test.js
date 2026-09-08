@@ -22,3 +22,4 @@ assert.doesNotMatch(html,/Allocation outlook|Portfolio forecast/,'Status Report 
 const legacy=renderer.renderReport({...report,entries:[{...report.entries[0],services:undefined,service:'Legacy Design'}]});
 assert.match(legacy,/Legacy Design/);
 console.log('Report renderer tests passed');
+require('./resource-plan-refinement.test.js');
