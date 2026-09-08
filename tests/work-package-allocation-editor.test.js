@@ -1,5 +1,7 @@
 const fs=require('fs'),assert=require('assert');
 const ui=fs.readFileSync('src/app-work-package-resource-planning.js','utf8');
+const styles=fs.readFileSync('src/app-work-package-resource-planning.css','utf8');
+const app3=fs.readFileSync('src/app-3.js','utf8');
 
 // Rich editing remains inside the canonical Work Package renderer rather than reintroducing an
 // override renderer. All interaction paths update allocationState.draft through setPct.
@@ -20,6 +22,18 @@ assert.match(ui,/function bindFillHandles\(\)/);
 assert.match(ui,/pct=snapPercent\(raw\)/,'Vertical drag should use the defined percentage increments');
 assert.match(ui,/original=Object\.fromEntries/,'Fill drag should preserve the original row for reversible preview');
 assert.match(ui,/for\(const m of visibleMonths\)a\.forecast\[m\]=original\[m\]/,'Fill preview should restore the original row before applying the current range');
+
+// The vertical adjustment affordance is a small circle on the top edge of the percentage fill.
+// Its position follows --alloc-pct so the handle moves with the selected allocation level.
+assert.match(styles,/\.alloc-month-cell\.editable \.alloc-level-handle/);
+assert.match(styles,/bottom:clamp\(6px,var\(--alloc-pct,0%\),calc\(100% - 6px\)\)/);
+assert.match(styles,/width:12px/);
+assert.match(styles,/height:12px/);
+assert.match(styles,/border-radius:50%/);
+assert.match(styles,/cursor:ns-resize/);
+assert.match(styles,/touch-action:none/);
+assert.match(app3,/app-work-package-resource-planning\.css\?v=\$\{encodeURIComponent\(build\)\}/,'Canonical component stylesheet must use the deployment build identity');
+assert.match(app3,/data-amo-work-package-resource-planning/,'Canonical loader should mark its component assets');
 
 // Colouring reports whole-person utilisation across every visible allocation, not only the Work Package being edited.
 assert.match(ui,/function totalResourceFraction\(resourceId,month\)/);
