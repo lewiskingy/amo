@@ -1,0 +1,20 @@
+# Allocation Runtime Ownership
+
+The active Allocations view has one renderer and one save path: `app-work-package-resource-planning.js`.
+
+`app-3.js` is the compatibility/load boundary. It loads that canonical module once using the deployment build identity and provides load-safe stubs only until the module evaluates.
+
+`app-allocation-filter-toolbar.js` is a DOM enhancement only. It may add Demand/Resource filters and mirror toolbar actions, but it must not load or replace the allocation renderer.
+
+The former `app-allocation-interactions.js`, `app-allocation-fill-polish.js` and `app-allocation-drag-wins.js` modules belong to the retired Demand-level allocation UI. They must not be loaded by the active application shell because `app-allocation-interactions.js` defines its own `renderAllocations` and exposes the obsolete `+ New Allocation` action at Demand level.
+
+Current steady-state creation is:
+
+```text
+Demand
+  -> Work Package
+      -> Allocate Person
+          -> monthly allocation
+```
+
+Legacy Demand-only allocations remain explicit transitional records and can be assigned to a Work Package. New allocations are never created directly against Demand.
