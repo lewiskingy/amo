@@ -9,7 +9,7 @@ function unresolvedWithoutAllocation(){return db.demand.filter(isOpenDemand).fil
 /* Load exactly one canonical implementation. Dynamic assets use the same deployment build identity
    as the application shell so a release cannot combine a new shell with a cached allocation UI. */
 (function loadWorkPackageResourcePlanning(){
-  if(window.WorkPackageResourcePlanning){window.WorkPackageResourcePlanning.render?.();return}
+  if(window.WorkPackageResourcePlanning){if(typeof renderAllocations==='function')renderAllocations();return}
   if(window.__amoWorkPackageResourcePlanningLoading)return;
   window.__amoWorkPackageResourcePlanningLoading=true;
   const script=document.createElement('script'),build=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
@@ -19,7 +19,8 @@ function unresolvedWithoutAllocation(){return db.demand.filter(isOpenDemand).fil
   script.onload=()=>{
     window.__amoWorkPackageResourcePlanningLoading=false;
     if(!window.WorkPackageResourcePlanning){console.error('Work Package resource planning module loaded without registering its API.');return}
-    window.WorkPackageResourcePlanning.render?.()
+    /* The canonical module replaces this compatibility function when it evaluates. */
+    if(typeof renderAllocations==='function')renderAllocations()
   };
   script.onerror=()=>{
     window.__amoWorkPackageResourcePlanningLoading=false;
@@ -28,6 +29,6 @@ function unresolvedWithoutAllocation(){return db.demand.filter(isOpenDemand).fil
   document.head.appendChild(script)
 })();
 
-/* Load-safe delegates allow early refresh/save calls while the canonical module is arriving. */
-function renderAllocations(){return window.WorkPackageResourcePlanning?.render?.()}
-function saveAllocations(){return window.WorkPackageResourcePlanning?.save?.()}
+/* Load-safe stubs prevent early refresh calls from failing before the canonical module arrives. */
+function renderAllocations(){}
+function saveAllocations(){}
