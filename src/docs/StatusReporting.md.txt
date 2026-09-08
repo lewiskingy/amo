@@ -85,6 +85,8 @@ Historical reports use values persisted at publication time. Changing today's wo
 
 Both in-application Preview/View and the lightweight `/reports` reader delegate to this renderer. Hosts must not maintain competing report HTML implementations or reimplement reporting calculations.
 
+Published Local Workspace HTML also uses this renderer. The publication layer embeds the renderer output and the required AMO/report CSS into a standalone document rather than maintaining another report layout.
+
 ## Health semantics and accessibility
 
 Status Reporting uses the same controlled Health model as Demand:
@@ -109,6 +111,35 @@ New snapshots persist Department/Team identifiers and names on entries so immuta
 
 Published/Final routes use `/reports/{reportId}` with optional `department` and `team` query parameters. Draft standalone preview uses the existing temporary one-time browser preview snapshot and `/reports/preview` route; it is not persisted to report history.
 
+## Publication behaviour
+
+Publication is distinct from the immutable Status Report JSON snapshot.
+
+### Local Workspace
+
+Local Workspace publishes a self-contained HTML document to a user-selected client folder using the browser File System Access API.
+
+On the first Publish, AMO asks the user to select a writable publication folder. The directory handle is remembered in browser IndexedDB. On every later Publish AMO rechecks write permission before using the remembered folder; if access has been lost, the remembered handle is cleared and the user is asked to select the publication folder again on the next Publish.
+
+The selected folder may be a normal local folder or a mapped/synchronised location exposed to the browser by the operating system. AMO does not store or depend on a physical filesystem path; it retains the browser-authorised directory handle.
+
+Published files are named by report identity and revision, for example:
+
+```text
+SR-20260908-201530-r01.html
+SR-20260908-201530-r02.html
+```
+
+The HTML is standalone: report markup and required CSS are embedded and it does not require AMO, an API connection or workspace access to be read. The document is generated from the canonical `AmoReportRenderer` using the immutable report snapshot.
+
+Unpublish never removes a published HTML file. Republish increments the report revision and writes a new file. The previous publication remains as a withdrawn/historical artefact.
+
+### Remote Workspace
+
+Remote Workspace currently persists the immutable published JSON snapshot but does not create a human-readable publication artefact. After Publish the user is notified that the JSON snapshot has been saved and that Remote PDF publication is not yet enabled.
+
+The target Remote design is server-side publication through a separately configured publication area/provider, with PDF generated from the same canonical report presentation. That later capability must not change the Local Workspace HTML publication contract or couple publication artefacts to Mongo persistence.
+
 ## Status Report History
 
 History exposes Published/Final snapshots. Latest Report is the shortcut to the most recent published artefact; History remains the catalogue for earlier reports.
@@ -117,10 +148,12 @@ History exposes Published/Final snapshots. Latest Report is the shortcut to the 
 
 Draft saves continue to use optimistic entry/field-level merge and the status-report draft lock. Publish, Unpublish and New Draft retain their existing lifecycle locking behaviour.
 
-Typical storage remains:
+Typical application-data storage remains:
 
 ```text
 status-reports/
   draft.json
   SR-YYYYMMDD-HHMMSS.json
 ```
+
+Local HTML publication is written to the separately authorised publication folder, not under `status-reports/` unless the user deliberately selects such a location.
