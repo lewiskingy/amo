@@ -1,0 +1,23 @@
+# Resource Plan presentation
+
+The Resource Plan is a management view and should read in this order:
+
+1. Monthly Capacity Position across the planning window.
+2. Consolidated capacity, Demand and management signals.
+3. Individual Utilisation.
+4. Demand planning position (when planning reporting is enabled).
+5. Work Package Resource Detail as the final drill-down.
+
+`app-resource-plan.js` remains the sole Resource Plan renderer. Quantitative Actual/Forecast arithmetic remains owned by `ReportingModel`; presentation code must not duplicate or reinterpret those calculations.
+
+## Actual / Forecast period treatment
+
+`app-reporting-period-presentation.js` is the shared presentation convention for reporting tables with monthly periods. It maps `ReportingModel.periodBasis(month)` to neutral Actual bands and muted blue Forecast bands, with subtle alternating shades and a stronger boundary where basis changes. Green, amber and red remain reserved for semantic status and exception signals.
+
+Resource Plan tables should call `ReportingPeriodPresentation.decorateTable(...)` rather than implement basis colours independently. Dark-theme treatment is owned by the same shared module.
+
+Actual-period presentation in Work Package Resource Detail must never imply Work Package-level Actual attribution. Imported Actuals remain reconciled at parent Demand / Project Number; Work Package rows retain the allocation plan and explicitly identify Demand-level Actual treatment.
+
+## Responsive management insight
+
+The consolidated management panel groups Capacity & Recovery, Demand and Signals. Desktop uses three semantic groups, tablet may wrap to two rows, and mobile stacks the groups. Healthy zero-value signals are visually quiet; non-zero exceptions receive emphasis.
