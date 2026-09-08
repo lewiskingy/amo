@@ -31,6 +31,18 @@ The live Status Report page is intentionally focused on producing the report. It
 
 Dashboard-style portfolio metrics are not rendered above the authoring table. The authoring surface should make it easy to identify At Risk/Off Track Demand and supply narrative without duplicating resource-management views.
 
+### Previous-cycle context
+
+When **New Draft** is created, AMO copies the final report entries into `previousEntries` and records `previousReportId` on the new draft. This is the immutable comparison baseline for that reporting cycle; authoring does not dynamically re-read or recalculate previous commentary from report history.
+
+While editing, previous Status Update, Achievements and Issues / Escalations are displayed read-only immediately above the corresponding current-cycle input. The author edits only the new commentary.
+
+### Active Work Package context
+
+While authoring, each Demand shows its current active Work Packages so commentary can be written with delivery context in view. Work Packages in `Complete` or `Cancelled` state are excluded from the active context.
+
+Work Package context is informational; commentary remains Demand-level management narrative rather than introducing separate commentary fields per Work Package.
+
 ## Canonical report semantics
 
 Published/Preview reporting must use the same reporting semantics as Dashboard, Resource Plan and Defined Demand. Calculations belong to `ReportingModel`; report views must not introduce their own competing effort/cost formulas.
@@ -51,7 +63,9 @@ AMO never infers Work-Package-level Actuals from Project/Demand Actuals.
 
 Service, delivery status, refined estimate and target dates are Work Package concerns. Defined Demand does not regain a current `service` field for reporting.
 
-A report snapshot may carry the derived list of child Work Package services and other derived delivery context so readers can understand the Demand. This is immutable snapshot context, not an authored Demand Service.
+A report snapshot carries the derived list of child Work Package services and a lightweight `workPackages[]` snapshot for active Work Packages. Each Work Package snapshot contains report-reading context such as ID, title, service, status and target dates. This is immutable publication context, not duplicated Work Package management data.
+
+The authoring surface uses live Work Package state so the author sees the current delivery picture. Publish freezes that active Work Package context into the immutable report snapshot, so historical reports continue to show what was active at that reporting point even if Work Packages later complete or change.
 
 Detailed Work Package scope and acceptance criteria remain in the authoritative delivery backlog and are not copied into status reports by AMO.
 
@@ -75,13 +89,13 @@ A report artefact can contain:
 1. concise portfolio/Demand highlights;
 2. capacity/recovery snapshot where useful;
 3. Architecture Status Report narrative and Health;
-4. Work Package-derived service/delivery context for each Demand where captured.
+4. immutable active Work Package context for each Demand where captured.
 
 Historical reports use values persisted at publication time. Changing today's workspace or scope does not recalculate an older report.
 
 ## One report renderer
 
-`app-report-renderer.js` is the authoritative report presentation implementation. It owns report structure, report-level presentation, Health semantics, scope projection, immutable snapshot sections and Demand narrative rendering.
+`app-report-renderer.js` is the authoritative report presentation implementation. It owns report structure, report-level presentation, Health semantics, scope projection, immutable snapshot sections, Work Package context and Demand narrative rendering.
 
 Both in-application Preview/View and the lightweight `/reports` reader delegate to this renderer. Hosts must not maintain competing report HTML implementations or reimplement reporting calculations.
 
