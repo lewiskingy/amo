@@ -29,5 +29,6 @@ const legacy=renderer.renderReport({...report,entries:[{...report.entries[0],ser
 assert.match(legacy,/Legacy Design/);
 assert.doesNotMatch(legacy,/Active Work Packages/);
 console.log('Report renderer tests passed');
+require('./status-report-authoring-context.test.js');
 require('./status-report-publication.test.js');
 require('./resource-plan-refinement.test.js');
