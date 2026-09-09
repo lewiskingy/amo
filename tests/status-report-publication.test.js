@@ -19,7 +19,9 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
   const publication=context.window.AmoStatusReportPublication;
   assert.ok(publication,'publication capability should be exported');
 
-  await Promise.resolve();await Promise.resolve();
+  // Remembered-target discovery is deliberately asynchronous. Give its promise chain one event-loop
+  // turn to settle rather than asserting against the transient module-initialisation state.
+  await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(JSON.parse(JSON.stringify(publication.localTargetInfo())),{loaded:true,selected:false,name:''});
   const selectedHandle={name:'Board Status Reports'};
   context.window.showDirectoryPicker=async()=>selectedHandle;
