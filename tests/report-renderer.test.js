@@ -28,3 +28,4 @@ console.log('Report renderer tests passed');
 require('./status-report-authoring-context.test.js');
 require('./status-report-publication.test.js');
 require('./resource-plan-refinement.test.js');
+require('./list-arrangement.test.js');
