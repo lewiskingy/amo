@@ -19,6 +19,14 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert');
   const publication=context.window.AmoStatusReportPublication;
   assert.ok(publication,'publication capability should be exported');
 
+  await Promise.resolve();await Promise.resolve();
+  assert.deepEqual(JSON.parse(JSON.stringify(publication.localTargetInfo())),{loaded:true,selected:false,name:''});
+  const selectedHandle={name:'Board Status Reports'};
+  context.window.showDirectoryPicker=async()=>selectedHandle;
+  const changed=await publication.changeLocalTarget();
+  assert.equal(changed,selectedHandle);
+  assert.deepEqual(JSON.parse(JSON.stringify(publication.localTargetInfo())),{loaded:true,selected:true,name:'Board Status Reports'});
+
   const report={id:'SR-20260908-201530',revision:2,status:'Published',publishedAt:'2026-09-08T20:15:30Z'};
   assert.equal(publication.fileNameFor(report),'SR-20260908-201530-r02.html');
   const metadata=publication.metadataFor(report,{name:'Architecture Reports'});
