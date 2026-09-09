@@ -175,7 +175,8 @@ window.amoTargetStageReady=window.amoTargetStageReady||new Promise((resolve,reje
     ['app-report-renderer.js','amoReportRenderer'],
     ['app-status-report-ui.js','amoStatusReportUi'],
     ['app-status-report-history-compat.js','amoStatusReportHistoryCompat'],
-    ['app-status-report-deep-links.js','amoStatusReportDeepLinks']
+    ['app-status-report-deep-links.js','amoStatusReportDeepLinks'],
+    ['app-list-arrangement.js','amoListArrangement']
   ];
   const loadAt=index=>{
     if(index>=modules.length)return;
