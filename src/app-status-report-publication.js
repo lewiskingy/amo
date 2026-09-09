@@ -4,9 +4,14 @@
 (function initStatusReportPublication(){
   if(window.AmoStatusReportPublication)return;
 
-  const DB_NAME='amo-publication-targets',STORE='handles',HANDLE_KEY='status-report-publication';
+  const DB_NAME='amo-publication-targets',STORE='handles',HANDLE_KEY='status-report-publication',TARGET_EVENT='amo:status-report-publication-target';
   let cachedHandle=null,handleLoaded=false;
 
+  function notifyTargetChanged(){
+    if(typeof window.dispatchEvent!=='function'||typeof CustomEvent==='undefined')return;
+    window.dispatchEvent(new CustomEvent(TARGET_EVENT,{detail:localTargetInfo()}))
+  }
+  function localTargetInfo(){return{loaded:handleLoaded,selected:!!cachedHandle,name:cachedHandle?.name||''}}
   function openDb(){
     return new Promise((resolve,reject)=>{
       if(!window.indexedDB){reject(new Error('This browser cannot remember the publication folder.'));return}
@@ -22,28 +27,32 @@
     try{const db=await openDb();try{await new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readwrite').objectStore(STORE).put(handle,HANDLE_KEY);req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error)})}finally{db.close()}}catch(e){console.warn('Could not persist Status Report publication directory handle.',e)}
   }
   async function forgetHandle(){
-    cachedHandle=null;try{const db=await openDb();try{await new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readwrite').objectStore(STORE).delete(HANDLE_KEY);req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error)})}finally{db.close()}}catch(_e){}
+    cachedHandle=null;try{const db=await openDb();try{await new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readwrite').objectStore(STORE).delete(HANDLE_KEY);req.onsuccess=()=>resolve();req.onerror=()=>reject(req.error)})}finally{db.close()}}catch(_e){}finally{notifyTargetChanged()}
   }
-  readRememberedHandle().then(handle=>{cachedHandle=handle;handleLoaded=true}).catch(()=>{handleLoaded=true});
+  readRememberedHandle().then(handle=>{cachedHandle=handle;handleLoaded=true;notifyTargetChanged()}).catch(()=>{handleLoaded=true;notifyTargetChanged()});
 
+  async function pickLocalTarget({cancelIsError=false}={}){
+    if(window.workspaceRepository?.mode!=='local')throw new Error('A Local Workspace is required for client-side HTML publication.');
+    if(typeof window.showDirectoryPicker!=='function')throw new Error('Local HTML publication requires a browser that supports selecting a writable folder.');
+    let handle;
+    try{handle=await window.showDirectoryPicker({id:'amo-status-report-publication',mode:'readwrite'})}
+    catch(e){if(e?.name==='AbortError'){if(cancelIsError)throw new Error('Publication folder selection was cancelled.');return null}throw e}
+    cachedHandle=handle;handleLoaded=true;await rememberHandle(handle);notifyTargetChanged();return handle
+  }
+  async function changeLocalTarget(){return pickLocalTarget({cancelIsError:false})}
   async function prepareLocalTarget(){
     if(window.workspaceRepository?.mode!=='local')throw new Error('A Local Workspace is required for client-side HTML publication.');
     if(cachedHandle){
       let permission='prompt';
       try{
-        if(typeof cachedHandle.requestPermission==='function')permission=await cachedHandle.requestPermission({mode:'readwrite'});
-        else if(typeof cachedHandle.queryPermission==='function')permission=await cachedHandle.queryPermission({mode:'readwrite'});
+        if(typeof cachedHandle.queryPermission==='function')permission=await cachedHandle.queryPermission({mode:'readwrite'});
+        if(permission==='prompt'&&typeof cachedHandle.requestPermission==='function')permission=await cachedHandle.requestPermission({mode:'readwrite'});
+        if(typeof cachedHandle.queryPermission!=='function'&&typeof cachedHandle.requestPermission!=='function')permission='granted'
       }catch(_e){permission='denied'}
       if(permission==='granted')return cachedHandle;
-      await forgetHandle();
-      throw new Error('Access to the remembered publication folder is no longer available. Publish again to select a publication folder.')
+      await forgetHandle()
     }
-    if(!handleLoaded)handleLoaded=true;
-    if(typeof window.showDirectoryPicker!=='function')throw new Error('Local HTML publication requires a browser that supports selecting a writable folder.');
-    let handle;
-    try{handle=await window.showDirectoryPicker({id:'amo-status-report-publication',mode:'readwrite'})}
-    catch(e){if(e?.name==='AbortError')throw new Error('Publication folder selection was cancelled.');throw e}
-    cachedHandle=handle;await rememberHandle(handle);return handle
+    return pickLocalTarget({cancelIsError:true})
   }
 
   function fileNameFor(report){return `${report.id}-r${String(Number(report.revision)||1).padStart(2,'0')}.html`}
@@ -64,5 +73,5 @@
   async function removeLocal(metadata,target){if(!metadata?.fileName||!target?.removeEntry)return;try{await target.removeEntry(metadata.fileName)}catch(_e){}}
   function remotePublicationNotice(){return 'Status Report published and its JSON snapshot has been saved to the Remote Workspace. Remote PDF publication is not enabled yet.'}
 
-  window.AmoStatusReportPublication={prepareLocalTarget,publishLocal,removeLocal,metadataFor,selfContainedHtml,fileNameFor,remotePublicationNotice};
+  window.AmoStatusReportPublication={prepareLocalTarget,changeLocalTarget,localTargetInfo,publishLocal,removeLocal,metadataFor,selfContainedHtml,fileNameFor,remotePublicationNotice,TARGET_EVENT};
 })();
