@@ -71,7 +71,9 @@
   function allocationDemandId(row){return clean(row.querySelector('.allocation-demand-id')?.textContent)}
   function arrangeAllocations(){
     const table=document.getElementById('allocationTable'),toolbar=document.getElementById('allocationToolbar');if(!table)return;
-    ensureControl(toolbar,'allocations',()=>typeof renderAllocations==='function'&&renderAllocations());
+    const rerender=()=>typeof renderAllocations==='function'&&renderAllocations();
+    ensureControl(toolbar,'allocations',rerender);
+    requestAnimationFrame(()=>ensureControl(table.querySelector('.list-sticky-actions'),'allocations',rerender));
     const tbody=table.tBodies?.[0];if(!tbody)return;
     const blocks=blocksFromRows(tbody,'tr.allocation-demand-header',allocationDemandId);regroup(table,blocks,valueFor('allocations'))
   }
