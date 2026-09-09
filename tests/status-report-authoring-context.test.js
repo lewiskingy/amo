@@ -27,6 +27,12 @@ assert.match(ui,/status-report-toolbar/);
 assert.match(ui,/unpublishStatusReport:'Reopen this Published report as Draft/);
 assert.match(ui,/newStatusDraft:'Finalise this Published report and start the next reporting cycle/);
 
+// Health is the fourth table column (zero-based index 3); Status Update remains the fifth column.
+assert.match(health,/cell=tr\.children\?\.\[3\]/,'Health sync must target the Health column');
+assert.doesNotMatch(health,/cell=tr\.children\?\.\[4\]/,'Health sync must never replace Status Update content');
+assert.match(lifecycle,/\[\['health',3\],\['statusUpdate',4\],\['achievements',5\],\['issues',6\]\]/);
+assert.match(lifecycle,/const cell=tr\.children\?\.\[3\]/,'Health visual semantics belong on the Health cell');
+
 // Authoring shows the immutable previous baseline above the new editable narrative fields.
 assert.match(ui,/function ensureAuthoringPreviousBaseline/);
 assert.match(ui,/source\.previousReportId=previous\.id/);
