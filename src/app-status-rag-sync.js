@@ -50,7 +50,7 @@
     if(filter){const selected=normalizeHealth(filter.value);filter.innerHTML=healthOptions(selected,true);filter.value=selected}
     document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{
       const d=db.demand.find(x=>x.id===tr.dataset.statusDemand);if(!d)return;
-      const explicit=explicitReportEntry(d.id,source),health=effectiveHealth(d,explicit),cell=tr.children?.[4];if(!cell)return;
+      const explicit=explicitReportEntry(d.id,source),health=effectiveHealth(d,explicit),cell=tr.children?.[3];if(!cell)return;
       cell.title=health?HEALTH_HELP[health]||'Demand Health':'Health has not been set.';
       if(statusReportState.editing){
         const select=cell.querySelector('[data-status-field="rag"]');
