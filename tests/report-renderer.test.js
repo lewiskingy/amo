@@ -17,11 +17,7 @@ assert.match(html,/Integration Design/);
 assert.match(html,/In Progress/);
 assert.match(html,/WP-0002/);
 assert.match(html,/Data Migration/);
-assert.match(html,/Effort to date/);
-assert.match(html,/Actual 1\.2 FTE-mo/);
-assert.match(html,/plan 1\.6 FTE-mo/);
-assert.match(html,/under plan/);
-assert.match(html,/coincides with those People recording effort on other Demand/);
+assert.doesNotMatch(html,/Effort to date|Actual 1\.2 FTE-mo|under plan|Actual effort is 25% below plan|coincides with those People recording effort on other Demand/,'Status Report should not render per-Demand Actuals commentary');
 assert.doesNotMatch(html,/Allocation outlook|Portfolio forecast/,'Status Report must not recreate detailed Dashboard/Resource Plan financial reporting');
 
 // Older immutable snapshots that stored singular service and no Work Package context remain readable.

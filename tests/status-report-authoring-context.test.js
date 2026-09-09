@@ -15,6 +15,24 @@ assert.match(lifecycle,/id="newStatusDraft"/);
 assert.match(lifecycle,/prepareLocalTarget\(\)/);
 assert.doesNotMatch(health,/publishStatusReport\s*=\s*function/,'Health sync must not maintain a competing Publish lifecycle');
 
+// The Status Report action area exposes lifecycle actions and the publication destination together.
+assert.match(ui,/function decoratePublicationControls/);
+assert.match(ui,/Publish HTML to/);
+assert.match(ui,/status-publication-change/);
+assert.match(ui,/changeLocalTarget/);
+assert.match(ui,/Remote publication/);
+assert.match(ui,/JSON snapshot only/);
+assert.match(ui,/PDF not enabled/);
+assert.match(ui,/status-report-toolbar/);
+assert.match(ui,/unpublishStatusReport:'Reopen this Published report as Draft/);
+assert.match(ui,/newStatusDraft:'Finalise this Published report and start the next reporting cycle/);
+
+// Health is the fourth table column (zero-based index 3); Status Update remains the fifth column.
+assert.match(health,/cell=tr\.children\?\.\[3\]/,'Health sync must target the Health column');
+assert.doesNotMatch(health,/cell=tr\.children\?\.\[4\]/,'Health sync must never replace Status Update content');
+assert.match(lifecycle,/\[\['health',3\],\['statusUpdate',4\],\['achievements',5\],\['issues',6\]\]/);
+assert.match(lifecycle,/const cell=tr\.children\?\.\[3\]/,'Health visual semantics belong on the Health cell');
+
 // Authoring shows the immutable previous baseline above the new editable narrative fields.
 assert.match(ui,/function ensureAuthoringPreviousBaseline/);
 assert.match(ui,/source\.previousReportId=previous\.id/);
