@@ -88,9 +88,15 @@
     $('viewLatestStatus')?.addEventListener('click',()=>openStatusReportModal(r));$('openLatestStatus')?.addEventListener('click',()=>openReportWindow(r,{departmentId:ORG,teamId:ALL}))
   };
 
-  function previousEntryFor(demandId){return(statusReportDraft?.previousEntries||[]).find(e=>e.demandId===demandId)||null}
+  function authoringSource(){return statusReportState?.editing&&statusReportState.draftBuffer?statusReportState.draftBuffer:statusReportDraft}
+  function ensureAuthoringPreviousBaseline(){
+    const source=authoringSource();if(!statusReportState?.editing||!source||source.previousReportId||(source.previousEntries||[]).length)return source;
+    const previous=latestPublishedReport();if(!previous)return source;
+    source.previousReportId=previous.id;source.previousEntries=clone(previous.entries||[]);return source
+  }
+  function previousEntryFor(demandId){const source=ensureAuthoringPreviousBaseline();return(source?.previousEntries||[]).find(e=>e.demandId===demandId)||null}
   function previousReportLabel(){
-    const id=statusReportDraft?.previousReportId;if(!id)return'Previous report';const report=(statusReports||[]).find(r=>r.id===id),date=report?.reportingDate;return date?`Previous report · ${date}`:`Previous report · ${id}`
+    const source=ensureAuthoringPreviousBaseline(),id=source?.previousReportId;if(!id)return'Previous report';const report=(statusReports||[]).find(r=>r.id===id),date=report?.reportingDate;return date?`Previous report · ${date}`:`Previous report · ${id}`
   }
   function liveActiveWorkPackages(demandId){const rows=window.WorkPackages?.forDemand?.(demandId)||window.WorkPackages?.state?.rows?.filter(w=>w.demandId===demandId)||[];return rows.filter(w=>!['Complete','Cancelled'].includes(String(w.status||'')))}
   async function copyPreviousText(button,text){
@@ -100,9 +106,13 @@
       const prior=button.getAttribute('aria-label')||'Copy previous text';button.classList.add('copied');button.setAttribute('aria-label','Copied');button.title='Copied';setTimeout(()=>{button.classList.remove('copied');button.setAttribute('aria-label',prior);button.title=prior},1200)
     }catch(_e){alert('Could not copy the previous report text to the clipboard.')}
   }
+  function commentaryStack(cell,textarea){
+    let stack=cell.querySelector('.status-commentary-stack');if(stack)return stack;
+    stack=document.createElement('div');stack.className='status-commentary-stack';cell.insertBefore(stack,textarea);stack.appendChild(textarea);return stack
+  }
   function decorateAuthoringContext(){
     if(!statusReportState?.editing)return;
-    const previousLabel=previousReportLabel();
+    ensureAuthoringPreviousBaseline();const previousLabel=previousReportLabel();
     document.querySelectorAll('#statusReportTable tr[data-status-demand]').forEach(tr=>{
       const demandId=tr.dataset.statusDemand,previous=previousEntryFor(demandId),first=tr.children?.[0];
       if(first&&!first.querySelector('.status-work-package-context')){
@@ -110,11 +120,11 @@
         box.innerHTML=`<div class="status-context-label">Active Work Packages</div>${rows.length?rows.map(w=>`<div class="status-work-package-row"><strong>${escHtml(w.id||'')}</strong><span>${escHtml(w.title||'')}</span><span class="pill blue">${escHtml(w.status||'')}</span>${w.targetEnd?`<span class="muted">to ${escHtml(w.targetEnd)}</span>`:''}</div>`).join(''):'<div class="muted">No active Work Packages.</div>'}`;first.appendChild(box)
       }
       tr.querySelectorAll('textarea[data-status-field]').forEach(textarea=>{
-        const field=textarea.dataset.statusField;if(!['statusUpdate','achievements','issues'].includes(field))return;const cell=textarea.closest('td');if(!cell)return;cell.classList.add('status-commentary-cell');
-        const value=previous?.[field]||'';if(!value||cell.querySelector(`.status-previous-context[data-field="${field}"]`))return;
+        const field=textarea.dataset.statusField;if(!['statusUpdate','achievements','issues'].includes(field))return;const cell=textarea.closest('td');if(!cell)return;cell.classList.add('status-commentary-cell');const stack=commentaryStack(cell,textarea);
+        const value=previous?.[field]||'';if(!value||stack.querySelector(`.status-previous-context[data-field="${field}"]`))return;
         const box=document.createElement('div');box.className='status-previous-context';box.dataset.field=field;
         box.innerHTML=`<div class="status-previous-head"><div class="status-context-label">${escHtml(previousLabel)}</div><button type="button" class="status-copy-previous" aria-label="Copy previous text" title="Copy previous text"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg></button></div><div class="status-previous-text">${escHtml(value)}</div>`;
-        box.querySelector('.status-copy-previous')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();copyPreviousText(e.currentTarget,value)});cell.insertBefore(box,textarea)
+        box.querySelector('.status-copy-previous')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();copyPreviousText(e.currentTarget,value)});stack.insertBefore(box,textarea)
       })
     })
   }
@@ -129,5 +139,5 @@
   if(typeof renderStatusReporting==='function'){const base=renderStatusReporting;renderStatusReporting=function(){const r=base();focusAuthoringPage();return r}}
 
   ensureRendererStyles();focusAuthoringPage();
-  const css=document.createElement('style');css.id='status-report-ui-styles';css.textContent=`.status-modal{width:min(1180px,96vw)}.status-modal-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:10px 0 14px;background:var(--panel);border-bottom:1px solid var(--line);margin-bottom:14px}.status-scope-controls{display:flex;gap:10px;flex-wrap:wrap}.status-scope-controls label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;font-weight:700;color:var(--muted)}.status-scope-controls select{min-width:210px;border:1px solid var(--line);border-radius:8px;padding:7px 28px 7px 9px;background:var(--panel);color:var(--ink)}.latest-status-report-card .toolbar{margin:0}.status-context-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.status-commentary-cell{vertical-align:top!important;display:flex;flex-direction:column;gap:8px;height:100%}.status-commentary-cell>textarea[data-status-field]{margin-top:auto;min-height:76px;flex:0 0 auto}.status-previous-context{margin:0;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}.status-previous-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}.status-previous-text{white-space:pre-wrap;font-size:.78rem;line-height:1.4;color:var(--ink)}.status-copy-previous{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--muted);cursor:pointer;padding:4px}.status-copy-previous:hover{color:var(--ink);border-color:var(--accent)}.status-copy-previous.copied{color:var(--success)}.status-copy-previous svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8}.status-work-package-context{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);display:grid;gap:5px}.status-work-package-row{display:grid;grid-template-columns:auto minmax(120px,1fr) auto;gap:6px;align-items:center;font-size:.72rem}.status-work-package-row .muted{grid-column:2/-1}.status-report-table .previous-report-detail,.status-report-table .previous-copy-all{display:none!important}@media(max-width:760px){.status-modal-toolbar{align-items:stretch;flex-direction:column}.status-scope-controls{display:grid;grid-template-columns:1fr}.status-scope-controls select{width:100%;min-width:0}.status-work-package-row{grid-template-columns:1fr}}`;document.head.appendChild(css)
+  const css=document.createElement('style');css.id='status-report-ui-styles';css.textContent=`.status-modal{width:min(1180px,96vw)}.status-modal-toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:10px 0 14px;background:var(--panel);border-bottom:1px solid var(--line);margin-bottom:14px}.status-scope-controls{display:flex;gap:10px;flex-wrap:wrap}.status-scope-controls label{display:flex;flex-direction:column;gap:5px;font-size:.78rem;font-weight:700;color:var(--muted)}.status-scope-controls select{min-width:210px;border:1px solid var(--line);border-radius:8px;padding:7px 28px 7px 9px;background:var(--panel);color:var(--ink)}.latest-status-report-card .toolbar{margin:0}.status-context-label{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.status-commentary-cell{vertical-align:top!important}.status-commentary-stack{min-height:150px;height:100%;display:flex;flex-direction:column;gap:8px}.status-commentary-stack>textarea[data-status-field]{margin-top:auto;min-height:76px;flex:0 0 auto}.status-previous-context{margin:0;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}.status-previous-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:5px}.status-previous-text{white-space:pre-wrap;font-size:.78rem;line-height:1.4;color:var(--ink)}.status-copy-previous{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--muted);cursor:pointer;padding:4px}.status-copy-previous:hover{color:var(--ink);border-color:var(--accent)}.status-copy-previous.copied{color:var(--success)}.status-copy-previous svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8}.status-work-package-context{margin-top:9px;padding-top:8px;border-top:1px solid var(--line);display:grid;gap:5px}.status-work-package-row{display:grid;grid-template-columns:auto minmax(120px,1fr) auto;gap:6px;align-items:center;font-size:.72rem}.status-work-package-row .muted{grid-column:2/-1}.status-report-table .previous-report-detail,.status-report-table .previous-copy-all{display:none!important}@media(max-width:760px){.status-modal-toolbar{align-items:stretch;flex-direction:column}.status-scope-controls{display:grid;grid-template-columns:1fr}.status-scope-controls select{width:100%;min-width:0}.status-work-package-row{grid-template-columns:1fr}}`;document.head.appendChild(css)
 })();
