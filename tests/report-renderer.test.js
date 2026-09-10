@@ -29,3 +29,4 @@ require('./status-report-authoring-context.test.js');
 require('./status-report-publication.test.js');
 require('./resource-plan-refinement.test.js');
 require('./list-arrangement.test.js');
+require('./commitment-health.test.js');
