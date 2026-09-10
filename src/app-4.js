@@ -22,3 +22,14 @@
   s.onerror=()=>console.error(`Could not load ${s.src}`);
   document.head.appendChild(s)
 })();
+
+/* Hierarchy controls coordinate presentation-only Expand all / Collapse all behaviour across the
+   canonical Demand Work Package tree and Work Package Resource Plan. */
+(function loadHierarchyControls(){
+  if(document.querySelector('script[data-amo-hierarchy-controls]')||window.HierarchyControls)return;
+  const s=document.createElement('script'),version=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  s.src=version?`app-hierarchy-controls.js?v=${encodeURIComponent(version)}`:'app-hierarchy-controls.js';
+  s.dataset.amoHierarchyControls='true';s.async=false;
+  s.onerror=()=>console.error(`Could not load ${s.src}`);
+  document.head.appendChild(s)
+})();

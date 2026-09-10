@@ -59,6 +59,7 @@
 
   function childRowHtml(w,demand,colspan){const dates=[w.targetStart,w.targetEnd].filter(Boolean).join(' → '),url=workItemUrl(w,demand);return`<tr class="wp-child-row" data-wp-row="${esc(w.id)}" data-demand-id="${esc(demand.id)}"><td colspan="${colspan}"><div class="wp-tree-child"><span class="wp-tree-branch">└</span><span class="pill blue">${esc(w.id)}</span><span class="wp-tree-title">${esc(w.title)}</span><span class="wp-tree-meta">${w.service?`<span class="pill">${esc(w.service)}</span>`:''}<span class="pill">${esc(w.status)}</span>${w.estimatedEffortDays!=null?`<span class="pill">${esc(w.estimatedEffortDays)}d</span>`:'<span class="pill">Not estimated</span>'}${dates?`<span class="pill">${esc(dates)}</span>`:''}${w.azureDevOpsWorkItemId?(url?`<a class="pill" href="${esc(url)}" target="_blank" rel="noopener noreferrer">AzDO #${esc(w.azureDevOpsWorkItemId)}</a>`:`<span class="pill">AzDO #${esc(w.azureDevOpsWorkItemId)}</span>`):''}</span><span class="wp-tree-actions"><button class="btn" data-wp-edit="${esc(w.id)}">Edit</button></span></div></td></tr>`}
   function rerenderDemandGrid(){if(typeof renderGrid==='function'&&typeof gridState!=='undefined'&&!gridState.demand?.editing)renderGrid('demand')}
+  function setDemandExpansion(demandIds,expanded,{render=true}={}){for(const id of demandIds||[]){if(expanded)collapsedDemandIds.delete(id);else collapsedDemandIds.add(id)}if(render)rerenderDemandGrid()}
   function scheduleTreeRefresh(){if(state.loaded||state.treeRefreshScheduled)return;state.treeRefreshScheduled=true;load().then(()=>{state.treeRefreshScheduled=false;rerenderDemandGrid()}).catch(e=>{state.treeRefreshScheduled=false;console.warn('Could not load Work Packages',e)})}
   function renderDemandTreeRows(table,demands){
     if(!table||!workspaceHandle)return;ensureStyles();
@@ -89,5 +90,5 @@
   window.addEventListener('amo-workspace-loaded',()=>{state.loaded=false;state.treeRefreshScheduled=false;collapsedDemandIds.clear()});
   window.addEventListener('amo:work-packages-updated',rerenderDemandGrid);
   document.querySelector('[data-view="config"]')?.addEventListener('click',()=>setTimeout(decorateConfig,0));
-  window.WorkPackages={state,load,forDemand,summaryForDemand,normalize,validate,azureDevOpsContextForDemand,workItemUrl,renderModalSection,renderDemandTreeRows,openEditor,remove};
+  window.WorkPackages={state,load,forDemand,summaryForDemand,normalize,validate,azureDevOpsContextForDemand,workItemUrl,renderModalSection,renderDemandTreeRows,setDemandExpansion,collapsedDemandIds,openEditor,remove};
 })();
