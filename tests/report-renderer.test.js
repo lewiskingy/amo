@@ -31,4 +31,5 @@ require('./resource-plan-refinement.test.js');
 require('./list-arrangement.test.js');
 require('./commitment-health.test.js');
 require('./management-filter-navigation.test.js');
+require('./demand-grid-composition.test.js');
 require('./hierarchy-controls.test.js');

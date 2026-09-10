@@ -21,9 +21,12 @@ assert.match(demandGrid,/Project Number for \$\{d\.id\} must contain digits only
 assert.match(demandGrid,/seenProjects\.has\(d\.projectNumber\)/);
 assert.doesNotMatch(app5,/<strong>Cost Centre \/ Project Code:<\/strong>/);
 
-// Late-loaded layers consume the canonical Defined Demand model rather than recreating old fields or a second renderer.
-assert.match(integrations,/const canonicalDemandColumns=\[\.\.\.demandCols\]/);
-assert.match(integrations,/function sourceDemandColumns\(editing\)/);
+// Late-loaded layers contribute to the canonical Demand renderer rather than recreating an old renderer or stale column snapshot.
+assert.match(integrations,/const INTEGRATION_SOURCE_KEYS=new Set/);
+assert.match(integrations,/function sourceDemandColumns\(editing,columns=demandCols\)/);
+assert.match(integrations,/AmoDemandGrid\?\.register/);
+assert.doesNotMatch(integrations,/const baseRenderGridIntegration=renderGrid/);
+assert.doesNotMatch(integrations,/renderGrid=function\(name\)/);
 assert.doesNotMatch(integrations,/function renderIntegratedDemandGrid/);
 assert.doesNotMatch(integrations,/key:'costCentreOrProjectCode'/);
 assert.doesNotMatch(integrations,/label:'Cost Centre \/ Project Code'/);
