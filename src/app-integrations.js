@@ -18,19 +18,23 @@ async function populateSourceTitleIfBlank(record,onDone){
 }
 
 /* ----- Demand register: source provenance only -----
-   app-2.js remains the one Demand renderer. This integration layer only supplies the source
-   provenance columns and their specialised presentation/edit behaviour. */
+   app-2.js remains the one Demand renderer. This module contributes columns/decorators through
+   AmoDemandGrid and never replaces renderGrid. */
 const INTEGRATION_DEMAND_TAIL_KEYS=new Set(['health']);
-const canonicalDemandColumns=[...demandCols];
-function sourceDemandColumns(editing){
-  const base=canonicalDemandColumns.filter(c=>!INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
-  const tail=canonicalDemandColumns.filter(c=>INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
+const INTEGRATION_SOURCE_KEYS=new Set(['_source','source.url','source.title']);
+function sourceDemandColumns(editing,columns=demandCols){
+  const canonical=[...columns].filter(c=>!INTEGRATION_SOURCE_KEYS.has(c.key));
+  const base=canonical.filter(c=>!INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
+  const tail=canonical.filter(c=>INTEGRATION_DEMAND_TAIL_KEYS.has(c.key));
   return editing
     ?[...base,{key:'source.url',label:'Source URL',type:'url',editable:true},{key:'source.title',label:'Source Title',type:'text',editable:true},...tail]
     :[...base,{key:'_source',label:'Source Demand',type:'text',editable:false,derived:true},...tail]
 }
-function installDemandColumns(){demandCols.splice(0,demandCols.length,...sourceDemandColumns(!!gridState.demand.editing))}
-function restoreCanonicalDemandColumns(){demandCols.splice(0,demandCols.length,...canonicalDemandColumns)}
+function installDemandColumns(){
+  const previous=[...demandCols];
+  demandCols.splice(0,demandCols.length,...sourceDemandColumns(!!gridState.demand.editing,previous));
+  return()=>demandCols.splice(0,demandCols.length,...previous)
+}
 
 const baseDisplayValIntegration=displayVal;
 displayVal=function(row,col){if(col?.key==='_source')return row.source?.title||linkFallback(row.source?.url||'','source')||'';return baseDisplayValIntegration(row,col)};
@@ -39,7 +43,7 @@ editControl=function(row,col){if(col?.key==='source.url'){const v=getPath(row,co
 
 function decorateDemandSourceCells(table,rows){
   if(!table||gridState.demand.editing)return;
-  const cols=sourceDemandColumns(false),sourceIndex=cols.findIndex(c=>c.key==='_source');if(sourceIndex<0)return;
+  const sourceIndex=demandCols.findIndex(c=>c.key==='_source');if(sourceIndex<0)return;
   for(const tr of table.tBodies?.[0]?.querySelectorAll('tr[data-row]')||[]){
     const row=rows.find(r=>String(r.id)===String(tr.dataset.row));if(!row||!tr.cells?.[sourceIndex])continue;
     tr.cells[sourceIndex].innerHTML=integrationLink(row.source?.url,row.source?.title,'source')
@@ -53,15 +57,12 @@ function bindDemandSourceTitleLookup(table){
     await populateSourceTitleIfBlank(row,()=>renderGrid('demand'))
   }))
 }
-const baseRenderGridIntegration=renderGrid;
-renderGrid=function(name){
-  if(name!=='demand')return baseRenderGridIntegration(name);
-  installDemandColumns();
-  try{
-    const result=baseRenderGridIntegration(name),table=$('demandTable'),rows=gridRows('demand');
-    decorateDemandSourceCells(table,rows);bindDemandSourceTitleLookup(table);return result
-  }finally{restoreCanonicalDemandColumns()}
+const demandSourceContribution={
+  id:'demand-source-provenance',priority:10,
+  beforeRender:()=>installDemandColumns(),
+  afterRender:({table,rows})=>{decorateDemandSourceCells(table,rows);bindDemandSourceTitleLookup(table)}
 };
+if(window.AmoDemandGrid?.register)window.AmoDemandGrid.register(demandSourceContribution);else(window.AmoDemandGridPending=window.AmoDemandGridPending||[]).push(demandSourceContribution);
 
 /* Modal: best-effort source title lookup after URL blur. */
 const baseRenderRecordModalIntegration=renderRecordModal;renderRecordModal=function(){baseRenderRecordModalIntegration();if(recordModalState.type==='demand'&&recordModalState.mode==='edit'){const urlEl=$('recordModalBody').querySelector('[data-modal-field="source.url"]'),titleEl=$('recordModalBody').querySelector('[data-modal-field="source.title"]');if(urlEl)urlEl.addEventListener('blur',async()=>{if(titleEl?.value.trim()||!urlEl.value.trim())return;const title=await fetchRemotePageTitle(urlEl.value.trim());if(title&&titleEl){titleEl.value=title;recordModalState.draft=readModalDraft()}})}};
