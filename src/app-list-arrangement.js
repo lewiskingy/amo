@@ -79,7 +79,8 @@
   }
 
   function after(fn,decorate){return function(...args){const result=fn.apply(this,args);decorate();return result}}
-  if(typeof renderGrid==='function'){const base=renderGrid;renderGrid=function(name){const result=base.apply(this,arguments);if(name==='demand')arrangeDemand();return result}}
+  const demandContribution={id:'list-arrangement',priority:30,afterRender:()=>arrangeDemand()};
+  if(window.AmoDemandGrid?.register)window.AmoDemandGrid.register(demandContribution);else(window.AmoDemandGridPending=window.AmoDemandGridPending||[]).push(demandContribution);
   if(typeof renderStatusReporting==='function'){const base=renderStatusReporting;renderStatusReporting=after(base,arrangeStatus)}
   if(typeof renderAllocations==='function'){const base=renderAllocations;renderAllocations=after(base,arrangeAllocations)}
 
