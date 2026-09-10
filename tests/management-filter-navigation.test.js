@@ -27,29 +27,41 @@ assert.match(commitment,/management-filter-chips/);
 assert.match(commitment,/Show: All/);
 assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the management filter bar');
 
-// The canonical Demand row query must consume the management predicate before rendering. This is the
-// behavioural contract that prevents a redraw from showing the same unfiltered population.
+// The canonical Demand row query consumes the exported management filter state directly for
+// parent-Demand fields. Derived Control remains delegated to Commitment Health semantics.
 assert.match(demandGrid,/function demandManagementMatch\(row\)/);
-assert.match(demandGrid,/window\.CommitmentHealth\?\.matchesDemandQuery/);
+assert.match(demandGrid,/const ch=window\.CommitmentHealth,filters=ch\?\.demandFilters/);
+assert.match(demandGrid,/filters\.businessArea/);
+assert.match(demandGrid,/filters\.initiative/);
+assert.match(demandGrid,/filters\.owner/);
+assert.match(demandGrid,/filters\.project==='missing'/);
+assert.match(demandGrid,/filters\.control/);
 assert.match(demandGrid,/name!=='demand'\|\|demandManagementMatch\(r\)/);
 assert.doesNotMatch(commitment,/const baseRows=gridRows/,'Commitment Health must not re-wrap the canonical Demand row query');
+
 const rows=[
-  {id:'DEM-1',title:'No project',projectNumber:''},
-  {id:'DEM-2',title:'Has project',projectNumber:'2002'},
-  {id:'DEM-3',title:'Also no project',projectNumber:''}
+  {id:'DEM-1',title:'No project',status:'In Progress',projectNumber:'',businessArea:'Pensions',initiative:'Modernise',ownerId:'P-1'},
+  {id:'DEM-2',title:'Has project',status:'Planned',projectNumber:'2002',businessArea:'Protection',initiative:'Growth',ownerId:'P-2'},
+  {id:'DEM-3',title:'Done no project',status:'Complete',projectNumber:'',businessArea:'Pensions',initiative:'Modernise',ownerId:'P-1'}
 ];
+const demandFilters={scope:'active',businessArea:'',initiative:'',owner:'',project:'',control:'',search:''};
 const coreContext={console,Set,Map,Object,Number,String,Date,Math,structuredClone,
-  window:{CommitmentHealth:{matchesDemandQuery:d=>!!String(d.projectNumber||'').trim()},WorkPackages:{}},
-  db:{demand:rows,team:[{id:'P-1',name:'One'}],settings:{businessAreas:[],initiatives:[],priorities:[],statuses:[],demandSizeDays:{},healthStates:[]}},
+  window:{CommitmentHealth:{demandFilters,matchesDemandQuery:d=>d.id==='DEM-2'},DefinedDemandModel:{isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{}},
+  db:{demand:rows,team:[{id:'P-1',name:'One'},{id:'P-2',name:'Two'}],settings:{businessAreas:[],initiatives:[],priorities:[],statuses:[],demandSizeDays:{},healthStates:[]}},
   gridState:{demand:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null},team:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null}},
-  getPath:(obj,path)=>path.split('.').reduce((v,k)=>v?.[k],obj),person:()=>null,normalizeInitiatives:x=>x,initiativesForBusinessArea:()=>[],escHtml:x=>String(x)
+  getPath:(obj,path)=>path.split('.').reduce((v,k)=>v?.[k],obj),person:id=>({name:id}),normalizeInitiatives:x=>x,initiativesForBusinessArea:()=>[],escHtml:x=>String(x)
 };
 vm.createContext(coreContext);vm.runInContext(demandGrid,coreContext);
-assert.deepEqual(Array.from(coreContext.gridRows('demand'),d=>d.id),['DEM-2'],'Has Project Number predicate must reduce canonical Demand rows');
-coreContext.window.CommitmentHealth.matchesDemandQuery=d=>!String(d.projectNumber||'').trim();
-assert.deepEqual(Array.from(coreContext.gridRows('demand'),d=>d.id),['DEM-1','DEM-3'],'No Project Number predicate must reduce canonical Demand rows');
-coreContext.window.CommitmentHealth.matchesDemandQuery=()=>false;
-assert.deepEqual(Array.from(coreContext.gridRows('team'),p=>p.id),['P-1'],'Demand management filters must not affect People rows');
+const ids=()=>Array.from(coreContext.gridRows('demand'),d=>d.id);
+assert.deepEqual(ids(),['DEM-1','DEM-2'],'Active must exclude terminal parent Demand');
+demandFilters.businessArea='Protection';assert.deepEqual(ids(),['DEM-2'],'Business Area must reduce canonical parent rows');demandFilters.businessArea='';
+demandFilters.initiative='Modernise';assert.deepEqual(ids(),['DEM-1'],'Initiative must reduce canonical parent rows and retain Active semantics');demandFilters.initiative='';
+demandFilters.owner='P-2';assert.deepEqual(ids(),['DEM-2'],'Owner must reduce canonical parent rows');demandFilters.owner='';
+demandFilters.project='missing';assert.deepEqual(ids(),['DEM-1'],'No Project Number must exclude rows with Project Number');demandFilters.project='present';assert.deepEqual(ids(),['DEM-2'],'Has Project Number must exclude rows without Project Number');demandFilters.project='';
+demandFilters.search='Has project';assert.deepEqual(ids(),['DEM-2'],'Search must reduce canonical parent rows');demandFilters.search='';
+demandFilters.scope='all';assert.deepEqual(ids(),['DEM-1','DEM-2','DEM-3'],'Show All must include terminal parent Demand');demandFilters.scope='active';
+demandFilters.control='funding-missing';assert.deepEqual(ids(),['DEM-2'],'Derived Control must remain delegated to Commitment Health');demandFilters.control='';
+assert.deepEqual(Array.from(coreContext.gridRows('team'),p=>p.id),['P-1','P-2'],'Demand management filters must not affect People rows');
 
 // Active / All applies consistently across the nested Demand hierarchy. Work Package filtering is
 // owned by the canonical Work Package renderer rather than a post-render DOM hider.
