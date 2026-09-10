@@ -15,6 +15,7 @@
   const departmentByIdSafe=id=>configuredDepartmentsSafe().find(d=>d.id===id)||null;
   const serviceOptions=()=>db.settings?.services||[];
   const statusOptions=()=>db.settings?.workPackageStatuses||window.DefinedDemandModel?.WORK_PACKAGE_STATUSES||['Planned','Ready','In Progress','Blocked','Complete','Cancelled'];
+  const isTerminalStatus=status=>['Complete','Cancelled'].includes(trim(status));
 
   function azureDevOpsContextForDemand(demand){
     const team=teamByIdSafe(demand?.teamId),department=departmentByIdSafe(team?.departmentId||demand?.departmentId)||null;
@@ -41,6 +42,7 @@
     state.loadPromise=promise;return promise
   }
   function forDemand(demandId){return state.rows.filter(x=>x.demandId===demandId).sort((a,b)=>String(a.targetStart||'9999').localeCompare(String(b.targetStart||'9999'))||a.id.localeCompare(b.id))}
+  function visibleForDemand(demandId,{show='active',control=''}={}){let rows=forDemand(demandId);if(show!=='all')rows=rows.filter(w=>!isTerminalStatus(w.status));if(control==='work-item-missing'&&typeof window.CommitmentHealth?.workPackageRequiresWorkItem==='function')rows=rows.filter(w=>window.CommitmentHealth.workPackageRequiresWorkItem(w)&&!trim(w.azureDevOpsWorkItemId));return rows}
   function summaryForDemand(demandId){const rows=forDemand(demandId),estimated=rows.map(x=>numberOrNull(x.estimatedEffortDays)).filter(x=>x!=null),starts=rows.map(x=>x.targetStart).filter(Boolean).sort(),ends=rows.map(x=>x.targetEnd).filter(Boolean).sort(),services=[...new Set(rows.map(x=>x.service).filter(Boolean))];return{count:rows.length,estimatedCount:estimated.length,estimatedEffortDays:estimated.reduce((n,v)=>n+v,0),start:starts[0]||'',end:ends.at(-1)||'',services}}
   async function releaseEditLock(reason){if(typeof lockOwnedByUs==='function'&&lockOwnedByUs()&&typeof releaseWorkspaceLock==='function')await releaseWorkspaceLock(reason)}
   async function ensureEditorLock(){if(typeof lockOwnedByUs==='function'&&lockOwnedByUs())return true;if(typeof acquireWorkspaceLock==='function')return await acquireWorkspaceLock();return true}
@@ -64,15 +66,15 @@
   function renderDemandTreeRows(table,demands){
     if(!table||!workspaceHandle)return;ensureStyles();
     const body=table.tBodies?.[0],colspan=table.tHead?.rows?.[0]?.cells?.length||1;if(!body)return;
-    const loaded=state.loaded;
+    const loaded=state.loaded,filters=window.CommitmentHealth?.demandFilters||{};
     for(const demand of demands){
       const parent=[...body.querySelectorAll('tr[data-row]')].find(tr=>tr.dataset.row===String(demand.id));if(!parent)continue;
-      const rows=loaded?forDemand(demand.id):[],first=parent.cells?.[0];if(!first)continue;
+      const rows=loaded?visibleForDemand(demand.id,{show:filters.scope||'active',control:filters.control||''}):[],first=parent.cells?.[0];if(!first)continue;
       const collapsed=collapsedDemandIds.has(demand.id),toggle=loaded&&rows.length?(collapsed?'▸':'▾'):loaded?'•':'…';
       first.innerHTML=`<div class="wp-parent-controls"><button class="wp-tree-toggle" data-wp-toggle="${esc(demand.id)}" aria-label="${collapsed?'Expand':'Collapse'} Work Packages" title="${loaded?(collapsed?'Expand':'Collapse'):'Loading'} Work Packages">${toggle}</button><span>${esc(demand.id)}</span><button class="btn wp-add-inline" data-wp-add="${esc(demand.id)}">+ WP</button></div>`;
       if(loaded&&!collapsed){let anchor=parent;for(const w of rows){anchor.insertAdjacentHTML('afterend',childRowHtml(w,demand,colspan));anchor=anchor.nextElementSibling}}
     }
-    body.querySelectorAll('[data-wp-toggle]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const id=b.dataset.wpToggle;if(!state.loaded||!forDemand(id).length)return;if(collapsedDemandIds.has(id))collapsedDemandIds.delete(id);else collapsedDemandIds.add(id);rerenderDemandGrid()}));
+    body.querySelectorAll('[data-wp-toggle]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();const id=b.dataset.wpToggle;if(!state.loaded||!visibleForDemand(id,{show:filters.scope||'active',control:filters.control||''}).length)return;if(collapsedDemandIds.has(id))collapsedDemandIds.delete(id);else collapsedDemandIds.add(id);rerenderDemandGrid()}));
     body.querySelectorAll('[data-wp-add]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openEditor({demandId:b.dataset.wpAdd})}));
     body.querySelectorAll('[data-wp-edit]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openEditor(state.rows.find(x=>x.id===b.dataset.wpEdit))}));
     body.querySelectorAll('tr[data-wp-row]').forEach(tr=>tr.addEventListener('dblclick',e=>{if(e.target.closest('button,a,input,select,textarea'))return;openEditor(state.rows.find(x=>x.id===tr.dataset.wpRow))}));
@@ -90,5 +92,5 @@
   window.addEventListener('amo-workspace-loaded',()=>{state.loaded=false;state.treeRefreshScheduled=false;collapsedDemandIds.clear()});
   window.addEventListener('amo:work-packages-updated',rerenderDemandGrid);
   document.querySelector('[data-view="config"]')?.addEventListener('click',()=>setTimeout(decorateConfig,0));
-  window.WorkPackages={state,load,forDemand,summaryForDemand,normalize,validate,azureDevOpsContextForDemand,workItemUrl,renderModalSection,renderDemandTreeRows,setDemandExpansion,collapsedDemandIds,openEditor,remove};
+  window.WorkPackages={state,load,forDemand,visibleForDemand,summaryForDemand,normalize,validate,azureDevOpsContextForDemand,workItemUrl,renderModalSection,renderDemandTreeRows,setDemandExpansion,collapsedDemandIds,openEditor,remove};
 })();
