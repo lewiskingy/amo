@@ -42,12 +42,18 @@ Dashboard summary KPIs navigate to the complete affected population, never to an
 
 Dashboard navigation writes the same visible filter state available to users on the destination view:
 
-- **No Project** → Demand / Active / Project = No Project Number / Control = Funding missing.
-- **Unmet Demand** → Demand / Active / Control = Resource missing.
-- **Work Items missing** → Demand / Active / Control = Work Item missing, preserving visibility of all affected Work Packages.
+- **No Project** → Demand / Show = Active / Project = No Project Number / Control = Funding missing.
+- **Unmet Demand** → Demand / Show = Active / Control = Resource missing.
+- **Work Items missing** → Demand / Show = Active / Control = Work Item missing, with affected Demand expanded and only active Work Packages causing the exception visible beneath them.
 - **Actuals missing** → Allocations / Control = Actuals missing.
 
-Demand filters are first-class query state. The default scope is **Active**, excluding Complete and Cancelled Demand. Users can switch to **All**. Project filtering explicitly supports **Has Project Number** and **No Project Number** rather than relying on text-box treatment of null values. Business Area, Initiative, Owner, Control Position and free-text search can be combined. Active filters are visible and individually removable.
+Demand filters are first-class query state. The local lifecycle selector is labelled **Show**, not Scope, so it is distinct from the page-level organisational context controlled by Department and Team. The default is **Active**: Complete and Cancelled Demand are excluded, and Complete and Cancelled Work Packages are also suppressed within otherwise-active Demand. **All** includes both active and terminal Demand and Work Packages. A parent Demand does not disappear merely because all of its Work Packages are terminal; under Show = Active it remains visible with no child rows.
+
+Business Area, Initiative, Owner and Project Number filter the parent Demand population. They do not independently match Work Package fields. Control Position filters the parent Demand by derived exception state. For Work Item missing, the nested Work Package view is narrowed to the active child records causing the exception so drill-through exposes the actionable records directly.
+
+Project filtering explicitly supports **Has Project Number** and **No Project Number** rather than relying on text-box treatment of null values. Business Area, Initiative, Owner, Control Position and free-text search can be combined. Active filters are visible and individually removable.
+
+The page-level Department and Team selectors define organisational context and are not reset by clearing Demand filters. Clear Filters resets only the Demand query to Show = Active with the other Demand filters empty.
 
 Filter, arrange and search remain distinct concepts: filtering controls which records appear; Arrange By changes grouping/presentation; search narrows by text.
 
@@ -62,6 +68,8 @@ On Allocations, Project context, Actual/Plan recovery and Actuals completeness a
 List pages use document-level vertical scrolling with sticky/floating headers. Wide tables retain native horizontal scrolling and expose a viewport-accessible synchronized horizontal scrollbar while the table extends below the viewport, so users do not have to reach the final row before panning sideways.
 
 Allocation Demand/Resource search continues to use selection-on-commit combobox behaviour: typing narrows suggestions without re-rendering on every keystroke, preventing focus loss.
+
+The Demand result count identifies the parent entity explicitly as Demand; Work Package rows are nested context and are not added to that parent count.
 
 ## Storage and workspace semantics
 
