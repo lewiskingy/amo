@@ -21,6 +21,15 @@ assert.match(commitment,/data-demand-filter="control"/);
 assert.match(commitment,/management-filter-chips/);
 assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the canonical Demand filter bar');
 
+// Manual filter changes must render through the same path as Dashboard drill-through and must not be
+// compounded by stale hidden filters from the retired per-column filter row.
+assert.match(commitment,/function clearLegacyDemandFilters\(\)/);
+assert.match(commitment,/gridState\.demand\.filters=\{\}/);
+assert.match(commitment,/function renderDemandView\(\)/);
+assert.match(commitment,/renderDemandView\(\)/);
+assert.match(commitment,/function applyDemandDomFilter\(table\)/,'Rendered Demand blocks are deterministically projected to the active management query');
+assert.match(commitment,/currentVisible=!!d&&matchesDemandQuery\(d\)/);
+
 // Control Position is a derived Demand presentation, not another persisted field.
 assert.match(commitment,/label:'Control Position'/);
 assert.doesNotMatch(commitment,/saveSettings|requestAutosave|dirtyRecords/);
