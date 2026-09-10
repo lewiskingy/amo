@@ -24,7 +24,7 @@ const context={console,Date,Set,Map,Object,Number,String,Math,structuredClone,
   demandCols:[],displayVal:()=>'',gridRows:()=>demand,renderGrid:()=>{},renderDashboard:()=>{},renderAllocations:()=>{},renderActualsAdmin:async()=>{},dashboardHeadlineSnapshot:()=>({}),
   unresolvedWithoutAllocation:()=>[demand[1]],switchView:()=>{},monthLabel:x=>x,escHtml:x=>String(x),
   document:{getElementById:()=>null,createElement:()=>({}),head:{appendChild:()=>{}},querySelectorAll:()=>[]},
-  window:{ReportingModel:rm,DefinedDemandModel:{canonicalState:d=>d,isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{state:{rows:workPackages},openEditor:()=>{},workItemUrl:()=>''},WorkPackageResourcePlanning:{}},
+  window:{addEventListener:()=>{},ReportingModel:rm,DefinedDemandModel:{canonicalState:d=>d,isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{state:{rows:workPackages},openEditor:()=>{},workItemUrl:()=>''},WorkPackageResourcePlanning:{}},
   setInterval:()=>0,clearInterval:()=>{}
 };
 context.window.window=context.window;vm.createContext(context);vm.runInContext(code,context);
