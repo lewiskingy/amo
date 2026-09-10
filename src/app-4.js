@@ -23,6 +23,18 @@
   document.head.appendChild(s)
 })();
 
+/* Demand management filtering is composed as a final row-query concern after the management
+   filter state exists. This avoids relying on parser/load timing between app-2.js and the
+   dynamically loaded Commitment Health module while still filtering before DOM rendering. */
+(function loadDemandManagementQuery(){
+  if(document.querySelector('script[data-amo-demand-management-query]')||window.AmoDemandManagementQuery)return;
+  const s=document.createElement('script'),version=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  s.src=version?`app-demand-management-query.js?v=${encodeURIComponent(version)}`:'app-demand-management-query.js';
+  s.dataset.amoDemandManagementQuery='true';s.async=false;
+  s.onerror=()=>console.error(`Could not load ${s.src}`);
+  document.head.appendChild(s)
+})();
+
 /* Hierarchy controls coordinate presentation-only Expand all / Collapse all behaviour across the
    canonical Demand Work Package tree and Work Package Resource Plan. */
 (function loadHierarchyControls(){
