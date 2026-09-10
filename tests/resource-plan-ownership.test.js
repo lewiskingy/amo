@@ -51,6 +51,12 @@ for(const name of fs.readdirSync('src').filter(n=>n.endsWith('.js')&&n!==path.ba
     `${name} defines or overrides renderResource; app-resource-plan.js must be the sole owner`);
 }
 
+// The HTML application shell is the source of truth for the deployment build identity. It must
+// never be reused across deployments, otherwise a browser can combine an older parser-loaded core
+// module with newer dynamically loaded presentation modules.
 assert.match(worker,/function versionApplicationScripts/);
 assert.match(worker,/AMO_ASSET_VERSION/);
+assert.match(worker,/headers\.set\('Cache-Control','no-store, max-age=0'\)/);
+assert.match(worker,/headers\.set\('Pragma','no-cache'\)/);
+assert.match(worker,/headers\.set\('X-AMO-Build',config\.buildId\)/);
 console.log('Resource Plan ownership contract tests passed');
