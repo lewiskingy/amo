@@ -5,7 +5,19 @@ function workPackageEstimateDisplay(row){if(!window.WorkPackages||window.WorkPac
 function displayVal(row,col){if(col.key==='_wpEstimate')return workPackageEstimateDisplay(row);let v=getPath(row,col.key);if(col.key==='ownerId')return v?(person(v)?.name||v):'Unallocated';if(col.key==='active')return v?'Yes':'No';return v??''}function filterValue(row,col){return String(displayVal(row,col)).toLowerCase()}
 function rememberFocus(){const a=document.activeElement;if(!a?.dataset?.filterKey)return null;return{key:a.dataset.filterKey,start:a.selectionStart,end:a.selectionEnd}}function restoreFocus(f){if(!f)return;requestAnimationFrame(()=>{const el=document.querySelector(`[data-filter-key="${CSS.escape(f.key)}"]`);if(el){el.focus({preventScroll:true});if(typeof el.setSelectionRange==='function'&&f.start!=null)el.setSelectionRange(f.start,f.end)}})}
 const debounceTimers={};function scheduleFilter(grid,key,value){clearTimeout(debounceTimers[grid]);gridState[grid].filters[key]=value;debounceTimers[grid]=setTimeout(()=>renderGrid(grid),350)}
-function demandManagementMatch(row){const predicate=window.CommitmentHealth?.matchesDemandQuery;return typeof predicate!=='function'||predicate(row)}
+function demandManagementMatch(row){
+  const ch=window.CommitmentHealth,filters=ch?.demandFilters;if(!filters)return true;
+  const clean=v=>String(v??'').trim();
+  if(filters.scope==='active'&&!(window.DefinedDemandModel?.isOpen?.(row)??true))return false;
+  if(filters.businessArea&&clean(row.businessArea)!==filters.businessArea)return false;
+  if(filters.initiative&&clean(row.initiative)!==filters.initiative)return false;
+  if(filters.owner&&clean(row.ownerId)!==filters.owner)return false;
+  if(filters.project==='present'&&!clean(row.projectNumber))return false;
+  if(filters.project==='missing'&&clean(row.projectNumber))return false;
+  const q=clean(filters.search).toLowerCase();if(q&&!`${row.id||''} ${row.title||''} ${row.projectNumber||''}`.toLowerCase().includes(q))return false;
+  if(filters.control){const predicate=ch?.matchesDemandQuery;if(typeof predicate==='function'&&!predicate(row))return false}
+  return true
+}
 function gridRows(name){const s=gridState[name],base=s.editing?s.draft:(name==='demand'?db.demand:db.team),cols=name==='demand'?demandCols:teamCols;let rows=base.filter(r=>(!s.editing||!s.deleted.has(r.id))&&(name!=='demand'||demandManagementMatch(r))&&cols.every(c=>{const f=(s.filters[c.key]||'').toLowerCase();return!f||filterValue(r,c).includes(f)}));if(s.sort){const c=cols.find(x=>x.key===s.sort);rows=[...rows].sort((a,b)=>{const av=displayVal(a,c),bv=displayVal(b,c);return typeof av==='number'?av-bv:String(av).localeCompare(String(bv),undefined,{numeric:true,sensitivity:'base'})});if(s.direction==='desc')rows.reverse()}return rows}
 function toggleSort(name,key){const s=gridState[name];if(s.sort!==key){s.sort=key;s.direction='asc'}else if(s.direction==='asc')s.direction='desc';else if(s.direction==='desc'){s.sort=null;s.direction=null}else s.direction='asc';renderGrid(name)}function sortMark(name,key){const s=gridState[name];return s.sort===key?(s.direction==='asc'?' ↑':' ↓'):' ↕'}
 function filterControl(name,col){if(col.derived)return'';const value=gridState[name].filters[col.key]||'',fk=`${name}:${col.key}`;if(col.type==='select')return`<select data-filter-key="${fk}" data-grid="${name}" data-key="${col.key}"><option value="">All</option>${normalizeOptions(col).map(o=>`<option value="${o.label}" ${value===String(o.label)?'selected':''}>${o.label}</option>`).join('')}</select>`;return`<input data-filter-key="${fk}" data-grid="${name}" data-key="${col.key}" value="${String(value).replaceAll('"','&quot;')}" placeholder="contains…">`}
