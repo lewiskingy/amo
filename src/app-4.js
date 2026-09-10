@@ -11,3 +11,14 @@
   s.onerror=()=>console.error(`Could not load ${s.src}`);
   document.head.appendChild(s)
 })();
+
+/* Commitment Health is a cross-cutting reporting capability over Demand, Work Packages,
+   Allocations and Actuals. Load the single canonical calculation/presentation module once. */
+(function loadCommitmentHealth(){
+  if(document.querySelector('script[data-amo-commitment-health]')||window.CommitmentHealth)return;
+  const s=document.createElement('script'),version=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  s.src=version?`app-commitment-health.js?v=${encodeURIComponent(version)}`:'app-commitment-health.js';
+  s.dataset.amoCommitmentHealth='true';s.async=false;
+  s.onerror=()=>console.error(`Could not load ${s.src}`);
+  document.head.appendChild(s)
+})();
