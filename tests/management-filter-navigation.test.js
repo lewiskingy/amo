@@ -1,5 +1,6 @@
-const fs=require('fs'),assert=require('assert');
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const commitment=fs.readFileSync('src/app-commitment-health.js','utf8');
+const demandGrid=fs.readFileSync('src/app-2.js','utf8');
 const sticky=fs.readFileSync('src/app-list-page-sticky.js','utf8');
 const allocationFilters=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
 
@@ -19,16 +20,36 @@ assert.match(commitment,/option value="active"/);
 assert.match(commitment,/option value="all"/);
 assert.match(commitment,/data-demand-filter="control"/);
 assert.match(commitment,/management-filter-chips/);
-assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the canonical Demand filter bar');
+assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the management filter bar');
 
-// Manual filter changes must render through the same path as Dashboard drill-through and must not be
-// compounded by stale hidden filters from the retired per-column filter row.
+// The canonical Demand row query must consume the management predicate before rendering. This is the
+// behavioural contract that prevents a redraw from showing the same unfiltered population.
+assert.match(demandGrid,/function demandManagementMatch\(row\)/);
+assert.match(demandGrid,/window\.CommitmentHealth\?\.matchesDemandQuery/);
+assert.match(demandGrid,/name!=='demand'\|\|demandManagementMatch\(r\)/);
+const rows=[
+  {id:'DEM-1',title:'No project',projectNumber:''},
+  {id:'DEM-2',title:'Has project',projectNumber:'2002'},
+  {id:'DEM-3',title:'Also no project',projectNumber:''}
+];
+const coreContext={console,Set,Map,Object,Number,String,Date,Math,structuredClone,
+  window:{CommitmentHealth:{matchesDemandQuery:d=>!!String(d.projectNumber||'').trim()},WorkPackages:{}},
+  db:{demand:rows,team:[{id:'P-1',name:'One'}],settings:{businessAreas:[],initiatives:[],priorities:[],statuses:[],demandSizeDays:{},healthStates:[]}},
+  gridState:{demand:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null},team:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null}},
+  getPath:(obj,path)=>path.split('.').reduce((v,k)=>v?.[k],obj),person:()=>null,normalizeInitiatives:x=>x,initiativesForBusinessArea:()=>[],escHtml:x=>String(x)
+};
+vm.createContext(coreContext);vm.runInContext(demandGrid,coreContext);
+assert.deepEqual(Array.from(coreContext.gridRows('demand'),d=>d.id),['DEM-2'],'Has Project Number predicate must reduce canonical Demand rows');
+coreContext.window.CommitmentHealth.matchesDemandQuery=d=>!String(d.projectNumber||'').trim();
+assert.deepEqual(Array.from(coreContext.gridRows('demand'),d=>d.id),['DEM-1','DEM-3'],'No Project Number predicate must reduce canonical Demand rows');
+coreContext.window.CommitmentHealth.matchesDemandQuery=()=>false;
+assert.deepEqual(Array.from(coreContext.gridRows('team'),p=>p.id),['P-1'],'Demand management filters must not affect People rows');
+
+// Manual filter changes and Dashboard drill-through share one render path; stale retired column filters are cleared.
 assert.match(commitment,/function clearLegacyDemandFilters\(\)/);
 assert.match(commitment,/gridState\.demand\.filters=\{\}/);
 assert.match(commitment,/function renderDemandView\(\)/);
 assert.match(commitment,/renderDemandView\(\)/);
-assert.match(commitment,/function applyDemandDomFilter\(table\)/,'Rendered Demand blocks are deterministically projected to the active management query');
-assert.match(commitment,/currentVisible=!!d&&matchesDemandQuery\(d\)/);
 
 // Control Position is a derived Demand presentation, not another persisted field.
 assert.match(commitment,/label:'Control Position'/);
