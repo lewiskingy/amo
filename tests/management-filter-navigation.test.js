@@ -1,0 +1,49 @@
+const fs=require('fs'),assert=require('assert');
+const commitment=fs.readFileSync('src/app-commitment-health.js','utf8');
+const sticky=fs.readFileSync('src/app-list-page-sticky.js','utf8');
+const allocationFilters=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
+
+// Dashboard KPI drill-through must target visible operational filter state, never an arbitrary first record.
+assert.match(commitment,/function setDemandNavigation\(control,extra=\{\}\)/);
+assert.match(commitment,/kind==='missing-work-item-list'\)\{setDemandNavigation\('work-item-missing'\)/);
+assert.doesNotMatch(commitment,/missingWorkItems\[0\]/,'Work Items Missing KPI must navigate to the population, not open the first Work Package');
+assert.match(commitment,/kind==='no-project'\)\{setDemandNavigation\('funding-missing',\{project:'missing'\}\)/);
+assert.match(commitment,/kind==='unmet-demand'\|\|kind==='no-allocation'/);
+assert.match(commitment,/allocationFilters\.control='actuals-missing'/);
+
+// Demand filtering is typed and visible; project null/present and Active/All are first-class values.
+assert.match(commitment,/const demandFilters=\{scope:'active'/);
+assert.match(commitment,/Has Project Number/);
+assert.match(commitment,/No Project Number/);
+assert.match(commitment,/option value="active"/);
+assert.match(commitment,/option value="all"/);
+assert.match(commitment,/data-demand-filter="control"/);
+assert.match(commitment,/management-filter-chips/);
+assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the canonical Demand filter bar');
+
+// Control Position is a derived Demand presentation, not another persisted field.
+assert.match(commitment,/label:'Control Position'/);
+assert.doesNotMatch(commitment,/saveSettings|requestAutosave|dirtyRecords/);
+assert.match(commitment,/Funding missing','bad'/);
+assert.match(commitment,/missing Work Item/);
+assert.match(commitment,/allocation.*missing Actuals/);
+
+// Recovery variance and Actuals completeness are distinct visual semantics.
+assert.match(commitment,/function recoveryTone\(c\)/);
+assert.match(commitment,/materialVariancePct/);
+assert.match(commitment,/allocationRecoveryHtml/);
+assert.match(commitment,/missingActuals\.length\?badge/);
+assert.doesNotMatch(commitment,/badge\(recovery,c\.actualStatus==='missing'/,'Aggregate recovery pill must not turn red merely because one allocation is missing Actuals');
+
+// Allocation search retains the issue #159 selection-on-commit interaction rather than rerendering every keystroke.
+assert.match(allocationFilters,/Typing only narrows suggestions; selecting commits/);
+assert.match(allocationFilters,/function commit\(input,value\)/);
+assert.doesNotMatch(allocationFilters,/input\.addEventListener\('input',[^\n]*renderAllocations/);
+
+// Issue #158: page owns vertical scrolling while a viewport-accessible horizontal scrollbar mirrors wide tables.
+assert.match(sticky,/amo-floating-list-scrollbar/);
+assert.match(sticky,/bottomWrap\.scrollLeft=bottomScroller\.scrollLeft/);
+assert.match(sticky,/bottomScroller\.scrollLeft=wrap\.scrollLeft/);
+assert.match(sticky,/overflowY='hidden'/);
+
+console.log('Management filter and navigation tests passed.');
