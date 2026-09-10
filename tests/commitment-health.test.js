@@ -14,7 +14,7 @@ const workPackages=[
   {id:'WP-2',demandId:'DEM-2',title:'Future package',status:'Planned',targetStart:'2999-01-01',azureDevOpsWorkItemId:''}
 ];
 const rm={
-  SIGNAL_THRESHOLDS:{zeroFte:.01},monthStart:m=>`${String(m).slice(0,7)}-01`,ensureLoaded:()=>true,latestActualMonth:()=> '2026-08',actualsAvailable:m=>String(m).startsWith('2026-08'),
+  SIGNAL_THRESHOLDS:{zeroFte:.01,materialVariancePct:.20},monthStart:m=>`${String(m).slice(0,7)}-01`,ensureLoaded:()=>true,latestActualMonth:()=> '2026-08',actualsAvailable:m=>String(m).startsWith('2026-08'),
   actualHours:(person,demandId,month)=>person==='P-1'&&demandId==='DEM-1'&&String(month).startsWith('2026-08')?0:10,
   forecastFte:(person,demandId)=>demandId==='DEM-1'?.5:.5,actualFte:(person,demandId)=>demandId==='DEM-1'?0:.2,
   personDemandRows:person=>person==='P-1'?[{demandId:'DEM-3',plannedFte:0,actualFte:.2}]:[]
@@ -46,8 +46,11 @@ assert.deepEqual(snapshot.unmetDemand.map(x=>x.id),['DEM-2'],'Existing unmet-dem
 assert.equal(snapshot.unexpectedActuals.length,1);
 assert.equal(snapshot.unexpectedActuals[0].demandId,'DEM-3');
 assert.match(ch.summaryText(demand[0]),/Funding missing/);
-assert.match(ch.summaryText(demand[0]),/WP untracked/);
+assert.match(ch.summaryText(demand[0]),/Work Item missing/);
 assert.match(ch.summaryText(demand[0]),/Actuals missing/);
+assert.equal(ch.demandFilters.scope,'active');
+ch.demandFilters.project='missing';assert.equal(ch.matchesDemandQuery(demand[0]),true);assert.equal(ch.matchesDemandQuery(demand[1]),false);ch.demandFilters.project='';
+ch.demandFilters.control='funding-missing';assert.equal(ch.matchesDemandQuery(demand[0]),true);assert.equal(ch.matchesDemandQuery(demand[1]),false);ch.demandFilters.control='';
 
 // Keep the feature compositionally loaded once; do not create a second persisted control model.
 const loader=fs.readFileSync('src/app-4.js','utf8');

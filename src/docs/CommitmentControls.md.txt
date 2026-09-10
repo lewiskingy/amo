@@ -1,88 +1,68 @@
 # Commitment Controls
 
-AMO derives management controls from the facts already held across Demand, Work Packages, Allocations and Actuals. The controls are reporting semantics only: they do not persist a second funding/resource/recovery RAG or duplicate the underlying business state.
+AMO derives management controls from canonical Demand, Work Package, Allocation and Actuals facts. The controls are reporting/query semantics only: they do not persist a second funding/resource/recovery RAG.
 
 ## Control chain
 
 Demand → scheduled Work Package → linked delivery Work Item → named resource allocation → Project Number → Actual recovery
 
-The purpose is to make it obvious which delivery commitments are funded, tracked, resourced and evidenced by Actuals, and to surface exceptions without requiring managers to reconstruct the position across several pages.
-
 ## Canonical definitions
 
 ### Committed Demand
 
-A Demand is treated as committed when its canonical state is `Planned` or `In Progress`.
-
-`Defined` is not yet treated as a delivery commitment. `Complete` and `Cancelled` are terminal. This definition is shared by all commitment-control surfaces.
+A Demand is committed when its canonical state is `Planned` or `In Progress`. `Defined` is not yet a delivery commitment. `Complete` and `Cancelled` are terminal.
 
 ### Confirmed resource commitment
 
-The current Allocation model does not persist a separate Proposed/Confirmed state. For this increment, a saved Allocation is treated as confirmed capacity when it references a named Person and contains at least one non-zero forecast period.
+The current Allocation model has no separate Proposed/Confirmed state. A saved Allocation counts as committed capacity when it references a named Person and contains at least one non-zero forecast period.
 
-This avoids introducing another user-maintained state before there is a demonstrated need to represent tentative allocations. If tentative resource planning is introduced later, confirmation belongs on Allocation rather than Demand.
+### Funding / recovery route
 
-### Funded / recoverable work
-
-The canonical `projectNumber` on Demand is the evidence that the Demand has an Oracle Project Number through which Actuals can be reconciled and recovery identified.
-
-A committed Demand with committed resource but no Project Number is therefore reported as a funding/recovery control exception.
+The canonical `projectNumber` on Demand is evidence that the Demand has an Oracle Project Number through which Actuals can be reconciled and recovery identified. A committed, resourced Demand without one is shown as **Funding missing**.
 
 ### Delivery Work Item required
 
-A Work Package requires a linked delivery Work Item when it is `Ready`, `In Progress` or `Blocked`.
+A Work Package requires a linked Work Item when it is `Ready`, `In Progress` or `Blocked`. A `Planned` Work Package is also due once Target Start has arrived. Future Planned, Complete and Cancelled Work Packages are not current execution-tracking exceptions.
 
-A `Planned` Work Package is also considered due for a Work Item once its Target Start date has arrived. A future Planned Work Package is not flagged. Complete/Cancelled Work Packages are not treated as current execution-tracking gaps.
-
-The Work Item reference remains `azureDevOpsWorkItemId` on the Work Package. When Azure DevOps Organisation and Project configuration are available, AMO derives the clickable URL dynamically rather than persisting another URL field.
+The Work Item reference remains `azureDevOpsWorkItemId`; AMO derives the Azure DevOps URL from Organisation/Project configuration rather than persisting a URL.
 
 ### Actuals due / missing
 
-AMO does not infer that Actuals are due merely because the calendar month has passed. ReportingModel remains authoritative for the Actual/Forecast cut-over.
+ReportingModel owns Actual/Forecast cut-over. An Allocation is missing Actuals only when the period has been imported as Actuals, the Allocation has non-zero forecast in that period, and the allocated Person has no Actual effort against the parent Demand in that period.
 
-An Allocation is reported as missing Actuals only when:
+Actuals completeness and recovery variance are separate controls. An aggregate Demand may have Actuals below plan while only one contributing allocation is actually missing Actuals. The aggregate Actual/Plan pill uses ReportingModel's material-variance threshold; missing contributor Actuals are shown as a separate red exception.
 
-- ReportingModel says the month is an imported Actuals period;
-- the Allocation has non-zero forecast in that month; and
-- the allocated Person has no Actual effort against the parent Demand in that month.
+### Unexpected Actuals and Unmet Demand
 
-Future or non-imported periods therefore remain Forecast and are not false-positive missing-Actuals exceptions.
+Unexpected Actuals use ReportingModel's existing planned-vs-observed semantics. Unmet Demand consumes AMO's existing unmet/unallocated calculation rather than defining another formula.
 
-### Unexpected Actuals
+## Operational query and navigation model
 
-Observed effort against a Demand is reported as unexpected when ReportingModel identifies Actual FTE for a Person/Demand in an imported period with no corresponding planned FTE.
+Dashboard summary KPIs navigate to the complete affected population, never to an arbitrary first record. Individual Attention Required entries may open a specific Demand or Work Package.
 
-### Unmet Demand
+Dashboard navigation writes the same visible filter state available to users on the destination view:
 
-Commitment Controls consume AMO's existing unmet/unallocated Demand calculation rather than maintaining a competing formula.
+- **No Project** → Demand / Active / Project = No Project Number / Control = Funding missing.
+- **Unmet Demand** → Demand / Active / Control = Resource missing.
+- **Work Items missing** → Demand / Active / Control = Work Item missing, preserving visibility of all affected Work Packages.
+- **Actuals missing** → Allocations / Control = Actuals missing.
 
-## Surfaces
+Demand filters are first-class query state. The default scope is **Active**, excluding Complete and Cancelled Demand. Users can switch to **All**. Project filtering explicitly supports **Has Project Number** and **No Project Number** rather than relying on text-box treatment of null values. Business Area, Initiative, Owner, Control Position and free-text search can be combined. Active filters are visible and individually removable.
 
-### Dashboard
+Filter, arrange and search remain distinct concepts: filtering controls which records appear; Arrange By changes grouping/presentation; search narrows by text.
 
-`Delivery & Funding` provides management-level counts for committed Demand, committed work without Project Number, unmet Demand, Work Packages without required Work Items, allocations with Actuals due but missing, and Actual-to-plan recovery for the latest imported Actuals period.
+## Visual semantics
 
-The associated attention list names affected Demand, Work Packages and People. Exception controls navigate to the relevant operational surface rather than ending at a metric.
+Red means an actionable control failure: Funding missing, Resource missing, required Work Item missing, or expected Actuals missing. Neutral labels provide context rather than implying an exception. Positive evidence is intentionally quieter than exceptions.
 
-### Demand
+On Allocations, Project context, Actual/Plan recovery and Actuals completeness are shown independently. A below-plan aggregate does not become a red "missing Actuals" state merely because one contributor is absent.
 
-The Demand Register includes a derived Commitment presentation covering Funding, Delivery tracking, Resource and Actuals. These values are calculated from canonical records and are not saved on Demand.
+## List usability
 
-### Allocations
+List pages use document-level vertical scrolling with sticky/floating headers. Wide tables retain native horizontal scrolling and expose a viewport-accessible synchronized horizontal scrollbar while the table extends below the viewport, so users do not have to reach the final row before panning sideways.
 
-Demand headers show Project Number and latest imported Actual/Plan context. Work Package headers show the delivery Work Item state; where Azure DevOps configuration is resolvable, an existing Work Item reference is rendered as a clickable Azure DevOps link.
-
-### Actuals
-
-The Actuals administration surface includes allocation reconciliation for observed Actuals which have no corresponding planned allocation in the latest imported period.
+Allocation Demand/Resource search continues to use selection-on-commit combobox behaviour: typing narrows suggestions without re-rendering on every keystroke, preventing focus loss.
 
 ## Storage and workspace semantics
 
-Commitment controls persist no new reporting state. Local Workspace and Remote Workspace therefore derive identical control semantics from the same repository/domain records.
-
-The source-of-truth boundaries remain:
-
-- Demand: portfolio state and Project Number;
-- Work Package: execution planning and delivery Work Item reference;
-- Allocation: named resource plan;
-- ReportingModel / Actuals: observed effort and Actual-vs-Forecast period semantics.
+Commitment controls and filter state add no business-data persistence. Local and Remote Workspace derive the same controls from the same repository/domain records. Source-of-truth boundaries remain Demand for portfolio state/Project Number, Work Package for delivery tracking, Allocation for named resource plan, and ReportingModel/Actuals for observed effort and Actual/Forecast semantics.
