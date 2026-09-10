@@ -15,10 +15,10 @@
 /* Demand Register composition must be installed before any cross-cutting Demand contributor.
    It is the only layer permitted to replace renderGrid; feature modules register contributions. */
 (function loadDemandGridComposition(){
-  if(document.querySelector('script[data-amo-demand-management-query]')||window.AmoDemandGrid)return;
+  if(document.querySelector('script[data-amo-demand-grid]')||window.AmoDemandGrid)return;
   const s=document.createElement('script'),version=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
-  s.src=version?`app-demand-management-query.js?v=${encodeURIComponent(version)}`:'app-demand-management-query.js';
-  s.dataset.amoDemandManagementQuery='true';s.async=false;
+  s.src=version?`app-demand-grid-composition.js?v=${encodeURIComponent(version)}`:'app-demand-grid-composition.js';
+  s.dataset.amoDemandGrid='true';s.async=false;
   s.onerror=()=>console.error(`Could not load ${s.src}`);
   document.head.appendChild(s)
 })();
