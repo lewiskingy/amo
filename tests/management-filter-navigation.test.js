@@ -3,6 +3,7 @@ const commitment=fs.readFileSync('src/app-commitment-health.js','utf8');
 const demandGrid=fs.readFileSync('src/app-2.js','utf8');
 const sticky=fs.readFileSync('src/app-list-page-sticky.js','utf8');
 const allocationFilters=fs.readFileSync('src/app-allocation-filter-toolbar.js','utf8');
+const workPackages=fs.readFileSync('src/app-work-packages.js','utf8');
 
 // Dashboard KPI drill-through must target visible operational filter state, never an arbitrary first record.
 assert.match(commitment,/function setDemandNavigation\(control,extra=\{\}\)/);
@@ -13,13 +14,17 @@ assert.match(commitment,/kind==='unmet-demand'\|\|kind==='no-allocation'/);
 assert.match(commitment,/allocationFilters\.control='actuals-missing'/);
 
 // Demand filtering is typed and visible; project null/present and Active/All are first-class values.
+// The user-facing label is Show, reserving organisational scope for Department / Team page context.
 assert.match(commitment,/const demandFilters=\{scope:'active'/);
+assert.match(commitment,/<label>Show<select data-demand-filter="scope">/);
+assert.doesNotMatch(commitment,/<label>Scope<select data-demand-filter="scope">/);
 assert.match(commitment,/Has Project Number/);
 assert.match(commitment,/No Project Number/);
 assert.match(commitment,/option value="active"/);
 assert.match(commitment,/option value="all"/);
 assert.match(commitment,/data-demand-filter="control"/);
 assert.match(commitment,/management-filter-chips/);
+assert.match(commitment,/Show: All/);
 assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the management filter bar');
 
 // The canonical Demand row query must consume the management predicate before rendering. This is the
@@ -27,6 +32,7 @@ assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\
 assert.match(demandGrid,/function demandManagementMatch\(row\)/);
 assert.match(demandGrid,/window\.CommitmentHealth\?\.matchesDemandQuery/);
 assert.match(demandGrid,/name!=='demand'\|\|demandManagementMatch\(r\)/);
+assert.doesNotMatch(commitment,/const baseRows=gridRows/,'Commitment Health must not re-wrap the canonical Demand row query');
 const rows=[
   {id:'DEM-1',title:'No project',projectNumber:''},
   {id:'DEM-2',title:'Has project',projectNumber:'2002'},
@@ -44,6 +50,16 @@ coreContext.window.CommitmentHealth.matchesDemandQuery=d=>!String(d.projectNumbe
 assert.deepEqual(Array.from(coreContext.gridRows('demand'),d=>d.id),['DEM-1','DEM-3'],'No Project Number predicate must reduce canonical Demand rows');
 coreContext.window.CommitmentHealth.matchesDemandQuery=()=>false;
 assert.deepEqual(Array.from(coreContext.gridRows('team'),p=>p.id),['P-1'],'Demand management filters must not affect People rows');
+
+// Active / All applies consistently across the nested Demand hierarchy. Work Package filtering is
+// owned by the canonical Work Package renderer rather than a post-render DOM hider.
+assert.match(workPackages,/const isTerminalStatus=status=>\['Complete','Cancelled'\]\.includes\(trim\(status\)\)/);
+assert.match(workPackages,/function visibleForDemand\(demandId,\{show='active',control=''\}=\{\}\)/);
+assert.match(workPackages,/if\(show!=='all'\)rows=rows\.filter\(w=>!isTerminalStatus\(w\.status\)\)/);
+assert.match(workPackages,/visibleForDemand\(demand\.id,\{show:filters\.scope\|\|'active',control:filters\.control\|\|''\}\)/);
+assert.match(workPackages,/control==='work-item-missing'/,'Work Item control drill-through should narrow nested children to the offending Work Packages');
+assert.doesNotMatch(commitment,/applyDemandDomFilter/,'Demand filtering must not depend on post-render DOM hiding');
+assert.match(commitment,/replace\(\/records\?\/i,'Demand'\)/,'Demand count should identify the parent entity rather than generic records');
 
 // Manual filter changes and Dashboard drill-through share one render path; stale retired column filters are cleared.
 assert.match(commitment,/function clearLegacyDemandFilters\(\)/);
