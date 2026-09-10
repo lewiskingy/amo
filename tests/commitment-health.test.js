@@ -1,9 +1,10 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const code=fs.readFileSync('src/app-commitment-health.js','utf8');
 const demand=[
-  {id:'DEM-1',title:'Funded gap',status:'In Progress',projectNumber:''},
-  {id:'DEM-2',title:'Resource gap',status:'Planned',projectNumber:'2002'},
-  {id:'DEM-3',title:'Early demand',status:'Defined',projectNumber:''}
+  {id:'DEM-1',title:'Funded gap',status:'In Progress',projectNumber:'',businessArea:'Pensions',initiative:'Modernise',ownerId:'P-1'},
+  {id:'DEM-2',title:'Resource gap',status:'Planned',projectNumber:'2002',businessArea:'Protection',initiative:'Growth',ownerId:'P-2'},
+  {id:'DEM-3',title:'Early demand',status:'Defined',projectNumber:'',businessArea:'Pensions',initiative:'Modernise',ownerId:'P-1'},
+  {id:'DEM-4',title:'Done',status:'Complete',projectNumber:'4004',businessArea:'Pensions',initiative:'Modernise',ownerId:'P-1'}
 ];
 const allocations=[
   {id:'A-1',demandId:'DEM-1',workPackageId:'WP-1',teamMemberId:'P-1',forecast:{'2026-08-01':.5}},
@@ -21,7 +22,7 @@ const rm={
 };
 const context={console,Date,Set,Map,Object,Number,String,Math,structuredClone,
   db:{demand,allocations,team:[{id:'P-1',name:'One',active:true},{id:'P-2',name:'Two',active:true}]},workspaceHandle:false,
-  demandCols:[],displayVal:()=>'',gridRows:()=>demand,renderGrid:()=>{},renderDashboard:()=>{},renderAllocations:()=>{},renderActualsAdmin:async()=>{},dashboardHeadlineSnapshot:()=>({}),
+  gridState:{demand:{filters:{}},team:{filters:{}}},demandCols:[],displayVal:()=>'',gridRows:()=>demand,renderGrid:()=>{},renderDashboard:()=>{},renderAllocations:()=>{},renderActualsAdmin:async()=>{},dashboardHeadlineSnapshot:()=>({}),
   unresolvedWithoutAllocation:()=>[demand[1]],switchView:()=>{},monthLabel:x=>x,escHtml:x=>String(x),
   document:{getElementById:()=>null,createElement:()=>({}),head:{appendChild:()=>{}},querySelectorAll:()=>[]},
   window:{addEventListener:()=>{},ReportingModel:rm,DefinedDemandModel:{canonicalState:d=>d,isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{state:{rows:workPackages},openEditor:()=>{},workItemUrl:()=>''},WorkPackageResourcePlanning:{}},
@@ -51,6 +52,10 @@ assert.match(ch.summaryText(demand[0]),/Actuals missing/);
 assert.equal(ch.demandFilters.scope,'active');
 ch.demandFilters.project='missing';assert.equal(ch.matchesDemandQuery(demand[0]),true);assert.equal(ch.matchesDemandQuery(demand[1]),false);ch.demandFilters.project='';
 ch.demandFilters.control='funding-missing';assert.equal(ch.matchesDemandQuery(demand[0]),true);assert.equal(ch.matchesDemandQuery(demand[1]),false);ch.demandFilters.control='';
+ch.demandFilters.businessArea='Protection';assert.deepEqual(demand.filter(ch.matchesDemandQuery).map(d=>d.id),['DEM-2']);ch.demandFilters.businessArea='';
+ch.demandFilters.initiative='Modernise';assert.deepEqual(demand.filter(ch.matchesDemandQuery).map(d=>d.id),['DEM-1','DEM-3']);ch.demandFilters.initiative='';
+ch.demandFilters.owner='P-2';assert.deepEqual(demand.filter(ch.matchesDemandQuery).map(d=>d.id),['DEM-2']);ch.demandFilters.owner='';
+ch.demandFilters.scope='all';assert.equal(ch.matchesDemandQuery(demand[3]),true);ch.demandFilters.scope='active';assert.equal(ch.matchesDemandQuery(demand[3]),false);
 
 // Keep the feature compositionally loaded once; do not create a second persisted control model.
 const loader=fs.readFileSync('src/app-4.js','utf8');
