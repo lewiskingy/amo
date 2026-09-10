@@ -4,12 +4,15 @@
 (function initDefinedDemandCompatibility(){
   if(!window.DefinedDemandModel)return;
 
-  /* app-department.js captured the canonical functions before applying its legacy mandatory-Team
-     decorators. Restore those originals rather than maintaining a second Demand implementation. */
+  /* app-department.js captured canonical functions before applying legacy decorators. Restore those
+     originals rather than maintaining a second Demand implementation. The canonical app-2.js row
+     query now owns organisational scope as well as management filters, so retire the Department-era
+     gridRows wrapper too. */
   if(typeof deptDefaultDemand==='function')defaultDemandRecord=deptDefaultDemand;
   if(typeof deptRenderDemandModal==='function')renderDemandModal=deptRenderDemandModal;
   if(typeof deptSaveDemandModal==='function')saveDemandModal=deptSaveDemandModal;
   if(typeof deptSaveGrid==='function')saveGrid=deptSaveGrid;
+  if(typeof window.AmoCanonicalGridRows==='function')gridRows=window.AmoCanonicalGridRows;
 
   /* Defined Demand may legitimately be visible before an Owning Team is known. People retain the
      existing Home Team migration because People capacity always belongs to a configured Team. */
