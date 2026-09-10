@@ -26,10 +26,18 @@ async function applicationShell(request,env,url,path){
   const config=environmentConfig(env,url);
   const html=versionApplicationScripts(await response.text(),config.buildId);
   const script=`<script>window.AMO_CONFIG=Object.assign({},window.AMO_CONFIG||{},${JSON.stringify(config)});window.AMO_ASSET_VERSION=${JSON.stringify(config.buildId)};</script>`;
+  const headers=new Headers(response.headers);
+  /* The HTML shell owns the deployment build identity. It must never be reused from browser/cache
+     across deployments, otherwise fixed legacy script query strings can preserve an older core
+     module while dynamically loaded modules come from the newer release. */
+  headers.set('Cache-Control','no-store, max-age=0');
+  headers.set('Pragma','no-cache');
+  headers.set('Expires','0');
+  headers.set('X-AMO-Build',config.buildId);
   return new Response(html.replace('</head>',`${script}</head>`),{
     status:response.status,
     statusText:response.statusText,
-    headers:response.headers
+    headers
   })
 }
 
