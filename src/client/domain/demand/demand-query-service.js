@@ -1,15 +1,11 @@
+import {demandInScope} from './demand-scope.js';
+
 const OPEN_STATES=new Set(['Assessing','Defined','Planned','In Progress','On Hold']);
 const COMMITTED_STATES=new Set(['Planned','In Progress']);
 const TRACKED_WP_STATES=new Set(['Ready','In Progress','Blocked']);
 const clean=v=>String(v??'').trim();
 const lower=v=>clean(v).toLowerCase();
 
-function inScope(demand,scope){
-  if(!scope||scope.mode==='all')return true;
-  if(scope.mode==='team')return clean(demand.owningTeamId)===clean(scope.teamId);
-  if(scope.mode==='department')return (scope.teamIds||[]).map(clean).includes(clean(demand.owningTeamId));
-  return true;
-}
 function workItemRequired(wp,today){
   if(TRACKED_WP_STATES.has(clean(wp.status)))return true;
   if(clean(wp.status)!=='Planned'||!wp.targetStart)return false;
@@ -36,7 +32,7 @@ export class DemandQueryService{
   matchesControl(demand,control){const c=this.controlPosition(demand);return control==='funding-missing'?c.fundingMissing:control==='resource-missing'?c.resourceMissing:control==='work-item-missing'?c.workItemMissing:true}
   query(filters={},scope={mode:'all'}){
     return this.demands.filter(d=>{
-      if(!inScope(d,scope))return false;
+      if(!demandInScope(d,scope))return false;
       if(filters.show==='active'&&!OPEN_STATES.has(clean(d.status)))return false;
       if(filters.businessArea&&clean(d.businessArea)!==filters.businessArea)return false;
       if(filters.initiative&&clean(d.initiative)!==filters.initiative)return false;
