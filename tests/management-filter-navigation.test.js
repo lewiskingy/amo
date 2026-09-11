@@ -15,7 +15,7 @@ assert.match(commitment,/allocationFilters\.control='actuals-missing'/);
 
 // Demand filtering is typed and visible; project null/present and Active/All are first-class values.
 // The user-facing label is Show, reserving organisational scope for Department / Team page context.
-assert.match(commitment,/const demandFilters=\{scope:'active'/);
+assert.match(commitment,/const demandFilters=window\.AmoDemandFilters=window\.AmoDemandFilters\|\|\{scope:'active'/);
 assert.match(commitment,/<label>Show<select data-demand-filter="scope">/);
 assert.doesNotMatch(commitment,/<label>Scope<select data-demand-filter="scope">/);
 assert.match(commitment,/Has Project Number/);
@@ -27,10 +27,10 @@ assert.match(commitment,/management-filter-chips/);
 assert.match(commitment,/Show: All/);
 assert.match(commitment,/table\.querySelector\('thead \.filter-row'\)\?\.remove\(\)/,'Legacy per-column filter row should not compete with the management filter bar');
 
-// The canonical Demand row query consumes the exported management filter state directly for
-// parent-Demand fields. Derived Control remains delegated to Commitment Health semantics.
+// The canonical Demand row query consumes the one global management filter-state object.
+// CommitmentHealth can be rebound by a dynamic module load without splitting UI state from query state.
 assert.match(demandGrid,/function demandManagementMatch\(row\)/);
-assert.match(demandGrid,/const ch=window\.CommitmentHealth,filters=ch\?\.demandFilters/);
+assert.match(demandGrid,/const ch=window\.CommitmentHealth,filters=window\.AmoDemandFilters\|\|ch\?\.demandFilters/);
 assert.match(demandGrid,/filters\.businessArea/);
 assert.match(demandGrid,/filters\.initiative/);
 assert.match(demandGrid,/filters\.owner/);
@@ -46,7 +46,7 @@ const rows=[
 ];
 const demandFilters={scope:'active',businessArea:'',initiative:'',owner:'',project:'',control:'',search:''};
 const coreContext={console,Set,Map,Object,Number,String,Date,Math,structuredClone,
-  window:{CommitmentHealth:{demandFilters,matchesDemandQuery:d=>d.id==='DEM-2'},DefinedDemandModel:{isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{}},
+  window:{AmoDemandFilters:demandFilters,CommitmentHealth:{demandFilters,matchesDemandQuery:d=>d.id==='DEM-2'},DefinedDemandModel:{isOpen:d=>!['Complete','Cancelled'].includes(d.status)},WorkPackages:{}},
   db:{demand:rows,team:[{id:'P-1',name:'One'},{id:'P-2',name:'Two'}],settings:{businessAreas:[],initiatives:[],priorities:[],statuses:[],demandSizeDays:{},healthStates:[]}},
   gridState:{demand:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null},team:{editing:false,draft:null,deleted:new Set(),filters:{},sort:null,direction:null}},
   getPath:(obj,path)=>path.split('.').reduce((v,k)=>v?.[k],obj),person:id=>({name:id}),normalizeInitiatives:x=>x,initiativesForBusinessArea:()=>[],escHtml:x=>String(x)
@@ -62,6 +62,12 @@ demandFilters.search='Has project';assert.deepEqual(ids(),['DEM-2'],'Search must
 demandFilters.scope='all';assert.deepEqual(ids(),['DEM-1','DEM-2','DEM-3'],'Show All must include terminal parent Demand');demandFilters.scope='active';
 demandFilters.control='funding-missing';assert.deepEqual(ids(),['DEM-2'],'Derived Control must remain delegated to Commitment Health');demandFilters.control='';
 assert.deepEqual(Array.from(coreContext.gridRows('team'),p=>p.id),['P-1','P-2'],'Demand management filters must not affect People rows');
+
+// Rebinding the CommitmentHealth export must not detach the canonical query from the object the UI changed.
+demandFilters.businessArea='Pensions';
+coreContext.window.CommitmentHealth={demandFilters:{scope:'active',businessArea:'',initiative:'',owner:'',project:'',control:'',search:''},matchesDemandQuery:()=>true};
+assert.deepEqual(ids(),['DEM-1'],'Canonical query must keep reading the singleton state even if CommitmentHealth is rebound');
+demandFilters.businessArea='';
 
 // Active / All applies consistently across the nested Demand hierarchy. Work Package filtering is
 // owned by the canonical Work Package renderer rather than a post-render DOM hider.
