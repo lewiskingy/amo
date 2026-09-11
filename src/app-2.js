@@ -6,7 +6,7 @@ function displayVal(row,col){if(col.key==='_wpEstimate')return workPackageEstima
 function rememberFocus(){const a=document.activeElement;if(!a?.dataset?.filterKey)return null;return{key:a.dataset.filterKey,start:a.selectionStart,end:a.selectionEnd}}function restoreFocus(f){if(!f)return;requestAnimationFrame(()=>{const el=document.querySelector(`[data-filter-key="${CSS.escape(f.key)}"]`);if(el){el.focus({preventScroll:true});if(typeof el.setSelectionRange==='function'&&f.start!=null)el.setSelectionRange(f.start,f.end)}})}
 const debounceTimers={};function scheduleFilter(grid,key,value){clearTimeout(debounceTimers[grid]);gridState[grid].filters[key]=value;debounceTimers[grid]=setTimeout(()=>renderGrid(grid),350)}
 function demandManagementMatch(row){
-  const ch=window.CommitmentHealth,filters=ch?.demandFilters;if(!filters)return true;
+  const ch=window.CommitmentHealth,filters=window.AmoDemandFilters||ch?.demandFilters;if(!filters)return true;
   const clean=v=>String(v??'').trim();
   if(filters.scope==='active'&&!(window.DefinedDemandModel?.isOpen?.(row)??true))return false;
   if(filters.businessArea&&clean(row.businessArea)!==filters.businessArea)return false;
