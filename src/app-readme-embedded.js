@@ -4,6 +4,26 @@
 
 AMO manages Defined Demand, Work Packages, People/capacity, Work Package Resource Plans, imported Oracle Actuals, roadmap planning and Status Reporting.
 
+## Target architecture
+
+This is the canonical target architecture for the AMO browser client. Existing global-state renderers, renderer wrappers, compatibility interception and DOM post-processing are legacy implementation to be migrated, not alternative target architectures.
+
+AMO remains one product and one deployed client. The target is a modular route-based client with a reusable shared shell and bounded route-owned application slices such as `/demand`, `/allocations`, `/people` and `/reports`.
+
+Shared application concerns have one canonical implementation: application shell, sidebar/navigation, page header, account/sign-on presentation, workspace status, organisational scope and reusable UI primitives such as filter bars, tables, badges, buttons and empty states.
+
+Each route owns page composition only. Business semantics belong in reusable domain/query modules and persistence is accessed through stable repository contracts such as `WorkspaceRepository`. Route code must not depend directly on storage location, global renderer state or unrelated page implementations.
+
+Target dependency direction:
+
+Application shell → route-owned page → page components → domain/query services → repository contracts → Local or Remote persistence
+
+The migration uses a strangler approach. `/demand` is the first proving slice: build it over the same workspace data, dark-launch it, prove parity with deterministic local Playwright E2E and deployed Test acceptance, then cut primary navigation over and remove the superseded legacy Demand implementation. Allocations, People and subsequent capabilities follow the same pattern.
+
+Local browser E2E is intended to run in CI before deployment using a transient seeded writable workspace and a test-only repository/bootstrap mechanism. Deployed acceptance remains the second layer for deployment identity, authentication, Remote Workspace/API integration and selected critical journeys.
+
+Implementation and migration are tracked in GitHub issue **#183 — Target client architecture: modular route-owned application slices**.
+
 ## Planning model
 
 AMO keeps each planning measure distinct:
