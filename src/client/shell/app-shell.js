@@ -6,12 +6,12 @@ export function renderSidebar(host,{activeRoute='/demand'}={}){
     <nav aria-label="AMO navigation">
       <div class="amo-shell-nav-group"><span>Management</span>
         <a class="${activeRoute==='/demand'?'active':''}" href="/demand">Demand <em>Preview</em></a>
-        <a href="/?view=allocations">Allocations <small>legacy</small></a>
-        <a href="/?view=team">People <small>legacy</small></a>
+        <a href="/">Allocations <small>legacy AMO</small></a>
+        <a href="/">People <small>legacy AMO</small></a>
       </div>
       <div class="amo-shell-nav-group"><span>Reporting</span>
-        <a href="/">Dashboard <small>legacy</small></a>
-        <a href="/?view=status-report">Status Report <small>legacy</small></a>
+        <a href="/">Dashboard <small>legacy AMO</small></a>
+        <a href="/">Status Report <small>legacy AMO</small></a>
       </div>
     </nav>
     <div id="amoShellAccount" class="amo-shell-account"></div>`;
