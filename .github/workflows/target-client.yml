@@ -5,16 +5,17 @@ on:
     paths:
       - 'src/client/**'
       - 'src/demand/**'
-      - 'tests/target-client-*.test.js'
+      - 'tests/target-client-*'
+      - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
       - '.github/workflows/target-client.yml'
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - 'src/client/**'
       - 'src/demand/**'
-      - 'tests/target-client-*.test.js'
+      - 'tests/target-client-*'
+      - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
       - '.github/workflows/target-client.yml'
 
@@ -28,20 +29,26 @@ jobs:
     steps:
       - name: Checkout candidate
         uses: actions/checkout@v4
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
+          cache: npm
+      - name: Install test dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
       - name: Validate route and canonical modules
         shell: bash
         run: |
           set -euo pipefail
           node --check worker.js
+          node --check tests/target-client-demand.e2e.cjs
+          node --check tests/e2e/bin/serve-target-client.cjs
           while IFS= read -r -d '' file; do
             node --input-type=module --check < "$file"
           done < <(find src/client src/demand -name '*.js' -print0)
-
       - name: Run target-client domain and architecture tests
         run: node tests/target-client-demand.test.js
+      - name: Run deterministic local Demand browser E2E
+        run: node tests/target-client-demand.e2e.cjs
