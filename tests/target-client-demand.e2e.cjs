@@ -6,6 +6,7 @@ const assert=require('node:assert/strict');const {spawn}=require('node:child_pro
   assert.deepEqual(await ids(),['DEM-2026-0001','DEM-2026-0002']);
   await page.selectOption('[data-filter="projectNumber"]','present');assert.deepEqual(await ids(),['DEM-2026-0001']);assert.match(await page.locator('#demandCount').textContent(),/Showing 1/);
   await page.selectOption('[data-filter="control"]','funding-missing');assert.deepEqual(await ids(),[],'Combined filters must be a true intersection.');
+  await page.click('[data-clear]');await page.selectOption('[data-filter="control"]','actuals-missing');assert.deepEqual(await ids(),['DEM-2026-0002'],'Actuals missing must derive from the latest available period and due allocations.');assert.match(await page.locator('.demand-row[data-demand-id="DEM-2026-0002"]').innerHTML(),/Actuals missing/);
   await page.click('[data-clear]');await page.selectOption('[data-filter="show"]','all');assert.deepEqual(await ids(),['DEM-2026-0001','DEM-2026-0002','DEM-2026-0003']);
 
   await page.selectOption('[data-scope-mode]','team');await page.selectOption('[data-team]','TEAM-B');assert.deepEqual(await ids(),['DEM-2026-0003'],'Team scope must honour canonical teamId records.');
