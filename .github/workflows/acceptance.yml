@@ -84,11 +84,24 @@ jobs:
           echo "E2E_EXPECTED_API_VERSION=$API_VERSION" >> "$GITHUB_ENV"
           echo "Acceptance expects Client $CLIENT_VERSION · Backend $BACKEND_VERSION · API $API_VERSION"
 
+      - name: Wait for deployed candidate readiness
+        env:
+          E2E_BASE_URL: ${{ vars.AMO_WEB_ORIGIN }}
+          E2E_API_BASE_URL: https://${{ vars.AMO_API_HOSTNAME }}
+          E2E_READINESS_ATTEMPTS: '12'
+          E2E_READINESS_REQUEST_TIMEOUT: '5000'
+          E2E_READINESS_DELAY: '3000'
+        run: node tests/e2e/bin/wait-for-deployment.cjs
+
       - name: Run deployed Gherkin acceptance tests
         env:
           E2E_BASE_URL: ${{ vars.AMO_WEB_ORIGIN }}
           E2E_API_BASE_URL: https://${{ vars.AMO_API_HOSTNAME }}
           E2E_PROFILE: ${{ matrix.profile }}
+          E2E_RETRY: '1'
+          E2E_UI_TIMEOUT: '10000'
+          E2E_APP_READY_TIMEOUT: '12000'
+          E2E_STEP_TIMEOUT: '30000'
         run: npm run test:e2e
 
       - name: Upload acceptance evidence

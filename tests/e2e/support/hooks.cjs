@@ -4,9 +4,10 @@ const { chromium } = require('playwright');
 const { BeforeAll, AfterAll, Before, After, Status, setDefaultTimeout } = require('@cucumber/cucumber');
 
 /* Deployed acceptance exercises real browser navigation and remote startup. Keep individual
-   assertions bounded, but do not let Cucumber's 5s default terminate a step before those
-   explicit waits can report the actual failure. */
-setDefaultTimeout(15000);
+   assertions bounded, but do not let Cucumber's default terminate a step before the explicit
+   readiness waits can report the actual failure. Local deterministic E2E can use a tighter value. */
+const stepTimeout=Number.parseInt(process.env.E2E_STEP_TIMEOUT||'30000',10);
+setDefaultTimeout(Number.isFinite(stepTimeout)&&stepTimeout>0?stepTimeout:30000);
 
 let browser;
 

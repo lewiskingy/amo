@@ -24,6 +24,17 @@ Production promotion uses the same change-aware model, comparing the selected Te
 
 The deployed acceptance workflow checks out the exact `head_sha` of the completed `AMO · Validate & Deploy` workflow that triggered it. When several merges are validating or deploying close together, check the acceptance job's checkout SHA before attributing a failure to the newest merge.
 
+## Reliability and bounded retry
+
+Deployed acceptance runs against real Cloudflare/Azure services and can encounter short-lived propagation, container warm-up or browser-startup delays immediately after deployment. The workflow therefore uses bounded defensive controls rather than requiring a manual job retry:
+
+1. **Release readiness poll** — before browser scenarios begin, `tests/e2e/bin/wait-for-deployment.cjs` confirms the frontend is reachable, the deployed `app-target-stage.js` reports the expected client version, and `/api/info` reports the expected backend and API versions. The poll is bounded and fails if the candidate never becomes ready.
+2. **UI readiness waits** — dynamic browser surfaces use a configurable default wait (`E2E_UI_TIMEOUT`, 10 seconds in deployed acceptance) and a slightly longer application-shell readiness wait (`E2E_APP_READY_TIMEOUT`, 12 seconds).
+3. **Step timeout** — deployed acceptance gives Cucumber steps a 30-second ceiling so the explicit readiness waits can report the useful failure rather than being pre-empted by a shorter framework default.
+4. **One scenario retry** — deployed acceptance sets `E2E_RETRY=1`. Only the failed scenario is retried; the entire desktop/mobile job is not repeated. Local/deterministic E2E should leave retries disabled so flaky local tests remain visible.
+
+Retries are a defence against transient deployed-environment timing only. They must not be used to weaken assertions or hide repeatable product failures. A scenario that fails again on its retry remains a release failure and should be investigated from its report/screenshot evidence.
+
 ## Acceptance tests are part of the change
 
 The acceptance suite is part of AMO's product contract and must be reviewed whenever observable application behaviour changes. Functional, UX, navigation, API, authentication, workspace, deployment and release changes should not be considered complete until their impact on `tests/e2e/` has been assessed.
@@ -64,7 +75,7 @@ E2E_PROFILE=desktop \
 npm run test:e2e
 ```
 
-Set `E2E_PROFILE=mobile` for the mobile shell run.
+Set `E2E_PROFILE=mobile` for the mobile shell run. `E2E_RETRY` defaults to `0` outside the deployed workflow; this is intentional for local/deterministic test runs.
 
 ## Adding and maintaining scenarios
 
