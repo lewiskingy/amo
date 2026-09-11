@@ -15,7 +15,7 @@
   const canonicalDemandState=d=>window.DefinedDemandModel?.canonicalState?.(d?.status)||clean(d?.status);
   const isOpen=d=>window.DefinedDemandModel?.isOpen?.(d)??true;
   const currentDate=()=>new Date().toISOString().slice(0,10);
-  const demandFilters={scope:'active',businessArea:'',initiative:'',owner:'',project:'',control:'',search:''};
+  const demandFilters=window.AmoDemandFilters=window.AmoDemandFilters||{scope:'active',businessArea:'',initiative:'',owner:'',project:'',control:'',search:''};
   const allocationFilters={control:''};
 
   function allocationHasCommitment(a){return !!clean(a?.teamMemberId)&&Object.values(a?.forecast||{}).some(v=>Number(v)>0)}
