@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <script>(()=>{try{const t=localStorage.getItem('amo.theme')||localStorage.getItem('amo.appearance');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch{}})();</script>
+  <title>Demand · Architecture Management Office</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/app-theme.css">
+  <link rel="stylesheet" href="/demand/demand.css">
+</head>
+<body class="target-client-body">
+  <div class="target-client-app">
+    <aside id="appSidebar"></aside>
+    <main class="target-client-main">
+      <header id="pageHeader"></header>
+      <div class="target-client-context">
+        <div id="workspaceStatus"></div>
+        <div id="scopeSelector"></div>
+      </div>
+      <section class="target-client-content" aria-labelledby="demand-heading">
+        <div class="migration-note"><strong>Dark launch.</strong> This is the strategic `/demand` implementation. The legacy Demand tab remains the primary navigation target until parity and acceptance are proven.</div>
+        <div id="demandFilters"></div>
+        <div class="demand-filter-summary"><div id="demandFilterChips"></div><div id="demandCount"></div></div>
+        <div id="demandAppState" class="demand-app-state">Loading Demand…</div>
+        <div class="target-table-wrap"><table id="demandTable" class="target-demand-table"></table></div>
+      </section>
+    </main>
+  </div>
+  <dialog id="demandEditor" class="target-dialog"></dialog>
+
+  <!-- Transitional migration boundary only. New route/domain code must depend on WorkspaceGateway,
+       not these globals. See src/client/README.md. -->
+  <script src="/app-workspace-repository.js"></script>
+  <script src="/app-workspace-remote-repository.js"></script>
+  <script src="/app-auth.js"></script>
+  <script type="module" src="/demand/main.js"></script>
+</body>
+</html>
