@@ -1,3 +1,5 @@
+const retry=Number.parseInt(process.env.E2E_RETRY||'0',10);
+
 module.exports = {
   default: {
     paths: ['tests/e2e/features/**/*.feature'],
@@ -11,6 +13,6 @@ module.exports = {
     ],
     publishQuiet: true,
     parallel: 1,
-    retry: 0
+    retry: Number.isFinite(retry)&&retry>0?retry:0
   }
 };
