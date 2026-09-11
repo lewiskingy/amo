@@ -9,7 +9,8 @@ const seed=()=>({
   demands:[{id:'DEM-2026-0001',title:'Seeded customer change',businessArea:'Customer',initiative:'Modernise',ownerId:'P-1',projectNumber:'12345',status:'In Progress',teamId:'TEAM-A',version:1},{id:'DEM-2026-0002',title:'Seeded unfunded change',businessArea:'Operations',initiative:'',ownerId:'P-2',projectNumber:'',status:'Planned',owningTeamId:'TEAM-A',version:1},{id:'DEM-2026-0003',title:'Completed change',businessArea:'Operations',initiative:'',ownerId:'P-2',projectNumber:'777',status:'Complete',teamId:'TEAM-B',version:1}],
   people:[{id:'P-1',name:'Alex Architect'},{id:'P-2',name:'Sam Strategist'}],
   allocations:[{id:'A-1',demandId:'DEM-2026-0001',teamMemberId:'P-1',forecast:{'2026-09':0.5}},{id:'A-2',demandId:'DEM-2026-0002',teamMemberId:'P-2',forecast:{'2026-09':0.3}}],
-  workPackages:[{id:'WP-1',demandId:'DEM-2026-0001',title:'Tracked package',status:'In Progress',azureDevOpsWorkItemId:'9001'},{id:'WP-2',demandId:'DEM-2026-0002',title:'Needs tracking',status:'Ready',azureDevOpsWorkItemId:''}]
+  workPackages:[{id:'WP-1',demandId:'DEM-2026-0001',title:'Tracked package',status:'In Progress',azureDevOpsWorkItemId:'9001'},{id:'WP-2',demandId:'DEM-2026-0002',title:'Needs tracking',status:'Ready',azureDevOpsWorkItemId:''}],
+  actuals:{month:'2026-09',facts:[{teamMemberId:'P-1',demandId:'DEM-2026-0001',actualHours:75,actualCostGbp:7000}]}
 });
 export class LocalTestWorkspaceGateway extends WorkspaceGateway{
   async connect(){if(!sessionStorage.getItem(KEY))sessionStorage.setItem(KEY,JSON.stringify(seed()));return true}
