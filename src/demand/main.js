@@ -6,8 +6,8 @@ const $=selector=>document.querySelector(selector);
 let loading=false,page=null;
 
 renderSidebar($('#appSidebar'),{activeRoute:'/demand'});
-const actions=renderPageHeader($('#pageHeader'),{title:'Demand Register',subtitle:'Dark-launched target client slice over the same AMO workspace.',actions:[{id:'expand',label:'Expand all'},{id:'collapse',label:'Collapse all'},{id:'refresh',label:'Refresh'},{id:'legacy',label:'Open legacy Demand'}]});
-actions.legacy.addEventListener('click',()=>{location.href='/?view=demand'});
+const actions=renderPageHeader($('#pageHeader'),{title:'Demand Register',subtitle:'Dark-launched target client slice over the same AMO workspace.',actions:[{id:'expand',label:'Expand all'},{id:'collapse',label:'Collapse all'},{id:'refresh',label:'Refresh'},{id:'legacy',label:'Open legacy AMO'}]});
+actions.legacy.addEventListener('click',()=>{location.href='/'});
 actions.expand.addEventListener('click',()=>page?.expandAll());actions.collapse.addEventListener('click',()=>page?.collapseAll());actions.refresh.addEventListener('click',()=>load());
 const statusHost=$('#workspaceStatus');
 const account=new AccountWidget($('#amoShellAccount'),window.amoAuth||null);account.start();
