@@ -1,16 +1,15 @@
 # Target client architecture
 
-This directory is the **strategic/canonical home for new AMO client code**. Code here implements the target architecture from issue #183: a shared application shell, route-owned page slices, reusable presentation components, pure domain/query services and persistence behind explicit repository/gateway boundaries.
+This directory is the **strategic/canonical home for new AMO client code**. Code here implements issue #183: shared shell, route-owned pages, reusable presentation, pure domain/query services and persistence behind explicit gateway boundaries.
 
 ## Status vocabulary
 
-Every client library should be treated as one of these states:
+- **Canonical** — strategic implementation. Reuse and improve it at source; do not create a competing implementation.
+- **Transitional adapter** — intentional anti-corruption boundary to the legacy runtime. Translate contracts only and remove it when the dependency migrates.
+- **Test-only support** — code used solely to prove canonical behaviour deterministically. It must be reachable only through an explicit test bootstrap and must never become a production persistence fallback.
+- **Legacy** — existing `src/app-*.js` global/render-wrapper code. Supported during strangler migration, not a template for new route code, and removed as each route cuts over.
 
-- **Canonical** — strategic implementation. Reuse it, improve it at source, and add tests here rather than creating a competing implementation.
-- **Transitional adapter** — an intentional anti-corruption boundary between canonical code and the legacy client/runtime. Keep the boundary narrow and remove the adapter when the dependency has migrated.
-- **Legacy** — existing `src/app-*.js` global/render-wrapper code outside this directory. It remains supported during the strangler migration but is not a template for new route code and is marked for decommissioning as each route cuts over.
-
-Do not copy a legacy helper into this directory merely to make a route self-contained. Extract stable domain behaviour deliberately, add a contract test, then make the canonical library the source of truth.
+Do not copy a legacy helper here merely to make a route self-contained. Extract stable behaviour deliberately, test it, and make the canonical library the source of truth.
 
 ## Dependency direction
 
@@ -28,17 +27,23 @@ transitional adapter (only where required)
 legacy Local/Remote repository implementation
 ```
 
-Dependencies must not point back from domain services into pages, DOM renderers or legacy global state.
+Domain services must not depend on pages, DOM renderers or legacy global state. `client/testing/` is outside the production dependency chain and is selected only by explicit E2E bootstrap.
 
 ## Current migration map
 
 | Capability | Target owner | State | Legacy implementation |
 | --- | --- | --- | --- |
-| Shared route shell | `client/shell/` | Canonical | `index.html`, `app-navigation.js`, shell mutation modules |
-| Demand filter/query semantics | `client/domain/demand/` | Canonical | `app-commitment-health.js`, `app-2.js` filter composition |
-| Work Package selection/presentation semantics used by Demand | `client/domain/work-packages/` | Canonical for `/demand` | `app-work-packages.js` renderer/global state |
-| Workspace access for route slices | `client/data/workspace-gateway.js` | Canonical contract | `app-workspace-repository*.js` |
-| Legacy repository bridge | `client/legacy/legacy-workspace-adapter.js` | Transitional adapter | Local/Remote repository globals |
-| `/demand` page | `client/pages/demand/` | Canonical dark launch | legacy `#demand` in `index.html` plus renderer wrappers |
+| Shared route shell | `client/shell/` | **Canonical** | `index.html`, `app-navigation.js`, shell mutation modules |
+| Demand filter/query semantics | `client/domain/demand/` | **Canonical** | `app-commitment-health.js`, `app-2.js` filter composition |
+| Demand create/save record semantics | `client/domain/demand/demand-record.js` | **Canonical** | mixed page/global creation and validation behaviour |
+| Work Package selection/presentation semantics used by Demand | `client/domain/work-packages/` | **Canonical for `/demand`** | `app-work-packages.js` renderer/global state |
+| Workspace access for route slices | `client/data/workspace-gateway.js` | **Canonical contract** | `app-workspace-repository*.js` |
+| Legacy repository bridge | `client/legacy/legacy-workspace-adapter.js` | **Transitional adapter** | Local/Remote repository globals |
+| Deterministic browser workspace | `client/testing/local-test-workspace-gateway.js` | **Test-only support** | none; explicit `?e2e=1` only |
+| `/demand` page | `client/pages/demand/` | **Canonical dark launch** | legacy `#demand` plus renderer wrappers |
 
-The legacy implementation is not removed until the replacement route has parity and acceptance coverage. After cutover, remove the superseded path rather than retaining two live implementations.
+## Demand Phase 2 proof
+
+The local browser suite starts a fresh static test server and clean Playwright browser context, selects the test-only gateway explicitly, seeds a writable session workspace and verifies real `/demand` behaviour including combined filters, counts, hierarchy/Work Item context, edit → save → reload and create → save → reload. It runs with zero retries. This does not weaken production authentication or create an anonymous production write path.
+
+The legacy implementation is not removed until replacement parity and acceptance coverage are complete. After cutover, remove the superseded path rather than retaining two live implementations.
