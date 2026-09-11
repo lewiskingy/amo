@@ -1,13 +1,20 @@
 const assert = require('node:assert/strict');
 const { Given, When, Then } = require('@cucumber/cucumber');
 
+const configuredTimeout=(name,fallback)=>{
+  const value=Number.parseInt(process.env[name]||String(fallback),10);
+  return Number.isFinite(value)&&value>0?value:fallback;
+};
+const UI_READY_TIMEOUT=configuredTimeout('E2E_UI_TIMEOUT',10000);
+const APP_READY_TIMEOUT=configuredTimeout('E2E_APP_READY_TIMEOUT',12000);
+
 const requiredEnv=name=>{
   const value=String(process.env[name]||'').trim();
   assert.ok(value,`${name} must be configured for the acceptance run.`);
   return value.replace(/\/+$/,'');
 };
 
-async function waitFor(fn,{timeout=5000,interval=100}={}){
+async function waitFor(fn,{timeout=UI_READY_TIMEOUT,interval=100}={}){
   const started=Date.now();let last;
   while(Date.now()-started<timeout){
     try{const value=await fn();if(value)return value}catch(error){last=error}
@@ -78,7 +85,7 @@ When('I open the application', async function(){
     const nav=await this.page.locator('.sidebar nav').count()===1;
     const configured=await this.page.evaluate(()=>!!window.AMO_CONFIG?.targetStage);
     return shell&&dashboard&&nav&&configured
-  },{timeout:5000});
+  },{timeout:APP_READY_TIMEOUT});
 });
 
 Then('the public hostname should identify itself as the Test application', async function(){
@@ -119,7 +126,7 @@ Then('the navigation shell should be usable at the selected viewport', async fun
   }
   /* Users & Access and the final information architecture are dynamically composed. Wait for the
      Administration capability to be installed before asserting the complete navigation contract. */
-  await waitFor(async()=>await sidebar.locator('.nav-btn[data-view="users"]').count()===1,{timeout:5000});
+  await waitFor(async()=>await sidebar.locator('.nav-btn[data-view="users"]').count()===1);
   const navText=String(await sidebar.locator('nav').textContent()||'');
   for(const expected of ['Dashboard','Demand','Allocations','Resource Plan','Roadmap','Users & Access','Settings','Improvement Ideas','Process Guide']){
     assert.ok(navText.includes(expected),`Navigation is missing ${expected}.`);
@@ -127,12 +134,12 @@ Then('the navigation shell should be usable at the selected viewport', async fun
 });
 
 Then('there should be one account identity surface', async function(){
-  const hostCount=await waitFor(async()=>{const n=await this.page.locator('#amoSidebarIdentity').count();return n===1?n:false},{timeout:4000});
+  const hostCount=await waitFor(async()=>{const n=await this.page.locator('#amoSidebarIdentity').count();return n===1?n:false});
   assert.equal(hostCount,1,'Expected exactly one sidebar account identity surface.');
   await waitFor(async()=>{
     const states=await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count();
     return states===1?states:false
-  },{timeout:4000});
+  });
   assert.equal(await this.page.locator('#amoSidebarIdentity .amo-sidebar-profile, #amoSidebarIdentity .amo-sidebar-signin').count(),1,'The account identity surface should contain exactly one signed-in or signed-out state.');
   assert.equal(await this.page.locator('.amo-sidebar-profile, .amo-sidebar-signin').count(),1,'Duplicate account/sign-in states were rendered.');
 });
@@ -175,7 +182,7 @@ Then('the user administration surface should expose identity, access and status 
       return expectedHeadings.every(expected=>headings.includes(expected));
     }
     return bootstrapPattern.test(String(await content.textContent()||''));
-  },{timeout:5000});
+  });
   if(await table.count()===1){
     const headings=(await table.locator('thead th').allTextContents()).map(x=>x.trim());
     for(const expected of expectedHeadings){
@@ -194,7 +201,7 @@ When('I open People', async function(){
 Then('People should expose AMO access separately from the Person record', async function(){
   const view=this.page.locator('#team.view.active');
   await waitFor(async()=>await view.count()===1);
-  await waitFor(async()=>String(await view.textContent()||'').includes('AMO access'),{timeout:5000});
+  await waitFor(async()=>String(await view.textContent()||'').includes('AMO access'));
   const text=String(await view.textContent()||'');
   assert.ok(text.includes('AMO access'),'People does not expose the Person-to-User relationship as AMO access.');
 });
