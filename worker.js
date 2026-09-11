@@ -48,15 +48,21 @@ function isReportDeepLink(pathname){
   return !match[1].includes('.')
 }
 
+function isDemandRoute(pathname){
+  return pathname==='/demand'||pathname==='/demand/'||pathname==='/demand/index.html'
+}
+
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
 
-    // Static Assets html_handling is deliberately disabled so deep report routes are not
-    // canonicalised to /reports/. Resolve application shells explicitly and inject the
-    // deployment target stage, build identity and matching Remote Workspace API default.
+    // Static Assets html_handling is deliberately disabled so routed application shells are not
+    // canonicalised away. Resolve shells explicitly and inject deployment target/build identity.
     if(url.pathname==='/'||url.pathname==='/index.html'){
       return applicationShell(request,env,url,'/index.html')
+    }
+    if(isDemandRoute(url.pathname)){
+      return applicationShell(request,env,url,'/demand/index.html')
     }
     if(isReportDeepLink(url.pathname)){
       return applicationShell(request,env,url,'/reports/index.html')
