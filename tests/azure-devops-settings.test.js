@@ -3,9 +3,9 @@ const fs=require('fs'),assert=require('assert');
 const settings=fs.readFileSync('src/app-config-settings.js','utf8');
 const workItems=fs.readFileSync('src/client/domain/work-packages/work-item-reference.js','utf8');
 
-// Azure DevOps is owned by the canonical tabbed Settings editor.
-assert.match(settings,/system:\{label:'System',keys:\['planningWindow','assistantUrl','azureDevOps'\]\}/);
-assert.match(settings,/organization:\{label:'Organization',keys:\['departments','teams','businessAreas','initiatives'\]\}/);
+// Azure DevOps is owned by the canonical tabbed Settings editor alongside other System/Organization settings.
+assert.match(settings,/system:\{label:'System',keys:\['planningWindow','assistantUrl','azureDevOps','dataStage'\]\}/);
+assert.match(settings,/organization:\{label:'Organization',keys:\['departments','teams','businessAreas','initiatives','tenantDomain'\]\}/);
 assert.match(settings,/id="settingsAzdoDefaultOrganization"/);
 assert.match(settings,/data-azdo-department-org/);
 assert.match(settings,/data-azdo-department-project/);
