@@ -43,15 +43,16 @@ export class WorkspaceSession{
     this.current={mode:'local',name:handle.name||'Workspace',gateway,handle};
     return this.snapshot();
   }
-  async chooseLocal(){
-    let handle=await this.rememberedHandle();
+  async chooseLocal({preferRemembered=true}={}){
+    let handle=preferRemembered?await this.rememberedHandle():null;
     if(handle){
       const permission=await handlePermission(handle);
       if(permission!=='granted'&&!await requestHandlePermission(handle))handle=null;
     }
     if(!handle){
-      if(typeof globalThis.showDirectoryPicker!=='function'&&typeof this.directoryPicker!=='function')throw new Error('Local Workspace folder access is not available in this browser.');
+      if(typeof this.directoryPicker!=='function')throw new Error('Local Workspace folder access is not available in this browser.');
       handle=await this.directoryPicker({id:'amo-local-workspace',mode:'readwrite'});
+      if(!handle)throw new Error('No Local Workspace folder was selected.');
     }
     return this.openLocalHandle(handle,{remember:true});
   }
