@@ -10,11 +10,12 @@ export class WorkspaceSwitcher{
   }
   render({busy=false}={}){
     if(!this.host)return;
-    const result=this.result||{},localLabel=result.state==='reconnect-required'&&result.preferredMode==='local'?`Reconnect ${result.rememberedName||'Local Workspace'}`:'Local Workspace';
+    const result=this.result||{},reconnect=result.state==='reconnect-required'&&result.preferredMode==='local',usingLocal=result.state==='ready'&&result.mode==='local';
+    const localLabel=reconnect?`Reconnect ${result.rememberedName||'Local Workspace'}`:usingLocal?'Change Local Workspace':'Local Workspace';
     const current=result.state==='ready'?`${result.mode==='local'?'Local':'Remote'} · ${result.name||'Workspace'}`:result.message||'No workspace connected';
     this.host.className='amo-workspace-switcher';
     this.host.innerHTML=`<span class="amo-workspace-current"><small>Workspace</small><strong>${esc(current)}</strong></span><div class="amo-workspace-actions"><button type="button" class="btn" data-workspace-local ${busy?'disabled':''}>${esc(localLabel)}</button><button type="button" class="btn" data-workspace-remote ${busy?'disabled':''}>Remote Workspace</button></div>`;
-    this.host.querySelector('[data-workspace-local]')?.addEventListener('click',()=>this.invoke(()=>this.session.chooseLocal()).catch(()=>{}));
+    this.host.querySelector('[data-workspace-local]')?.addEventListener('click',()=>this.invoke(()=>this.session.chooseLocal({preferRemembered:!usingLocal})).catch(()=>{}));
     this.host.querySelector('[data-workspace-remote]')?.addEventListener('click',()=>this.invoke(()=>this.session.chooseRemote()).catch(()=>{}));
   }
 }
