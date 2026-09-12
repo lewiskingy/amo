@@ -29,7 +29,7 @@ export class DemandPage{
     this.onStatus?.({state:'loading',message:`Saving ${next.id}…`});await this.gateway.saveDemand(next);
     const index=this.data.demands.findIndex(d=>d.id===next.id);
     if(index>=0)this.data.demands.splice(index,1,next);else this.data.demands.push(next);
-    this.queryService=this.buildQueryService();this.render();this.onStatus?.({state:'ready',message:'Remote Workspace connected',detail:`${isNew?'Created':'Saved'} ${next.id}`});
+    this.queryService=this.buildQueryService();this.render();this.onStatus?.({state:'ready',message:'Workspace connected',detail:`${isNew?'Created':'Saved'} ${next.id}`});
   }
   start(){this.scopeSelector.render();this.render()}
 }
