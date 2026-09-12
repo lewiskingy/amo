@@ -68,5 +68,6 @@
   register('record-modal',{label:'Record changes',isEditing:()=>typeof recordModalState!=='undefined'&&document.getElementById('recordModalBackdrop')?.classList.contains('open')&&recordModalState.mode==='edit',save:()=>{saveRecordModal?.();return recordModalState.mode!=='edit'||!document.getElementById('recordModalBackdrop')?.classList.contains('open')},cancel:()=>{if(typeof recordModalState==='undefined')return;if(recordModalState.isNew)closeRecordModal?.();else{recordModalState.mode='view';recordModalState.draft=null;renderRecordModal?.()}}});
 
   window.addEventListener('beforeunload',event=>{if(hasActive()){event.preventDefault();event.returnValue=''}});
-  window.AmoEditTransactions={register,active,hasActive,resolveActive,navigate:guardedSwitchView}
+  window.AmoEditTransactions={register,active,hasActive,resolveActive,navigate:guardedSwitchView};
+  try{window.dispatchEvent(new CustomEvent('amo-edit-transactions-ready'))}catch(_e){}
 })();
