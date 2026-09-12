@@ -1,15 +1,15 @@
 import {WorkspaceStateStore,handlePermission,requestHandlePermission} from './workspace-state-store.js';
-import {legacyLocalGateway,configuredLegacyRemoteGateway} from '../legacy/legacy-workspace-adapter.js';
 
 const clean=value=>String(value??'').trim();
+const unconfigured=kind=>()=>{throw new Error(`${kind} Workspace gateway factory is not configured.`)};
 
 export class WorkspaceSession{
   constructor({
     store=new WorkspaceStateStore(),
-    createLocalGateway=handle=>legacyLocalGateway(handle),
-    createRemoteGateway=url=>configuredLegacyRemoteGateway(url),
+    createLocalGateway=unconfigured('Local'),
+    createRemoteGateway=unconfigured('Remote'),
     directoryPicker=options=>globalThis.showDirectoryPicker?.(options),
-    defaultRemoteUrl=()=>globalThis.AMO_CONFIG?.defaultRemoteUrl||''
+    defaultRemoteUrl=()=>''
   }={}){
     this.store=store;this.createLocalGateway=createLocalGateway;this.createRemoteGateway=createRemoteGateway;this.directoryPicker=directoryPicker;this.defaultRemoteUrl=defaultRemoteUrl;
     this.current=null;this.rememberedLocalHandle=null;
