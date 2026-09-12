@@ -1,5 +1,5 @@
 import {renderSidebar,renderPageHeader,renderWorkspaceStatus,AccountWidget} from '../client/shell/app-shell.js';
-import {WorkspaceSession} from '../client/workspace/workspace-session.js';
+import {configuredLegacyWorkspaceSession} from '../client/legacy/legacy-workspace-session.js';
 import {WorkspaceSwitcher} from '../client/workspace/workspace-switcher.js';
 import {DemandPage} from '../client/pages/demand/demand-page.js';
 
@@ -27,7 +27,7 @@ async function refresh(){
 }
 
 if(!e2e){
-  session=new WorkspaceSession();
+  session=configuredLegacyWorkspaceSession();
   switcher=new WorkspaceSwitcher($('#workspaceSwitcher'),{session,onChange:result=>loadGateway(result.gateway,result),onError:showError});switcher.render();
   window.addEventListener('amo-auth-changed',()=>{if(!loading&&session.current?.mode==='remote')restoreWorkspace()});
 }else $('#workspaceSwitcher').hidden=true;
