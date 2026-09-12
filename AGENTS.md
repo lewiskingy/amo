@@ -47,6 +47,26 @@ New behaviour should live with the module or component responsible for that capa
 
 A narrowly scoped new module is appropriate when it represents a genuine new responsibility or clearly separates an existing responsibility. A new file should not exist solely to override behaviour that could safely be maintained at its source.
 
+### Follow the canonical edit transaction model
+
+All mutable client surfaces must follow the editing semantics defined in `src/docs/EditTransactions.md.txt`. Treat that document as the canonical contract for edit behaviour.
+
+The default interaction is:
+
+**View → explicitly Edit → change a draft / working copy → Save or Cancel / Discard → navigate safely.**
+
+Contributors must preserve these rules:
+
+- ordinary field controls update only the current draft and must not persist consequential changes merely on selection, input or change;
+- one mutable surface has one clear edit transaction and one canonical Save / Cancel path;
+- settings cards participate in their owning Settings-tab transaction rather than introducing independent Edit or Save behaviour;
+- record dialogs create/edit a working copy and persist only through explicit Save / Create;
+- deliberate operations such as Import, Publish, Unpublish or Restore may remain explicit commands where that better represents the action;
+- navigation protection must use the owning surface's existing edit state and Save / Cancel operations rather than creating a second dirty-state or persistence mechanism;
+- relationship, identity, access or reassignment changes that could be surprising or destructive should be explicit and confirmed where appropriate.
+
+When adding or changing an editable surface, review `src/docs/EditTransactions.md.txt` and ensure tests cover Save, Cancel/Discard and navigation-away behaviour where relevant.
+
 ## Tests are part of the product contract
 
 Treat tests as part of the change, not as testing work performed afterwards.
@@ -78,7 +98,7 @@ Changes to acceptance tests are themselves product-maintenance changes: keep sce
 
 When behaviour, terminology, workflow, data shape, configuration, deployment or operation changes, assess the affected documentation in the same pull request.
 
-The canonical application/user and technical guide is `src/docs/AMO-README.md.txt`. Release and environment behaviour is documented under `.github/`, including `.github/RELEASES.md`. Test-specific execution guidance belongs with the relevant test suite, such as `tests/e2e/README.md`.
+The canonical application/user and technical guide is `src/docs/AMO-README.md.txt`. The canonical client editing contract is `src/docs/EditTransactions.md.txt`. Release and environment behaviour is documented under `.github/`, including `.github/RELEASES.md`. Test-specific execution guidance belongs with the relevant test suite, such as `tests/e2e/README.md`.
 
 Keep documentation aligned with the implemented product. Do not leave instructions describing UI, workflows, fields, contracts, deployment behaviour or terminology that the change has made obsolete.
 
@@ -111,6 +131,7 @@ Before considering a change complete, explicitly check:
 - **Canonical implementation:** Have I changed the existing owner of this behaviour rather than creating an unnecessary parallel, override or patch implementation?
 - **Refactoring:** If I encountered related duplication or patch layering, could it safely be consolidated as part of this change? If so, have I done that and removed superseded code?
 - **Reuse:** Have I searched for and reused existing helpers, rules, constants and patterns rather than duplicating them?
+- **Edit semantics:** If the change introduces or alters editing, does it follow `src/docs/EditTransactions.md.txt`, with one transaction, draft-only field changes, explicit Save/Cancel and safe navigation?
 - **Tests:** Have I reviewed the tests affected by this change and updated or added the appropriate coverage where intended behaviour changed?
 - **Acceptance:** Have I reviewed the deployed acceptance scenarios affected by observable product changes and updated or added them where appropriate?
 - **Documentation:** Have I reviewed and updated the canonical user, technical, test and release documentation affected by the change?
@@ -129,6 +150,8 @@ In particular, look for:
 - new files that override or patch behaviour owned elsewhere;
 - duplicated helpers, business rules, constants, UI patterns or documentation;
 - old paths left active after replacement behaviour has been introduced;
+- editable controls that persist independently of the owning edit transaction;
+- competing Save/Cancel paths on the same mutable surface;
 - tests changed to accommodate regressions rather than intentional product changes;
 - behaviour changed without corresponding test or documentation assessment;
 - terminology or contracts that have drifted between code, tests and documentation;
