@@ -1,0 +1,38 @@
+# Edit Transactions
+
+AMO uses one editing transaction per mutable surface.
+
+## Standard interaction
+
+**View → Edit → change a draft → Save or Cancel/Discard → navigate safely.**
+
+- A normal page or settings scope is read-only until the user explicitly enters Edit.
+- Editable controls change a draft/working copy; they do not persist merely because a control value changed.
+- Save validates and persists through the surface's canonical persistence path.
+- Cancel/Discard abandons the draft and leaves persisted data unchanged.
+- A create/edit dialog follows the same rule: opening the dialog creates a draft and only Save persists it.
+- Deliberate commands such as Import, Publish, Unpublish and Restore can remain explicit commands rather than entering a general page edit state.
+
+## Settings
+
+System, Process and Organization each have one tab-level transaction. Every setting displayed within a tab participates in that tab's Edit / Save / Discard lifecycle. Cards must not introduce their own competing settings save path.
+
+Data Stage is a System setting. Tenant Domain, Departments and Teams are Organization settings. Azure DevOps inheritance is split between the System default and Organization overrides but still uses the same tab transactions.
+
+## Users and Person relationships
+
+User details, access and the optional User ↔ Person relationship are edited through **Edit Users**. `Person.userId` remains the relationship source of truth. Selecting a Person changes only the Users draft; relationship changes are persisted by **Save Users**. Existing relationship reassignment is confirmed before persistence. Cancel leaves relationships unchanged.
+
+## Navigation while editing
+
+The shared edit-transaction registry coordinates navigation but does not own surface state. A surface registers its own `isEditing`, `save` and `cancel` operations.
+
+When the user navigates away while a transaction is active, AMO offers:
+
+- **Save and leave** — invoke the surface's canonical Save and navigate only if it succeeds.
+- **Discard changes** — invoke the surface's canonical Cancel/Discard, then navigate.
+- **Stay here** — keep the transaction and remain on the current surface.
+
+A failed Save leaves the user on the current surface in Edit mode. Browser close/reload also receives native unsaved-change protection while an edit transaction is active.
+
+The registry must not maintain a second copy of draft or dirty state; the surface that owns the edit owns the transaction state.
