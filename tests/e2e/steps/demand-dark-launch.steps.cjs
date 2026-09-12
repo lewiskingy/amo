@@ -24,6 +24,12 @@ Then('the target Demand shell should be displayed',async function(){
   assert.equal(await this.page.locator('.amo-shell-sidebar a[href="/demand"].active').count(),1,'The strategic Demand route is not active in the shared target shell.');
 });
 
+Then('the deployed Demand route should connect to Remote Workspace',async function(){
+  const status=this.page.locator('#workspaceStatus');
+  await waitFor(async()=>/Remote Workspace connected/i.test(String(await status.textContent()||'')),Number(process.env.E2E_APP_TIMEOUT||12000));
+  assert.ok(await this.page.locator('#demandFilters [data-filter]').count()>0,'Canonical Demand filters were not initialised from the deployed workspace.');
+});
+
 Then('the Demand route should identify itself as a dark launch',async function(){
   const note=this.page.locator('.migration-note');
   await waitFor(async()=>await note.count()===1);

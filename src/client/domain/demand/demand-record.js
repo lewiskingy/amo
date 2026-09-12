@@ -11,13 +11,14 @@ export function nextDemandId(demands=[],year=new Date().getFullYear()){
 
 export function newDemandRecord({demands=[],year=new Date().getFullYear(),now=()=>new Date().toISOString()}={}){
   return {
-    id:nextDemandId(demands,year),title:'',businessArea:'',initiative:'',teamId:'',owningTeamId:'',priority:'',status:'Assessing',ownerId:'',projectNumber:'',health:'',context:'',demandModelVersion:2,version:0,modifiedAt:now()
+    id:nextDemandId(demands,year),title:'',businessArea:'',initiative:'',teamId:'',priority:'',status:'Assessing',ownerId:'',projectNumber:'',health:'',context:'',demandModelVersion:2,version:0,modifiedAt:now()
   };
 }
 
 export function prepareDemandForSave(record,{now=()=>new Date().toISOString()}={}){
   const next={...record};
-  next.title=clean(next.title);next.businessArea=clean(next.businessArea);next.initiative=clean(next.initiative);next.projectNumber=clean(next.projectNumber);next.ownerId=clean(next.ownerId);
+  next.title=clean(next.title);next.businessArea=clean(next.businessArea);next.initiative=clean(next.initiative);next.projectNumber=clean(next.projectNumber);next.ownerId=clean(next.ownerId);next.teamId=clean(next.teamId)||clean(next.owningTeamId);
+  if(Object.prototype.hasOwnProperty.call(next,'owningTeamId'))delete next.owningTeamId;
   if(!next.id)throw new Error('Demand ID is required.');
   if(!next.title||!next.businessArea)throw new Error('Title and Business Area are required.');
   if(next.projectNumber&&!/^\d+$/.test(next.projectNumber))throw new Error('Project Number must contain digits only.');

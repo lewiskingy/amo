@@ -12,7 +12,7 @@ export class DemandPage{
     this.filters=new DemandFilterState();this.scope={mode:'all'};this.expanded=new Set();this.queryService=this.buildQueryService();
     this.scopeSelector=new ScopeSelector(elements.scope,{settings,onChange:scope=>{this.scope=scope;this.render()}});
   }
-  buildQueryService(){return new DemandQueryService({demands:this.data.demands,workPackages:this.data.workPackages,allocations:this.data.allocations,people:this.data.people})}
+  buildQueryService(){return new DemandQueryService({demands:this.data.demands,workPackages:this.data.workPackages,allocations:this.data.allocations,people:this.data.people,actuals:this.data.actuals||null})}
   render(){
     const filters=this.filters.value,rows=this.queryService.query(filters,this.scope);
     renderDemandFilterBar(this.elements.filters,{filters,settings:this.settings,people:this.data.people,onChange:(key,value)=>{this.filters.set(key,value);this.render()},onClear:()=>{this.filters.reset();this.render()}});

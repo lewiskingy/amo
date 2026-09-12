@@ -10,13 +10,21 @@ export class LegacyWorkspaceRepositoryAdapter extends WorkspaceGateway{
   async loadDemandSlice(){
     const bundle=await this.repository.loadWorkspace();
     const workPackages=await this.repository.listRecords('workPackages').catch(()=>[]);
+    const actuals=await (async()=>{
+      if(typeof this.repository.listActualsPeriods!=='function'||typeof this.repository.readActualsPeriod!=='function')return null;
+      const periods=await this.repository.listActualsPeriods().catch(()=>[]),month=[...periods].sort().at(-1);
+      if(!month)return null;
+      const period=await this.repository.readActualsPeriod(month).catch(()=>null);
+      return period?{month, facts:Array.isArray(period.facts)?period.facts:[]}:null;
+    })();
     return {
       workspace:bundle.workspace||{},
       settings:bundle.settings||bundle.configFiles?.['settings.json']||{},
       demands:bundle.demand||[],
       people:bundle.team||[],
       allocations:bundle.allocations||[],
-      workPackages
+      workPackages,
+      actuals
     };
   }
   async saveDemand(record){return this.repository.saveRecord('demand',record)}

@@ -1,24 +1,19 @@
+import {buildWorkItemReference} from '../../domain/work-packages/work-item-reference.js';
+
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
-function azdoContext(demand,settings){
-  const team=(settings.teams||[]).find(t=>t.id===demand.owningTeamId)||{};
-  const department=(settings.departments||[]).find(d=>d.id===team.departmentId)||{};
-  const organization=team.azureDevOps?.organization||team.azureDevOpsOrganization||department.azureDevOps?.organization||department.azureDevOpsOrganization||settings.azureDevOps?.defaultOrganization||settings.defaultOrganization||'';
-  const project=team.azureDevOps?.project||team.azureDevOpsProject||department.azureDevOps?.project||department.azureDevOpsProject||'';
-  return{organization,project};
-}
 function workItem(demand,wp,settings){
-  const id=String(wp.azureDevOpsWorkItemId||'').trim();if(!id)return'<span class="control-badge danger">Work Item missing</span>';
-  const {organization,project}=azdoContext(demand,settings);
-  if(!organization||!project)return`<span class="work-item-id">#${esc(id)}</span>`;
-  const href=`https://dev.azure.com/${encodeURIComponent(organization)}/${encodeURIComponent(project)}/_workitems/edit/${encodeURIComponent(id)}`;
-  return`<a href="${href}" target="_blank" rel="noopener">#${esc(id)}</a>`;
+  const reference=buildWorkItemReference(wp,demand,settings);
+  if(!reference.id)return'<span class="control-badge danger">Work Item missing</span>';
+  if(!reference.url)return`<span class="work-item-id">#${esc(reference.id)}</span>`;
+  return`<a href="${reference.url}" target="_blank" rel="noopener">#${esc(reference.id)}</a>`;
 }
 function controlBadges(control){
   const badges=[];
   if(control.fundingMissing)badges.push('<span class="control-badge danger">Funding missing</span>');
   if(control.resourceMissing)badges.push('<span class="control-badge danger">Resource missing</span>');
   if(control.workItemMissing)badges.push('<span class="control-badge danger">Work Item missing</span>');
+  if(control.actualsMissing)badges.push('<span class="control-badge danger">Actuals missing</span>');
   if(!badges.length)badges.push('<span class="control-badge neutral">No exception</span>');
   return badges.join(' ');
 }
