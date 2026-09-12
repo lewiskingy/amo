@@ -16,7 +16,7 @@ Do not copy a legacy helper here merely to make a route self-contained. Extract 
 ```text
 shell/shared UI
       ↓
-route page composition
+workspace session / route page composition
       ↓
 domain/query services
       ↓
@@ -27,6 +27,8 @@ transitional adapter (only where required)
 legacy Local/Remote repository implementation
 ```
 
+`client/workspace/WorkspaceSession` is the canonical owner of route-level workspace continuity. It restores the same Local/Remote connection preference used by the legacy application, rehydrates the remembered Local `FileSystemDirectoryHandle` from the existing IndexedDB store when permission is available, and exposes an explicit reconnect/change action when a user gesture is required. Future route-owned pages such as `/allocations` and `/settings` must reuse this capability rather than inventing route-specific workspace bootstrap logic.
+
 Domain services must not depend on pages, DOM renderers or legacy global state. `client/testing/` is outside the production dependency chain and is selected only by explicit E2E bootstrap.
 
 ## Current migration map
@@ -34,6 +36,8 @@ Domain services must not depend on pages, DOM renderers or legacy global state. 
 | Capability | Target owner | State | Legacy implementation |
 | --- | --- | --- | --- |
 | Shared route shell | `client/shell/` | **Canonical** | `index.html`, `app-navigation.js`, shell mutation modules |
+| Workspace continuity / Local-Remote selection | `client/workspace/workspace-session.js` + `workspace-state-store.js` | **Canonical** | `app-workspace-memory.js`, `app-remote-workspace.js` |
+| Shared workspace selector UI | `client/workspace/workspace-switcher.js` | **Canonical** | mixed Workspace/topbar controls |
 | Demand filter/query semantics | `client/domain/demand/demand-query-service.js` | **Canonical** | `app-commitment-health.js`, `app-2.js` filter composition |
 | Demand management-control semantics | `client/domain/demand/demand-control-service.js` | **Canonical for `/demand`** | `app-commitment-health.js` |
 | Demand organisational scope semantics | `client/domain/demand/demand-scope.js` | **Canonical for `/demand`** | mixed grid/global scope logic |
@@ -49,6 +53,8 @@ Domain services must not depend on pages, DOM renderers or legacy global state. 
 
 The local browser suite starts a fresh static test server and clean Playwright browser context, selects the test-only gateway explicitly, seeds a writable session workspace and verifies real `/demand` behaviour. It covers combined filters, visible parent counts, hierarchy, canonical Azure DevOps Work Item links, Team/Department scope, Actuals completeness controls, edit → save → reload, create → save → reload and a narrow mobile viewport. It runs with zero retries. This does not weaken production authentication or create an anonymous production write path.
 
-The Demand migration gateway now exposes the latest available Actuals period as data to the canonical control service. The service derives Actuals completeness from due allocations and observed Actuals facts; page code does not consume `window.ReportingModel` or legacy CommitmentHealth globals.
+The Demand migration gateway exposes the latest available Actuals period as data to the canonical control service. The service derives Actuals completeness from due allocations and observed Actuals facts; page code does not consume `window.ReportingModel` or legacy CommitmentHealth globals.
+
+The `/demand` bootstrap now uses `WorkspaceSession` instead of hard-wiring Remote Workspace. If the main AMO application last used a remembered Local Workspace, `/demand` restores that same handle when browser permission remains granted, asks the user to reconnect it when a gesture is required, and never silently substitutes Remote Workspace for an explicit Local preference. Users can also switch between Local and Remote and change the remembered Local folder from the shared workspace switcher.
 
 The legacy implementation is not removed until replacement parity and acceptance coverage are complete. After cutover, remove the superseded path rather than retaining two live implementations.

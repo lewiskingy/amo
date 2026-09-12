@@ -15,7 +15,7 @@ export class LegacyWorkspaceRepositoryAdapter extends WorkspaceGateway{
       const periods=await this.repository.listActualsPeriods().catch(()=>[]),month=[...periods].sort().at(-1);
       if(!month)return null;
       const period=await this.repository.readActualsPeriod(month).catch(()=>null);
-      return period?{month, facts:Array.isArray(period.facts)?period.facts:[]}:null;
+      return period?{month,facts:Array.isArray(period.facts)?period.facts:[]}:null;
     })();
     return {
       workspace:bundle.workspace||{},
@@ -27,12 +27,20 @@ export class LegacyWorkspaceRepositoryAdapter extends WorkspaceGateway{
       actuals
     };
   }
-  async saveDemand(record){return this.repository.saveRecord('demand',record)}
+  async saveDemand(record){
+    if(typeof this.repository.ensureWritePermission==='function'&&this.repository.mode==='local'&&!await this.repository.ensureWritePermission())throw new Error('Read/write permission is required for this Local Workspace.');
+    return this.repository.saveRecord('demand',record)
+  }
 }
 
-export function configuredLegacyRemoteGateway(){
+export function legacyLocalGateway(handle){
+  if(typeof window.LocalWorkspaceRepository!=='function')throw new Error('Legacy LocalWorkspaceRepository is not available at the migration boundary.');
+  if(!handle)throw new Error('A Local Workspace folder is required.');
+  return new LegacyWorkspaceRepositoryAdapter(new window.LocalWorkspaceRepository(handle));
+}
+
+export function configuredLegacyRemoteGateway(baseUrl=window.AMO_CONFIG?.defaultRemoteUrl){
   if(typeof window.RemoteWorkspaceRepository!=='function')throw new Error('Legacy RemoteWorkspaceRepository is not available at the migration boundary.');
-  const baseUrl=window.AMO_CONFIG?.defaultRemoteUrl;
   if(!baseUrl)throw new Error('No Remote Workspace API is configured for this AMO deployment.');
-  return new LegacyWorkspaceRepositoryAdapter(new window.RemoteWorkspaceRepository(baseUrl));
+  return new LegacyWorkspaceRepositoryAdapter(new window.RemoteWorkspaceRepository(String(baseUrl).replace(/\/+$/,'')));
 }
