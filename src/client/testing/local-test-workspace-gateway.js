@@ -5,11 +5,11 @@ import {WorkspaceGateway} from '../data/workspace-gateway.js';
 const KEY='amo.e2e.demand.workspace';
 const seed=()=>({
   workspace:{name:'Transient E2E Workspace'},
-  settings:{businessAreas:['Customer','Operations'],initiatives:[{name:'Modernise',businessArea:'Customer'}],statuses:['Assessing','Planned','In Progress','Complete'],priorities:['Low','Medium','High'],healthStates:['On Track','At Risk'],teams:[{id:'TEAM-A',name:'Architecture',departmentId:'DEP-A',azureDevOps:{organization:'amo-test',project:'Architecture'}},{id:'TEAM-B',name:'Operations Architecture',departmentId:'DEP-B'}],departments:[{id:'DEP-A',name:'Technology'},{id:'DEP-B',name:'Operations',azureDevOps:{organization:'amo-test',project:'Operations'}}]},
+  settings:{businessAreas:['Customer','Operations'],initiatives:[{name:'Modernise',businessArea:'Customer'}],statuses:['Assessing','Planned','In Progress','Complete'],priorities:['Low','Medium','High'],healthStates:['On Track','At Risk'],services:['Architecture','Data'],workPackageStatuses:['Planned','Ready','In Progress','Blocked','Complete','Cancelled'],teams:[{id:'TEAM-A',name:'Architecture',departmentId:'DEP-A',azureDevOps:{organization:'amo-test',project:'Architecture'}},{id:'TEAM-B',name:'Operations Architecture',departmentId:'DEP-B'}],departments:[{id:'DEP-A',name:'Technology'},{id:'DEP-B',name:'Operations',azureDevOps:{organization:'amo-test',project:'Operations'}}]},
   demands:[{id:'DEM-2026-0001',title:'Seeded customer change',businessArea:'Customer',initiative:'Modernise',ownerId:'P-1',projectNumber:'12345',status:'In Progress',teamId:'TEAM-A',version:1},{id:'DEM-2026-0002',title:'Seeded unfunded change',businessArea:'Operations',initiative:'',ownerId:'P-2',projectNumber:'',status:'Planned',owningTeamId:'TEAM-A',version:1},{id:'DEM-2026-0003',title:'Completed change',businessArea:'Operations',initiative:'',ownerId:'P-2',projectNumber:'777',status:'Complete',teamId:'TEAM-B',version:1}],
   people:[{id:'P-1',name:'Alex Architect'},{id:'P-2',name:'Sam Strategist'}],
   allocations:[{id:'A-1',demandId:'DEM-2026-0001',teamMemberId:'P-1',forecast:{'2026-09':0.5}},{id:'A-2',demandId:'DEM-2026-0002',teamMemberId:'P-2',forecast:{'2026-09':0.3}}],
-  workPackages:[{id:'WP-1',demandId:'DEM-2026-0001',title:'Tracked package',status:'In Progress',azureDevOpsWorkItemId:'9001'},{id:'WP-2',demandId:'DEM-2026-0002',title:'Needs tracking',status:'Ready',azureDevOpsWorkItemId:''}],
+  workPackages:[{id:'WP-1',demandId:'DEM-2026-0001',title:'Tracked package',service:'Architecture',status:'In Progress',estimatedEffortDays:5,targetStart:'2026-09-01',targetEnd:'2026-10-31',azureDevOpsWorkItemId:'9001',version:1},{id:'WP-2',demandId:'DEM-2026-0002',title:'Needs tracking',service:'Data',status:'Ready',estimatedEffortDays:3,targetStart:'2026-09-15',targetEnd:'2026-11-30',azureDevOpsWorkItemId:'',version:1}],
   actuals:{month:'2026-09',facts:[{teamMemberId:'P-1',demandId:'DEM-2026-0001',actualHours:75,actualCostGbp:7000}]}
 });
 export class LocalTestWorkspaceGateway extends WorkspaceGateway{
@@ -17,4 +17,5 @@ export class LocalTestWorkspaceGateway extends WorkspaceGateway{
   state(){return JSON.parse(sessionStorage.getItem(KEY)||JSON.stringify(seed()))}
   async loadDemandSlice(){return structuredClone(this.state())}
   async saveDemand(record){const state=this.state(),index=state.demands.findIndex(d=>d.id===record.id);if(index>=0)state.demands.splice(index,1,structuredClone(record));else state.demands.push(structuredClone(record));sessionStorage.setItem(KEY,JSON.stringify(state));return record}
+  async saveWorkPackage(record){const state=this.state(),index=state.workPackages.findIndex(w=>w.id===record.id);if(index>=0)state.workPackages.splice(index,1,structuredClone(record));else state.workPackages.push(structuredClone(record));sessionStorage.setItem(KEY,JSON.stringify(state));return record}
 }
