@@ -50,8 +50,20 @@ export class DemandPage{
     }catch(error){this.onStatus?.({state:'error',message:'List changes were not saved',detail:error.message||String(error)});throw error}
   }
   async create(){const demand=newDemandRecord({demands:this.data.demands});await editDemand(this.elements.dialog,{demand,settings:this.settings,people:this.data.people,isNew:true,onSave:next=>this.save(next,{isNew:true})})}
-  async openEditor(demand){await editDemand(this.elements.dialog,{demand,settings:this.settings,people:this.data.people,onSave:next=>this.save(next)})}
-  async openWorkPackageEditor(workPackage,demand){await editWorkPackage(this.elements.dialog,{workPackage,demand,settings:this.settings,onSave:next=>this.saveWorkPackage(next)})}
+  async openEditor(demand){
+    const target=this.editMode?this.demandDraftFor(demand):demand;
+    await editDemand(this.elements.dialog,{demand:target,settings:this.settings,people:this.data.people,onSave:next=>{
+      if(!this.editMode)return this.save(next);
+      const original=this.data.demands.find(d=>d.id===next.id)||demand;next.version=original.version;next.modifiedAt=original.modifiedAt;this.demandDrafts.set(next.id,next);this.changedDemandIds.add(next.id);this.render()
+    }})
+  }
+  async openWorkPackageEditor(workPackage,demand){
+    const target=this.editMode?this.workPackageDraftFor(workPackage):workPackage;
+    await editWorkPackage(this.elements.dialog,{workPackage:target,demand,settings:this.settings,onSave:next=>{
+      if(!this.editMode)return this.saveWorkPackage(next);
+      const original=this.data.workPackages.find(w=>w.id===next.id)||workPackage;next.version=original.version;next.modifiedAt=original.modifiedAt;this.workPackageDrafts.set(next.id,next);this.changedWorkPackageIds.add(next.id);this.render()
+    }})
+  }
   async save(next,{isNew=false}={}){
     this.onStatus?.({state:'loading',message:`Saving ${next.id}…`});await this.gateway.saveDemand(next);
     const index=this.data.demands.findIndex(d=>d.id===next.id);if(index>=0)this.data.demands.splice(index,1,next);else this.data.demands.push(next);
