@@ -27,10 +27,11 @@ export class LegacyWorkspaceRepositoryAdapter extends WorkspaceGateway{
       actuals
     };
   }
-  async saveDemand(record){
+  async ensureLocalWritePermission(){
     if(typeof this.repository.ensureWritePermission==='function'&&this.repository.mode==='local'&&!await this.repository.ensureWritePermission())throw new Error('Read/write permission is required for this Local Workspace.');
-    return this.repository.saveRecord('demand',record)
   }
+  async saveDemand(record){await this.ensureLocalWritePermission();return this.repository.saveRecord('demand',record)}
+  async saveWorkPackage(record){await this.ensureLocalWritePermission();return this.repository.saveRecord('workPackages',record)}
 }
 
 export function legacyLocalGateway(handle){
