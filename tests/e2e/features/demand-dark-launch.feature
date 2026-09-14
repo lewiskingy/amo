@@ -8,3 +8,11 @@ Feature: Dark-launched Demand route
     And the deployed Demand route should connect to Remote Workspace
     And the Demand route should identify itself as a dark launch
     And the legacy Demand view should not be the rendered page
+
+  Scenario: Demand deep links and search interaction survive route rendering
+    Given the deployed AMO Test application
+    When I open the dark-launched Demand route for control "work-item-missing"
+    Then the deployed Demand route should connect to Remote Workspace
+    And the Demand control filter should be "work-item-missing"
+    When I type "architecture" into the Demand search filter
+    Then the Demand search should apply after a short pause and retain keyboard focus
