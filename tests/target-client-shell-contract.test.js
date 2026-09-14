@@ -1,0 +1,13 @@
+const fs=require('node:fs');const assert=require('node:assert/strict');
+const shell=fs.readFileSync('src/client/shell/app-shell.js','utf8');
+const shellCss=fs.readFileSync('src/client/shell/app-shell.css','utf8');
+const legacyNav=fs.readFileSync('src/app-navigation.js','utf8');
+assert.match(shell,/data-shell-theme/,'Target page header must include the shared theme control.');
+assert.match(shell,/localStorage\.setItem\(THEME_KEY/,'Target theme control must persist the shared browser preference.');
+assert.match(shell,/type:'icon',shape:'circle'/,'Target shell must request the compact Google icon button.');
+assert.match(shellCss,/amo-shell-signin-button[^}]*border-radius:50%[^}]*overflow:hidden/,'Google sign-in host must clip the provider iframe to a true circular control.');
+assert.match(shellCss,/amo-shell-signin-button iframe[^}]*border-radius:50%/,'Google iframe itself must be circular rather than a white square.');
+assert.match(legacyNav,/data\.canonicalDemand='true'/,'Legacy shell must create a canonical Demand navigation entry.');
+assert.match(legacyNav,/canonical\.href='\/demand'/,'Legacy shell canonical Demand entry must navigate to /demand.');
+assert.match(legacyNav,/Demand \(legacy\)/,'Legacy in-page Demand entry must remain explicitly available as Demand (legacy).');
+console.log('Target client shell contract tests passed.');
