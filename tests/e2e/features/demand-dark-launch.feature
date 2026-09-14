@@ -6,6 +6,8 @@ Feature: Dark-launched Demand route
     When I open the dark-launched Demand route
     Then the target Demand shell should be displayed
     And the deployed Demand route should connect to Remote Workspace
+    And the Demand loading state should be cleared
+    And the target navigation should show version, account and workspace context
     And the Demand route should identify itself as a dark launch
     And the legacy Demand view should not be the rendered page
 
