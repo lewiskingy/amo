@@ -1,5 +1,6 @@
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const option=(value,label,current)=>`<option value="${esc(value)}" ${String(current)===String(value)?'selected':''}>${esc(label)}</option>`;
+const SEARCH_DEBOUNCE_MS=120;
 
 export function renderDemandFilterBar(host,{filters,settings,people,onChange,onClear}){
   const businessAreas=[...new Set((settings.businessAreas||[]).filter(Boolean))];
@@ -14,9 +15,20 @@ export function renderDemandFilterBar(host,{filters,settings,people,onChange,onC
     <label>Control<select data-filter="control">${option('','All',filters.control)}${option('funding-missing','Funding missing',filters.control)}${option('resource-missing','Resource missing',filters.control)}${option('work-item-missing','Work Item missing',filters.control)}${option('actuals-missing','Actuals missing',filters.control)}</select></label>
     <label class="filter-search">Search<input data-filter="search" value="${esc(filters.search)}" placeholder="ID, title, Project Number…"></label>
     <button type="button" class="btn" data-clear>Clear</button>`;
-  host.querySelectorAll('[data-filter]').forEach(control=>{
-    const event=control.tagName==='INPUT'?'input':'change';
-    control.addEventListener(event,()=>onChange(control.dataset.filter,control.value));
+  host.querySelectorAll('select[data-filter]').forEach(control=>control.addEventListener('change',()=>onChange(control.dataset.filter,control.value)));
+  const search=host.querySelector('input[data-filter="search"]');let searchTimer;
+  search?.addEventListener('input',()=>{
+    clearTimeout(searchTimer);
+    const value=search.value,start=search.selectionStart,end=search.selectionEnd;
+    searchTimer=setTimeout(()=>{
+      onChange('search',value);
+      queueMicrotask(()=>{
+        const replacement=host.querySelector('input[data-filter="search"]');if(!replacement)return;
+        replacement.focus({preventScroll:true});const limit=replacement.value.length;replacement.setSelectionRange(Math.min(start??limit,limit),Math.min(end??limit,limit));
+      });
+    },SEARCH_DEBOUNCE_MS);
   });
   host.querySelector('[data-clear]').addEventListener('click',onClear);
 }
+
+export const DemandFilterInteraction={SEARCH_DEBOUNCE_MS};

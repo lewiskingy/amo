@@ -34,6 +34,17 @@
   document.head.appendChild(s)
 })();
 
+/* During the strangler migration, legacy Dashboard control cards route to the canonical Demand
+   filter URL rather than reopening the legacy in-page Demand view. */
+(function loadDashboardDemandDeepLinks(){
+  if(document.querySelector('script[data-amo-dashboard-demand-deeplinks]')||window.AmoDashboardDemandDeepLinks)return;
+  const s=document.createElement('script'),version=String(window.AMO_ASSET_VERSION||window.AMO_CONFIG?.buildId||'').trim();
+  s.src=version?`app-dashboard-demand-deeplink.js?v=${encodeURIComponent(version)}`:'app-dashboard-demand-deeplink.js';
+  s.dataset.amoDashboardDemandDeeplinks='true';s.async=false;
+  s.onerror=()=>console.error(`Could not load ${s.src}`);
+  document.head.appendChild(s)
+})();
+
 /* Hierarchy controls coordinate presentation-only Expand all / Collapse all behaviour across the
    canonical Demand Work Package tree and Work Package Resource Plan. */
 (function loadHierarchyControls(){
