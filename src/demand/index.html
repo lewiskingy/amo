@@ -11,7 +11,9 @@
   <link rel="stylesheet" href="/app-theme.css">
   <link rel="stylesheet" href="/client/workspace/workspace-switcher.css">
   <link rel="stylesheet" href="/demand/demand.css">
+  <link rel="stylesheet" href="/client/shell/app-shell.css">
   <link rel="stylesheet" href="/demand/demand-edit.css">
+  <link rel="stylesheet" href="/demand/demand-polish.css">
 </head>
 <body class="target-client-body">
   <div class="target-client-app">
@@ -38,6 +40,7 @@
 
   <!-- Transitional migration boundary only. New route/domain code must depend on WorkspaceGateway,
        not these globals. See src/client/README.md. -->
+  <script src="/app-version.js"></script>
   <script src="/app-workspace-repository.js"></script>
   <script src="/app-workspace-remote-repository.js"></script>
   <script src="/app-auth.js"></script>
