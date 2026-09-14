@@ -5,9 +5,9 @@ const option=(value,label,current)=>`<option value="${esc(value)}" ${String(curr
 const interactiveTarget=target=>!!target?.closest?.('button,a,input,select,textarea,label');
 
 function workPackageTitle(demand,wp,settings){
-  const reference=buildWorkItemReference(wp,demand,settings),title=esc(wp.title||'Untitled Work Package');
-  const label=reference.id?`${title} <span class="wp-azdo-ref">(<span class="sr-only">Azure DevOps </span>#${esc(reference.id)})</span>`:title;
-  return reference.url?`<a class="wp-title-link" href="${reference.url}" target="_blank" rel="noopener">${label}</a>`:`<span class="wp-title-text">${label}</span>`;
+  const reference=buildWorkItemReference(wp,demand,settings),plainTitle=String(wp.title||'Untitled Work Package'),title=esc(plainTitle);
+  const label=reference.id?`${title} <span class="wp-azdo-ref">(#${esc(reference.id)})</span>`:title;
+  return reference.url?`<a class="wp-title-link" href="${reference.url}" target="_blank" rel="noopener" aria-label="${esc(`${plainTitle}, Azure DevOps Work Item #${reference.id}`)}">${label}</a>`:`<span class="wp-title-text">${label}</span>`;
 }
 function controlBadges(control){
   const badges=[];
