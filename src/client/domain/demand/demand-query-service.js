@@ -2,6 +2,7 @@ import {demandInScope} from './demand-scope.js';
 import {DemandControlService,DemandControlRules} from './demand-control-service.js';
 
 const OPEN_STATES=new Set(['Assessing','Defined','Planned','In Progress','On Hold']);
+const TERMINAL_WORK_PACKAGE_STATES=new Set(['Complete','Cancelled']);
 const clean=v=>String(v??'').trim();
 const lower=v=>clean(v).toLowerCase();
 
@@ -10,7 +11,12 @@ export class DemandQueryService{
     this.demands=demands;this.workPackages=workPackages;this.allocations=allocations;this.people=people;this.today=today;
     this.controls=new DemandControlService({allocations,workPackages,actuals,today});
   }
-  workPackagesFor(id){return this.controls.workPackagesFor(id)}
+  workPackagesFor(id,{show='all',control=''}={}){
+    let rows=this.controls.workPackagesFor(id);
+    if(show==='active')rows=rows.filter(w=>!TERMINAL_WORK_PACKAGE_STATES.has(clean(w.status)));
+    if(control==='work-item-missing')rows=rows.filter(w=>DemandControlRules.workItemRequired(w,this.today())&&!clean(w.azureDevOpsWorkItemId));
+    return rows;
+  }
   allocationsFor(id){return this.controls.allocationsFor(id)}
   ownerName(id){return this.people.find(p=>p.id===id)?.name||id||'Unallocated'}
   controlPosition(demand){return this.controls.controlPosition(demand)}
@@ -30,4 +36,4 @@ export class DemandQueryService{
     });
   }
 }
-export const DemandLifecycle={OPEN_STATES,COMMITTED_STATES:DemandControlRules.COMMITTED_STATES,TRACKED_WP_STATES:DemandControlRules.TRACKED_WP_STATES};
+export const DemandLifecycle={OPEN_STATES,TERMINAL_WORK_PACKAGE_STATES,COMMITTED_STATES:DemandControlRules.COMMITTED_STATES,TRACKED_WP_STATES:DemandControlRules.TRACKED_WP_STATES};
