@@ -22,28 +22,30 @@ export function renderSidebar(host,{activeRoute='/demand'}={}){
   host.className='amo-shell-sidebar';
   host.innerHTML=`<div class="amo-shell-sidebar-head"><a class="amo-shell-brand" href="/"><img src="/assets/amo-icon.png" alt=""><span><strong>Architecture Management Office</strong><small id="amoShellVersion">Target client · dark launch</small></span></a><button type="button" class="amo-shell-close" data-shell-close aria-label="Close navigation">×</button></div>
     <nav aria-label="AMO navigation">
-      <a class="amo-shell-primary-link" href="${legacy('readme')}">README</a>
+      <a class="amo-shell-primary-link" href="${legacy('dashboard')}">Dashboard <small>legacy</small></a>
       <a class="amo-shell-primary-link" data-amo-assistant-target hidden target="_blank" rel="noopener noreferrer">↗ Launch AMO Assistant</a>
-      <div class="amo-shell-nav-group"><span>Reporting</span>
-        <a href="${legacy('dashboard')}">Dashboard <small>legacy</small></a>
-        <a href="${legacy('resource')}">Resource Plan <small>legacy</small></a>
-        <a href="${legacy('roadmap')}">Roadmap <small>legacy</small></a>
-        <a href="${legacy('status-report')}">Status Report <small>legacy</small></a>
-      </div>
-      <div class="amo-shell-nav-group"><span>Management</span>
+      <details class="amo-shell-nav-group" data-amo-nav-section="work" ${activeRoute==='/demand'?'open':''}><summary>Work</summary><div class="amo-shell-nav-group-items">
         <a class="${activeRoute==='/demand'?'active':''}" href="/demand">Demand</a>
         <a href="${legacy('demand')}">Demand (legacy)</a>
         <a href="${legacy('allocations')}">Allocations <small>legacy</small></a>
         <a href="${legacy('team')}">People <small>legacy</small></a>
-        <a href="${legacy('ideas')}">Ideas <small>legacy</small></a>
-      </div>
-      <div class="amo-shell-nav-group"><span>Admin</span>
-        <a href="${legacy('config')}">Config <small>legacy</small></a>
-        <a href="${legacy('actuals')}">Actuals <small>legacy</small></a>
+      </div></details>
+      <details class="amo-shell-nav-group" data-amo-nav-section="planning"><summary>Planning &amp; Reporting</summary><div class="amo-shell-nav-group-items">
+        <a href="${legacy('resource')}">Resource Plan <small>legacy</small></a>
+        <a href="${legacy('roadmap')}">Roadmap <small>legacy</small></a>
+        <a href="${legacy('status-report')}">Status Report <small>legacy</small></a>
         <a href="${legacy('status-history')}">Status Report History <small>legacy</small></a>
+      </div></details>
+      <details class="amo-shell-nav-group" data-amo-nav-section="administration"><summary>Administration</summary><div class="amo-shell-nav-group-items">
+        <a href="${legacy('config')}">Settings <small>legacy</small></a>
+        <a href="${legacy('actuals')}">Actuals <small>legacy</small></a>
         <a href="${legacy('data')}">Workspace <small>legacy</small></a>
-      </div>
-      <a class="amo-shell-primary-link" href="${legacy('process-overview')}">Process Overview <small>legacy</small></a>
+      </div></details>
+      <details class="amo-shell-nav-group" data-amo-nav-section="help"><summary>Help</summary><div class="amo-shell-nav-group-items">
+        <a href="${legacy('ideas')}">Improvement Ideas <small>legacy</small></a>
+        <a href="${legacy('process-overview')}">Process Guide <small>legacy</small></a>
+        <a href="${legacy('readme')}">README <small>legacy</small></a>
+      </div></details>
     </nav>
     <div class="amo-shell-sidebar-lower">
       <section class="amo-shell-workspace-panel" aria-label="Workspace"><span class="amo-shell-sidebar-label">Workspace</span><div id="amoShellWorkspace"></div></section>
