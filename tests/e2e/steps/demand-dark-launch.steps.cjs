@@ -36,6 +36,18 @@ Then('the deployed Demand route should connect to Remote Workspace',async functi
   assert.ok(await this.page.locator('#demandFilters [data-filter]').count()>0,'Canonical Demand filters were not initialised from the deployed workspace.');
 });
 
+Then('the Demand loading state should be cleared',async function(){
+  await waitFor(async()=>await this.page.locator('#demandAppState').isHidden());
+  assert.doesNotMatch(String(await this.page.locator('#demandAppState').textContent()||''),/Loading Demand/i,'Loading Demand remained after the route was ready.');
+});
+
+Then('the target navigation should show version, account and workspace context',async function(){
+  assert.match(String(await this.page.locator('#amoShellVersion').textContent()||''),/Client\s+\S+.*Schema\s+\S+/,'Client/schema identity is missing from target navigation.');
+  assert.equal(await this.page.locator('#amoShellAccount').count(),1,'Target navigation has no account/sign-in area.');
+  assert.equal(await this.page.locator('#workspaceSwitcher').evaluate(el=>el.parentElement?.id),'amoShellWorkspace','Workspace selection is not hosted in the target navigation panel.');
+  assert.ok(await this.page.locator('.amo-shell-nav-group').count()>=3,'Target navigation has not converged to Reporting, Management and Admin groups.');
+});
+
 Then('the Demand control filter should be {string}',async function(control){
   await waitFor(async()=>await this.page.inputValue('[data-filter="control"]')===control);
   assert.match(this.page.url(),new RegExp(`control=${control}`));
