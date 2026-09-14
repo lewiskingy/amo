@@ -7,7 +7,7 @@ assert.match(shell,/localStorage\.setItem\(THEME_KEY/,'Target theme control must
 assert.match(shell,/type:'icon',shape:'circle'/,'Target shell must request the compact Google icon button.');
 assert.match(shellCss,/amo-shell-signin-button[^}]*border-radius:50%[^}]*overflow:hidden/,'Google sign-in host must clip the provider iframe to a true circular control.');
 assert.match(shellCss,/amo-shell-signin-button iframe[^}]*border-radius:50%/,'Google iframe itself must be circular rather than a white square.');
-assert.match(legacyNav,/data\.canonicalDemand='true'/,'Legacy shell must create a canonical Demand navigation entry.');
+assert.match(legacyNav,/canonical\.dataset\.canonicalDemand='true'/,'Legacy shell must create a canonical Demand navigation entry.');
 assert.match(legacyNav,/canonical\.href='\/demand'/,'Legacy shell canonical Demand entry must navigate to /demand.');
 assert.match(legacyNav,/Demand \(legacy\)/,'Legacy in-page Demand entry must remain explicitly available as Demand (legacy).');
 console.log('Target client shell contract tests passed.');
