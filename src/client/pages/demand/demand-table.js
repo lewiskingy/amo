@@ -6,7 +6,7 @@ const interactiveTarget=target=>!!target?.closest?.('button,a,input,select,texta
 
 function workPackageTitle(demand,wp,settings){
   const reference=buildWorkItemReference(wp,demand,settings),title=esc(wp.title||'Untitled Work Package');
-  const label=reference.id?`${title} <span class="wp-azdo-ref">(#${esc(reference.id)})</span>`:title;
+  const label=reference.id?`${title} <span class="wp-azdo-ref">(<span class="sr-only">Azure DevOps </span>#${esc(reference.id)})</span>`:title;
   return reference.url?`<a class="wp-title-link" href="${reference.url}" target="_blank" rel="noopener">${label}</a>`:`<span class="wp-title-text">${label}</span>`;
 }
 function controlBadges(control){
@@ -44,7 +44,7 @@ export function renderDemandTable(host,{demands,queryService,settings,people=[],
   for(const sourceDemand of demands){
     const demand=editMode?demandDraftFor(sourceDemand):sourceDemand,workPackages=queryService.workPackagesFor(sourceDemand.id,{show:filters.show||'active',control:filters.control||''}),isExpanded=expanded.has(sourceDemand.id),editors=editMode?demandCellEditors(demand,settings,people):null;
     const row=document.createElement('tr');row.dataset.demandId=sourceDemand.id;row.className='demand-row';
-    row.innerHTML=`<td><button type="button" class="tree-toggle" aria-expanded="${isExpanded}" ${workPackages.length?'':'disabled'}>${workPackages.length?(isExpanded?'−':'+'):'·'}</button></td><td>${editMode?editors.title:`<strong class="demand-title">${esc(demand.title||'Untitled Demand')}</strong><span class="row-id">${esc(demand.id)}</span>`}</td><td>${editMode?editors.businessArea:esc(demand.businessArea||'—')}</td><td>${editMode?editors.initiative:esc(demand.initiative||'—')}</td><td>${editMode?editors.projectNumber:esc(demand.projectNumber||'—')}</td><td>${editMode?editors.status:esc(demand.status||'—')}</td><td>${editMode?editors.owner:esc(queryService.ownerName(demand.ownerId))}</td><td>${controlBadges(queryService.controlPosition(sourceDemand))}</td><td><button type="button" class="btn compact" data-edit>View / edit</button></td>`;
+    row.innerHTML=`<td><button type="button" class="tree-toggle" aria-expanded="${isExpanded}" ${workPackages.length?'':'disabled'}>${workPackages.length?(isExpanded?'−':'+'):'·'}</button></td><td>${editMode?editors.title:`<strong class="demand-title row-title">${esc(demand.title||'Untitled Demand')}</strong><span class="row-id">${esc(demand.id)}</span>`}</td><td>${editMode?editors.businessArea:esc(demand.businessArea||'—')}</td><td>${editMode?editors.initiative:esc(demand.initiative||'—')}</td><td>${editMode?editors.projectNumber:esc(demand.projectNumber||'—')}</td><td>${editMode?editors.status:esc(demand.status||'—')}</td><td>${editMode?editors.owner:esc(queryService.ownerName(demand.ownerId))}</td><td>${controlBadges(queryService.controlPosition(sourceDemand))}</td><td><button type="button" class="btn compact" data-edit>View / edit</button></td>`;
     row.querySelector('.tree-toggle')?.addEventListener('click',()=>onToggle(sourceDemand.id));row.querySelector('[data-edit]')?.addEventListener('click',()=>onEdit(sourceDemand));
     row.addEventListener('dblclick',event=>{if(!interactiveTarget(event.target))onEdit(sourceDemand)});
     row.querySelectorAll('[data-inline-entity="demand"]').forEach(control=>control.addEventListener('change',()=>onInlineChange?.('demand',sourceDemand.id,control.dataset.field,control.value)));
