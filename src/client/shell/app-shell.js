@@ -15,7 +15,7 @@ export function renderSidebar(host,{activeRoute='/demand'}={}){
       </div>
       <div class="amo-shell-nav-group"><span>Management</span>
         <a class="${activeRoute==='/demand'?'active':''}" href="/demand">Demand</a>
-        <a href="${legacy('demand')}">Demand <small>legacy</small></a>
+        <a href="${legacy('demand')}">Demand (legacy)</a>
         <a href="${legacy('allocations')}">Allocations <small>legacy</small></a>
         <a href="${legacy('team')}">People <small>legacy</small></a>
         <a href="${legacy('ideas')}">Ideas <small>legacy</small></a>
