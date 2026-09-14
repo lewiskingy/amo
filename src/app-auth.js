@@ -75,9 +75,19 @@
     if(!element)throw new Error('A sign-in button container is required.');
     if(!await initialise())throw new Error(unavailableReason||'Google authentication is unavailable.');
     element.innerHTML='';
-    window.google.accounts.id.renderButton(element,{
-      type:'standard',theme:'outline',size:'medium',text:'signin_with',shape:'rectangular',logo_alignment:'left',width:Math.max(180,Math.min(260,options.width||220))
-    })
+    const type=options.type==='icon'?'icon':'standard';
+    const config={
+      type,
+      theme:options.theme||'outline',
+      size:options.size||'medium',
+      shape:options.shape||(type==='icon'?'circle':'rectangular')
+    };
+    if(type==='standard'){
+      config.text=options.text||'signin_with';
+      config.logo_alignment=options.logoAlignment||'left';
+      config.width=Math.max(180,Math.min(260,options.width||220))
+    }
+    window.google.accounts.id.renderButton(element,config)
   }
 
   async function signOut(){

@@ -27,6 +27,8 @@ const assert=require('node:assert/strict');const {spawn}=require('node:child_pro
   assert.equal(await page.locator('#workspaceSwitcher').evaluate(el=>el.parentElement?.id),'amoShellWorkspace','Workspace selection belongs in the shared navigation panel.');
   assert.match(String(await page.locator('#amoShellAccount').textContent()),/E2E test workspace/,'Target navigation must reserve the signed-in/account area.');
   assert.ok(await page.locator('.amo-shell-nav-group').count()>=3,'Target navigation should expose Reporting, Management and Admin groups.');
+  const primaryDemand=page.locator('.amo-shell-nav-group a[href="/demand"]');assert.equal(String(await primaryDemand.textContent()).trim(),'Demand','The canonical /demand route should now be presented as Demand, not Preview.');assert.equal(await primaryDemand.getAttribute('class'),'active');
+  const legacyDemand=page.locator('.amo-shell-nav-group a[href="/?view=demand"]');assert.equal(String(await legacyDemand.textContent()).trim(),'Demand (legacy)','The legacy Demand implementation must remain available as an explicit fallback link.');
 
   await page.setViewportSize({width:390,height:844});const menu=page.locator('[data-shell-menu]');assert.equal(await menu.isVisible(),true,'Mobile target layout needs a navigation fly-out trigger.');await menu.click();assert.equal(await page.evaluate(()=>document.body.classList.contains('amo-shell-nav-open')),true,'Mobile navigation should open as a fly-out rather than becoming a top strip.');await page.locator('[data-shell-close]').click();assert.equal(await page.evaluate(()=>document.body.classList.contains('amo-shell-nav-open')),false);
   await browser.close();console.log('Target client Demand shell browser E2E passed.');
