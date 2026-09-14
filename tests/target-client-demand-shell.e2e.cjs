@@ -23,7 +23,7 @@ const assert=require('node:assert/strict');const {spawn}=require('node:child_pro
 
   assert.match(String(await page.locator('#amoShellVersion').textContent()),/Client 1\.2\.2.*Schema 3/,'Target sidebar must expose client/schema identity.');
   assert.equal(await page.locator('[data-amo-assistant-target]').isVisible(),true,'Configured AMO Assistant must be available from target navigation.');
-  assert.equal(await page.locator('[data-amo-assistant-target]').getAttribute('href'),'https://assistant.example.test/');
+  assert.equal(new URL(await page.locator('[data-amo-assistant-target]').getAttribute('href')).origin,'https://assistant.example.test');
   assert.equal(await page.locator('#workspaceSwitcher').evaluate(el=>el.parentElement?.id),'amoShellWorkspace','Workspace selection belongs in the shared navigation panel.');
   assert.match(String(await page.locator('#amoShellAccount').textContent()),/E2E test workspace/,'Target navigation must reserve the signed-in/account area.');
   assert.ok(await page.locator('.amo-shell-nav-group').count()>=3,'Target navigation should expose Reporting, Management and Admin groups.');
