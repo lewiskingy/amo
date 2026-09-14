@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/client/**'
       - 'src/demand/**'
+      - 'src/app-version.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'src/client/**'
       - 'src/demand/**'
+      - 'src/app-version.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -42,7 +44,9 @@ jobs:
         run: |
           set -euo pipefail
           node --check worker.js
+          node --check src/app-version.js
           node --check tests/target-client-demand.e2e.cjs
+          node --check tests/target-client-demand-shell.e2e.cjs
           node --check tests/target-client-workspace-session.test.js
           node --check tests/e2e/bin/serve-target-client.cjs
           while IFS= read -r -d '' file; do
@@ -53,4 +57,6 @@ jobs:
           node tests/target-client-demand.test.js
           node tests/target-client-workspace-session.test.js
       - name: Run deterministic local Demand browser E2E
-        run: node tests/target-client-demand.e2e.cjs
+        run: |
+          node tests/target-client-demand.e2e.cjs
+          node tests/target-client-demand-shell.e2e.cjs

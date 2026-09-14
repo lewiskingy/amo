@@ -21,6 +21,12 @@ export class DemandQueryService{
   ownerName(id){return this.people.find(p=>p.id===id)?.name||id||'Unallocated'}
   controlPosition(demand){return this.controls.controlPosition(demand)}
   matchesControl(demand,control){return this.controls.matches(demand,control)}
+  matchesSearch(demand,filters={}){
+    const needle=lower(filters.search);if(!needle)return true;
+    const demandHay=lower(`${demand.id} ${demand.title} ${demand.projectNumber} ${demand.businessArea} ${demand.initiative} ${this.ownerName(demand.ownerId)}`);
+    if(demandHay.includes(needle))return true;
+    return this.workPackagesFor(demand.id,{show:filters.show||'active'}).some(w=>lower(`${w.id} ${w.title} ${w.azureDevOpsWorkItemId}`).includes(needle));
+  }
   query(filters={},scope={mode:'all'}){
     return this.demands.filter(d=>{
       if(!demandInScope(d,scope))return false;
@@ -31,7 +37,7 @@ export class DemandQueryService{
       if(filters.projectNumber==='present'&&!clean(d.projectNumber))return false;
       if(filters.projectNumber==='missing'&&clean(d.projectNumber))return false;
       if(filters.control&&!this.matchesControl(d,filters.control))return false;
-      if(filters.search){const hay=lower(`${d.id} ${d.title} ${d.projectNumber} ${d.businessArea} ${d.initiative} ${this.ownerName(d.ownerId)}`);if(!hay.includes(lower(filters.search)))return false}
+      if(!this.matchesSearch(d,filters))return false;
       return true;
     });
   }
