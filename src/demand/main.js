@@ -2,8 +2,11 @@ import {renderSidebar,renderPageHeader,renderWorkspaceStatus,AccountWidget} from
 import {configuredLegacyWorkspaceSession} from '../client/legacy/legacy-workspace-session.js';
 import {WorkspaceSwitcher} from '../client/workspace/workspace-switcher.js';
 import {DemandPage} from '../client/pages/demand/demand-page.js';
+import {demandFiltersFromSearch,demandFiltersToSearch} from '../client/domain/demand/demand-filter-url.js';
 
-const $=selector=>document.querySelector(selector),e2e=new URLSearchParams(location.search).get('e2e')==='1';let loading=false,page=null,session=null,switcher=null;
+const $=selector=>document.querySelector(selector),params=new URLSearchParams(location.search),e2e=params.get('e2e')==='1';let loading=false,page=null,session=null,switcher=null;
+const initialFilters=demandFiltersFromSearch(location.search);
+function syncFilterUrl(filters){const query=demandFiltersToSearch(filters),next=new URL(location.href);next.search=query;if(e2e)next.searchParams.set('e2e','1');history.replaceState(null,'',`${next.pathname}${next.search}${next.hash}`)}
 renderSidebar($('#appSidebar'),{activeRoute:'/demand'});
 const actions=renderPageHeader($('#pageHeader'),{title:'Demand Register',subtitle:e2e?'Deterministic local E2E workspace.':'Dark-launched target client slice over the same AMO workspace.',actions:[{id:'new',label:'New Demand',tone:'primary'},{id:'editList',label:'Edit List'},{id:'saveList',label:'Save changes',tone:'primary'},{id:'cancelList',label:'Cancel'},{id:'expand',label:'Expand all'},{id:'collapse',label:'Collapse all'},{id:'refresh',label:'Refresh'},{id:'legacy',label:'Open legacy AMO'}]});
 function setListEditActions(active){actions.editList.hidden=!!active;actions.saveList.hidden=!active;actions.cancelList.hidden=!active;actions.new.disabled=!!active;actions.refresh.disabled=!!active}
@@ -15,7 +18,7 @@ function showError(error){console.error('Demand target slice could not load.',er
 function showAwaitingWorkspace(result){page=null;$('#demandAppState').hidden=false;$('#demandAppState').innerHTML='<strong>Choose a workspace to continue.</strong><span>The target client can use the same remembered Local Workspace or the configured Remote Workspace.</span>';renderWorkspaceStatus(statusHost,{state:'loading',message:result?.message||'Workspace selection required',detail:result?.rememberedName||''})}
 async function loadGateway(gateway,{mode='remote',name=''}={}){
   if(!gateway||loading)return;loading=true;page=null;setListEditActions(false);renderWorkspaceStatus(statusHost,{state:'loading',message:'Loading workspace…',detail:name});$('#demandAppState').hidden=false;$('#demandAppState').textContent='Loading Demand…';
-  try{const slice=await gateway.loadDemandSlice(),settings=slice.settings||{};page=new DemandPage({gateway,settings,workspace:slice.workspace,data:slice,elements:{scope:$('#scopeSelector'),filters:$('#demandFilters'),chips:$('#demandFilterChips'),count:$('#demandCount'),table:$('#demandTable'),dialog:$('#demandEditor')},onStatus:value=>renderWorkspaceStatus(statusHost,value),onEditModeChange:setListEditActions});page.start();$('#demandAppState').hidden=true;renderWorkspaceStatus(statusHost,{state:'ready',message:`${mode==='local'?'Local':'Remote'} Workspace connected`,detail:slice.workspace?.name||name||gateway.repository?.name||''});}
+  try{const slice=await gateway.loadDemandSlice(),settings=slice.settings||{};page=new DemandPage({gateway,settings,workspace:slice.workspace,data:slice,initialFilters,onFiltersChange:syncFilterUrl,elements:{scope:$('#scopeSelector'),filters:$('#demandFilters'),chips:$('#demandFilterChips'),count:$('#demandCount'),table:$('#demandTable'),dialog:$('#demandEditor')},onStatus:value=>renderWorkspaceStatus(statusHost,value),onEditModeChange:setListEditActions});page.start();$('#demandAppState').hidden=true;renderWorkspaceStatus(statusHost,{state:'ready',message:`${mode==='local'?'Local':'Remote'} Workspace connected`,detail:slice.workspace?.name||name||gateway.repository?.name||''});}
   catch(error){showError(error)}finally{loading=false}
 }
 async function restoreWorkspace(){
