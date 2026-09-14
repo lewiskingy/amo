@@ -1,5 +1,22 @@
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const legacy=(view='dashboard')=>view==='dashboard'?'/':`/?view=${encodeURIComponent(view)}`;
+const THEME_KEY='amo.theme';
+const LEGACY_THEME_KEY='amo.appearance';
+
+function currentTheme(){
+  const dom=document.documentElement.dataset.theme;if(dom==='dark'||dom==='light')return dom;
+  try{const saved=localStorage.getItem(THEME_KEY)||localStorage.getItem(LEGACY_THEME_KEY);if(saved==='dark'||saved==='light')return saved}catch{}
+  return matchMedia?.('(prefers-color-scheme: dark)')?.matches?'dark':'light'
+}
+function applyTheme(theme,persist=true){
+  const value=theme==='dark'?'dark':'light';document.documentElement.dataset.theme=value;
+  if(persist){try{localStorage.setItem(THEME_KEY,value);localStorage.removeItem(LEGACY_THEME_KEY)}catch{}}
+  return value
+}
+function syncThemeButton(button){
+  if(!button)return;const theme=currentTheme(),next=theme==='dark'?'light':'dark';
+  button.textContent=theme==='dark'?'☀':'☾';button.title=`Switch to ${next} theme`;button.setAttribute('aria-label',button.title);button.dataset.theme=theme
+}
 
 export function renderSidebar(host,{activeRoute='/demand'}={}){
   host.className='amo-shell-sidebar';
@@ -55,8 +72,9 @@ export function moveWorkspaceSwitcherToSidebar(sidebarHost,switcherHost){
 
 export function renderPageHeader(host,{title,subtitle='',actions=[]}={}){
   host.className='amo-shell-page-header';
-  host.innerHTML=`<div class="amo-shell-heading"><button type="button" class="amo-shell-menu-toggle" data-shell-menu aria-label="Open navigation" aria-expanded="false">☰</button><div><h1>${esc(title)}</h1>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div></div><div class="amo-shell-actions">${actions.map(a=>`<button type="button" class="btn ${esc(a.tone||'')}" data-action="${esc(a.id)}">${esc(a.label)}</button>`).join('')}</div>`;
+  host.innerHTML=`<div class="amo-shell-heading"><button type="button" class="amo-shell-menu-toggle" data-shell-menu aria-label="Open navigation" aria-expanded="false">☰</button><div><h1>${esc(title)}</h1>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div></div><div class="amo-shell-actions">${actions.map(a=>`<button type="button" class="btn ${esc(a.tone||'')}" data-action="${esc(a.id)}">${esc(a.label)}</button>`).join('')}<button type="button" class="theme-toggle amo-shell-theme-toggle" data-shell-theme></button></div>`;
   const menu=host.querySelector('[data-shell-menu]');menu?.addEventListener('click',()=>{const open=!document.body.classList.contains('amo-shell-nav-open');document.body.classList.toggle('amo-shell-nav-open',open);menu.setAttribute('aria-expanded',String(open))});
+  const theme=host.querySelector('[data-shell-theme]');syncThemeButton(theme);theme?.addEventListener('click',()=>{applyTheme(currentTheme()==='dark'?'light':'dark',true);syncThemeButton(theme)});
   return Object.fromEntries(actions.map(a=>[a.id,host.querySelector(`[data-action="${CSS.escape(a.id)}"]`)]));
 }
 
@@ -69,7 +87,7 @@ export class AccountWidget{
       this.host.innerHTML=`<div class="amo-shell-account-row">${identity.picture?`<img src="${esc(identity.picture)}" alt="">`:''}<span><strong>${esc(identity.name||'Signed in')}</strong><small>${esc(identity.email||'')}</small></span><button type="button" class="btn" data-signout>Sign out</button></div>`;
       this.host.querySelector('[data-signout]')?.addEventListener('click',async()=>{await this.auth.signOut();await this.render()});
     }else{
-      this.host.innerHTML='<div class="amo-shell-signin" aria-label="Not signed in"><div data-signin></div></div>';
+      this.host.innerHTML='<div class="amo-shell-signin" aria-label="Not signed in"><div class="amo-shell-signin-button" data-signin></div></div>';
       try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{type:'icon',shape:'circle',size:'medium'})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
     }
   }

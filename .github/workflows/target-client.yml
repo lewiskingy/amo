@@ -6,6 +6,8 @@ on:
       - 'src/client/**'
       - 'src/demand/**'
       - 'src/app-version.js'
+      - 'src/app-auth.js'
+      - 'src/app-navigation.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -16,6 +18,8 @@ on:
       - 'src/client/**'
       - 'src/demand/**'
       - 'src/app-version.js'
+      - 'src/app-auth.js'
+      - 'src/app-navigation.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -45,8 +49,11 @@ jobs:
           set -euo pipefail
           node --check worker.js
           node --check src/app-version.js
+          node --check src/app-auth.js
+          node --check src/app-navigation.js
           node --check tests/target-client-demand.e2e.cjs
           node --check tests/target-client-demand-shell.e2e.cjs
+          node --check tests/target-client-shell-contract.test.js
           node --check tests/target-client-workspace-session.test.js
           node --check tests/e2e/bin/serve-target-client.cjs
           while IFS= read -r -d '' file; do
@@ -55,6 +62,7 @@ jobs:
       - name: Run target-client domain and architecture tests
         run: |
           node tests/target-client-demand.test.js
+          node tests/target-client-shell-contract.test.js
           node tests/target-client-workspace-session.test.js
       - name: Run deterministic local Demand browser E2E
         run: |
