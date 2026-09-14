@@ -24,6 +24,26 @@
     return btn
   }
 
+  function ensureCanonicalDemandNav(){
+    const nav=document.querySelector('.sidebar nav');
+    if(!nav)return null;
+    const legacyDemand=nav.querySelector('.nav-group [data-view="demand"]');
+    if(!legacyDemand)return null;
+    legacyDemand.innerHTML='<span class="nav-dot"></span>Demand (legacy)';
+    let canonical=nav.querySelector('[data-canonical-demand]');
+    if(!canonical){
+      canonical=document.createElement('a');
+      canonical.className='nav-btn';
+      canonical.dataset.canonicalDemand='true';
+      canonical.href='/demand';
+      canonical.innerHTML='<span class="nav-dot"></span>Demand';
+    }
+    const items=legacyDemand.parentElement;
+    if(items&&canonical.parentElement!==items)items.insertBefore(canonical,legacyDemand);
+    else if(items&&canonical.nextSibling!==legacyDemand)items.insertBefore(canonical,legacyDemand);
+    return canonical
+  }
+
   function ensureProcessOverviewNav(){
     const nav=document.querySelector('.sidebar nav');
     if(!nav)return null;
@@ -68,6 +88,7 @@
       const reference=(assistant||readmeBtn)?.nextSibling||anchor.nextSibling;
       if(firstGroup!==reference)nav.insertBefore(firstGroup,reference)
     }
+    ensureCanonicalDemandNav();
     ensureProcessOverviewNav();
   }
 
