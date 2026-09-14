@@ -14,7 +14,8 @@ export function renderSidebar(host,{activeRoute='/demand'}={}){
         <a href="${legacy('status-report')}">Status Report <small>legacy</small></a>
       </div>
       <div class="amo-shell-nav-group"><span>Management</span>
-        <a class="${activeRoute==='/demand'?'active':''}" href="/demand">Demand <em>Preview</em></a>
+        <a class="${activeRoute==='/demand'?'active':''}" href="/demand">Demand</a>
+        <a href="${legacy('demand')}">Demand <small>legacy</small></a>
         <a href="${legacy('allocations')}">Allocations <small>legacy</small></a>
         <a href="${legacy('team')}">People <small>legacy</small></a>
         <a href="${legacy('ideas')}">Ideas <small>legacy</small></a>
@@ -68,8 +69,8 @@ export class AccountWidget{
       this.host.innerHTML=`<div class="amo-shell-account-row">${identity.picture?`<img src="${esc(identity.picture)}" alt="">`:''}<span><strong>${esc(identity.name||'Signed in')}</strong><small>${esc(identity.email||'')}</small></span><button type="button" class="btn" data-signout>Sign out</button></div>`;
       this.host.querySelector('[data-signout]')?.addEventListener('click',async()=>{await this.auth.signOut();await this.render()});
     }else{
-      this.host.innerHTML='<div class="amo-shell-signin"><span>Not signed in</span><div data-signin></div></div>';
-      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{width:210})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
+      this.host.innerHTML='<div class="amo-shell-signin" aria-label="Not signed in"><div data-signin></div></div>';
+      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{type:'icon',shape:'circle',size:'medium'})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
     }
   }
   async start(){await this.render();this.unsubscribe=this.auth?.onChange?.(()=>this.render())||null}
