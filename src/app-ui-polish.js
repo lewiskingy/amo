@@ -26,7 +26,14 @@
     const nav=document.querySelector('.sidebar nav');if(!nav)return;const buttons=[...nav.querySelectorAll('.nav-btn')];const byView=view=>buttons.find(b=>b.dataset.view===view)||nav.querySelector(`[data-view="${view}"]`);
     const dashboard=byView('dashboard');
     setButtonLabel(byView('config'),'Settings');setButtonLabel(byView('process-overview'),'Process Guide');setButtonLabel(byView('ideas'),'Improvement Ideas');
-    navSections.forEach(section=>{const host=ensureNavSection(nav,section);section.views.forEach(view=>{const button=byView(view);if(button&&button.parentElement!==host)host.appendChild(button)})});
+    navSections.forEach(section=>{
+      const host=ensureNavSection(nav,section);
+      if(section.id==='work'){
+        const canonicalDemand=nav.querySelector('[data-canonical-demand]');
+        if(canonicalDemand&&canonicalDemand.parentElement!==host)host.appendChild(canonicalDemand)
+      }
+      section.views.forEach(view=>{const button=byView(view);if(button&&button.parentElement!==host)host.appendChild(button)})
+    });
     [...nav.querySelectorAll('details.nav-group')].filter(g=>!g.dataset.amoNavSection).forEach(g=>{if(!g.querySelector('.nav-btn'))g.remove()});
     const anchor=document.getElementById('primaryNavAnchor');let cursor=anchor;
     if(dashboard){cursor?.after(dashboard);cursor=dashboard}
