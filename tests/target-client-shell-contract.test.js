@@ -2,6 +2,7 @@ const fs=require('node:fs');const assert=require('node:assert/strict');
 const shell=fs.readFileSync('src/client/shell/app-shell.js','utf8');
 const shellCss=fs.readFileSync('src/client/shell/app-shell.css','utf8');
 const legacyNav=fs.readFileSync('src/app-navigation.js','utf8');
+const legacyPolish=fs.readFileSync('src/app-ui-polish.js','utf8');
 assert.match(shell,/data-shell-theme/,'Target page header must include the shared theme control.');
 assert.match(shell,/localStorage\.setItem\(THEME_KEY/,'Target theme control must persist the shared browser preference.');
 assert.match(shell,/type:'icon',shape:'circle'/,'Target shell must request the compact Google icon button.');
@@ -10,4 +11,10 @@ assert.match(shellCss,/amo-shell-signin-button iframe[^}]*border-radius:50%/,'Go
 assert.match(legacyNav,/canonical\.dataset\.canonicalDemand='true'/,'Legacy shell must create a canonical Demand navigation entry.');
 assert.match(legacyNav,/canonical\.href='\/demand'/,'Legacy shell canonical Demand entry must navigate to /demand.');
 assert.match(legacyNav,/Demand \(legacy\)/,'Legacy in-page Demand entry must remain explicitly available as Demand (legacy).');
+assert.match(legacyPolish,/id:'work',label:'Work'/,'Legacy information architecture must retain the Work section.');
+assert.match(legacyPolish,/section\.id==='work'[\s\S]*data-canonical-demand/,'Canonical Demand must be composed into the legacy Work section rather than a separate Management group.');
+for(const label of ['Work','Planning &amp; Reporting','Administration','Help'])assert.match(shell,new RegExp(`<summary>${label}<\\/summary>`),`Target shell must expose collapsible ${label.replace('&amp;','&')} navigation.`);
+assert.doesNotMatch(shell,/<span>Management<\/span>|<summary>Management<\/summary>/,'Target shell must not introduce a separate Management navigation section.');
+assert.match(shell,/data-amo-nav-section="work"[\s\S]*href="\/demand">Demand<\/a>[\s\S]*Demand \(legacy\)/,'Target Work section must contain canonical Demand followed by Demand (legacy).');
+assert.match(shellCss,/amo-shell-nav-group\[open\] summary::before/,'Target navigation groups must have explicit collapsible styling.');
 console.log('Target client shell contract tests passed.');
