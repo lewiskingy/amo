@@ -2,7 +2,7 @@
 
 This file applies to `src/client/**` and complements the repository-level `AGENTS.md`.
 
-`src/client/` is the strategic client architecture introduced by issue #183. Treat modules here as **canonical unless they are explicitly located under `src/client/legacy/` or documented as transitional**.
+`src/client/` is the strategic client architecture introduced by issue #183 and continued by #206. Treat modules here as **canonical unless they are explicitly located under `src/client/legacy/` or documented as transitional**.
 
 ## Canonical code
 
@@ -12,10 +12,23 @@ Canonical modules are intended to survive the strangler migration. Contributors 
 - keep domain/query modules independent of DOM rendering and storage implementation;
 - keep page modules responsible for page composition rather than business rules;
 - keep shared shell/components free of route-specific business behaviour;
-- depend on `WorkspaceGateway` or a more specific canonical contract rather than browser/storage globals;
+- depend on canonical client-side capability APIs rather than browser/storage globals, HTTP details or page-specific workspace loaders;
 - add or strengthen tests when extending canonical behaviour.
 
 If a canonical abstraction proves wrong, refactor it at source. Do not route around it with a second implementation.
+
+## Hybrid Local / Remote data access
+
+Route-owned pages and domain services must be **workspace-mode neutral**. They consume canonical client-side capability APIs; they do not choose how data is persisted.
+
+- Local Workspace uses a client-side implementation over the local workspace.
+- Remote Workspace uses an implementation backed by the AMO backend HTTP API.
+- Both modes expose the same capability contracts to consumers.
+- Data access answers what records/data are available. Business/query semantics belong in canonical domain services.
+- Do not create page-specific aggregate APIs such as `loadAllocationsSlice()` or `loadPeopleSlice()` as the strategic pattern. Pages compose the reusable Demand, Work Package, People, Allocation, Actuals and other capability APIs they need.
+- Do not put `fetch`, File System Access API calls, MongoDB concerns or legacy `window.*` repository globals in canonical page/domain/capability-contract modules. Transport/storage details belong behind the selected implementation.
+
+During migration the capability APIs may adapt the existing Local/Remote `WorkspaceRepository` implementations. That is a transition seam, not permission for consumers to depend on those legacy implementations directly. #215 tracks final retirement of the transitional workspace architecture.
 
 ## Transitional adapters
 
