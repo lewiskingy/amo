@@ -20,7 +20,8 @@ function syncThemeButton(button){
 
 export function renderSidebar(host,{activeRoute='/demand'}={}){
   host.className='amo-shell-sidebar';
-  host.innerHTML=`<div class="amo-shell-sidebar-head"><a class="amo-shell-brand" href="/"><img src="/assets/amo-icon.png" alt=""><span><strong>Architecture Management Office</strong><small id="amoShellVersion">Target client · dark launch</small></span></a><button type="button" class="amo-shell-close" data-shell-close aria-label="Close navigation">×</button></div>
+  host.innerHTML=`<div class="amo-shell-sidebar-head"><a class="amo-shell-brand" href="/"><img src="/assets/amo-icon.png" alt=""><span><strong>Architecture Management Office</strong><small id="amoShellVersion">Target client</small></span></a><button type="button" class="amo-shell-close" data-shell-close aria-label="Close navigation">×</button></div>
+    <div class="amo-shell-experience-badge" aria-label="New AMO experience"><span>New experience</span><small>You're using the new AMO navigation and Demand experience.</small></div>
     <nav aria-label="AMO navigation">
       <a class="amo-shell-primary-link" href="${legacy('dashboard')}">Dashboard <small>legacy</small></a>
       <a class="amo-shell-primary-link" data-amo-assistant-target hidden target="_blank" rel="noopener noreferrer">↗ Launch AMO Assistant</a>
