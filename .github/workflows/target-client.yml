@@ -8,6 +8,8 @@ on:
       - 'src/app-version.js'
       - 'src/app-auth.js'
       - 'src/app-navigation.js'
+      - 'src/app-workspace-repository.js'
+      - 'src/app-workspace-remote-repository.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -20,6 +22,8 @@ on:
       - 'src/app-version.js'
       - 'src/app-auth.js'
       - 'src/app-navigation.js'
+      - 'src/app-workspace-repository.js'
+      - 'src/app-workspace-remote-repository.js'
       - 'tests/target-client-*'
       - 'tests/e2e/bin/serve-target-client.cjs'
       - 'worker.js'
@@ -55,6 +59,8 @@ jobs:
           node --check tests/target-client-demand-shell.e2e.cjs
           node --check tests/target-client-shell-contract.test.js
           node --check tests/target-client-workspace-session.test.js
+          node --check tests/target-client-capability-api.test.js
+          node --check tests/target-client-capability-api-paths.test.js
           node --check tests/e2e/bin/serve-target-client.cjs
           while IFS= read -r -d '' file; do
             node --input-type=module --check < "$file"
@@ -64,6 +70,8 @@ jobs:
           node tests/target-client-demand.test.js
           node tests/target-client-shell-contract.test.js
           node tests/target-client-workspace-session.test.js
+          node tests/target-client-capability-api.test.js
+          node tests/target-client-capability-api-paths.test.js
       - name: Run deterministic local Demand browser E2E
         run: |
           node tests/target-client-demand.e2e.cjs
