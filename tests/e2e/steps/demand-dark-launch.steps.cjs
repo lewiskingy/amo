@@ -12,13 +12,13 @@ async function waitFor(fn,timeout=uiTimeout()){
   throw new Error(`Condition was not met within ${timeout}ms.`);
 }
 
-When('I open the dark-launched Demand route',async function(){
+When('I open the Demand route',async function(){
   const response=await this.page.goto(`${this.baseUrl}/demand`,{waitUntil:'domcontentloaded'});
   assert.ok(response,'No response received from the /demand route.');
   assert.ok(response.ok(),`/demand returned HTTP ${response.status()}.`);
 });
 
-When('I open the dark-launched Demand route for control {string}',async function(control){
+When('I open the Demand route for control {string}',async function(control){
   const response=await this.page.goto(`${this.baseUrl}/demand?control=${encodeURIComponent(control)}`,{waitUntil:'domcontentloaded'});
   assert.ok(response,'No response received from the /demand deep link.');
   assert.ok(response.ok(),`/demand deep link returned HTTP ${response.status()}.`);
@@ -62,12 +62,6 @@ Then('the Demand search should apply after a short pause and retain keyboard foc
   await waitFor(async()=>new URL(this.page.url()).searchParams.get('search')===value,3000);
   assert.equal(await this.page.evaluate(()=>document.activeElement?.dataset?.filter),'search','Demand search lost keyboard focus after its debounced render.');
   assert.equal(await this.page.locator('[data-filter="search"]').evaluate(el=>el.selectionStart),value.length,'Demand search cursor did not return to the typed position.');
-});
-
-Then('the Demand route should identify itself as a dark launch',async function(){
-  const note=this.page.locator('.migration-note');
-  await waitFor(async()=>await note.count()===1);
-  assert.match(String(await note.textContent()||''),/Dark launch/i);
 });
 
 Then('the legacy Demand view should not be the rendered page',async function(){
