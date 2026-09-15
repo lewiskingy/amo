@@ -14,12 +14,13 @@ export class DemandQueryService{
   workPackagesFor(id,{show='all',control=''}={}){
     let rows=this.controls.workPackagesFor(id);
     if(show==='active')rows=rows.filter(w=>!TERMINAL_WORK_PACKAGE_STATES.has(clean(w.status)));
-    if(control==='work-item-missing')rows=rows.filter(w=>DemandControlRules.workItemRequired(w,this.today())&&!clean(w.azureDevOpsWorkItemId));
+    if(control==='work-item-missing')rows=rows.filter(DemandControlRules.workItemMissing);
     return rows;
   }
   allocationsFor(id){return this.controls.allocationsFor(id)}
   ownerName(id){return this.people.find(p=>p.id===id)?.name||id||'Unallocated'}
   controlPosition(demand){return this.controls.controlPosition(demand)}
+  workPackageControlPosition(workPackage){return {workItemMissing:this.controls.workItemMissing(workPackage)}}
   matchesControl(demand,control){return this.controls.matches(demand,control)}
   matchesSearch(demand,filters={}){
     const needle=lower(filters.search);if(!needle)return true;
