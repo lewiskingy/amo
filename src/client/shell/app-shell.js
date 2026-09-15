@@ -89,8 +89,8 @@ export class AccountWidget{
       this.host.innerHTML=`<div class="amo-shell-account-row">${identity.picture?`<img src="${esc(identity.picture)}" alt="">`:''}<span><strong>${esc(identity.name||'Signed in')}</strong><small>${esc(identity.email||'')}</small></span><button type="button" class="btn" data-signout>Sign out</button></div>`;
       this.host.querySelector('[data-signout]')?.addEventListener('click',async()=>{await this.auth.signOut();await this.render()});
     }else{
-      this.host.innerHTML='<div class="amo-shell-signin" aria-label="Not signed in"><div class="amo-shell-signin-button" data-signin></div></div>';
-      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{type:'icon',shape:'circle',size:'medium'})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
+      this.host.innerHTML='<div class="amo-shell-signin amo-sidebar-signin" aria-label="Not signed in"><span class="amo-shell-sidebar-label amo-sidebar-account-label">Account</span><div class="amo-shell-signin-button amo-google-signin" data-signin></div></div>';
+      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{width:180})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
     }
   }
   async start(){await this.render();this.unsubscribe=this.auth?.onChange?.(()=>this.render())||null}
