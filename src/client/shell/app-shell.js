@@ -20,7 +20,8 @@ function syncThemeButton(button){
 
 export function renderSidebar(host,{activeRoute='/demand'}={}){
   host.className='amo-shell-sidebar';
-  host.innerHTML=`<div class="amo-shell-sidebar-head"><a class="amo-shell-brand" href="/"><img src="/assets/amo-icon.png" alt=""><span><strong>Architecture Management Office</strong><small id="amoShellVersion">Target client · dark launch</small></span></a><button type="button" class="amo-shell-close" data-shell-close aria-label="Close navigation">×</button></div>
+  host.innerHTML=`<div class="amo-shell-sidebar-head"><a class="amo-shell-brand" href="/"><img src="/assets/amo-icon.png" alt=""><span><strong>Architecture Management Office</strong><small id="amoShellVersion">Target client</small></span></a><button type="button" class="amo-shell-close" data-shell-close aria-label="Close navigation">×</button></div>
+    <div class="amo-shell-experience-badge" aria-label="New AMO experience"><span>New experience</span><small>You're using the new AMO navigation and Demand experience.</small></div>
     <nav aria-label="AMO navigation">
       <a class="amo-shell-primary-link" href="${legacy('dashboard')}">Dashboard <small>legacy</small></a>
       <a class="amo-shell-primary-link" data-amo-assistant-target hidden target="_blank" rel="noopener noreferrer">↗ Launch AMO Assistant</a>
@@ -89,8 +90,8 @@ export class AccountWidget{
       this.host.innerHTML=`<div class="amo-shell-account-row">${identity.picture?`<img src="${esc(identity.picture)}" alt="">`:''}<span><strong>${esc(identity.name||'Signed in')}</strong><small>${esc(identity.email||'')}</small></span><button type="button" class="btn" data-signout>Sign out</button></div>`;
       this.host.querySelector('[data-signout]')?.addEventListener('click',async()=>{await this.auth.signOut();await this.render()});
     }else{
-      this.host.innerHTML='<div class="amo-shell-signin" aria-label="Not signed in"><div class="amo-shell-signin-button" data-signin></div></div>';
-      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{type:'icon',shape:'circle',size:'medium'})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
+      this.host.innerHTML='<div class="amo-shell-signin amo-sidebar-signin" aria-label="Not signed in"><span class="amo-shell-sidebar-label amo-sidebar-account-label">Account</span><div class="amo-shell-signin-button amo-google-signin" data-signin></div></div>';
+      try{await this.auth.renderSignInButton(this.host.querySelector('[data-signin]'),{width:180})}catch(e){this.host.querySelector('[data-signin]').textContent=e.message}
     }
   }
   async start(){await this.render();this.unsubscribe=this.auth?.onChange?.(()=>this.render())||null}

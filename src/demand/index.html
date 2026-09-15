@@ -6,7 +6,9 @@
   <meta name="color-scheme" content="light dark">
   <script>(()=>{try{const t=localStorage.getItem('amo.theme')||localStorage.getItem('amo.appearance');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch{}})();</script>
   <title>Demand · Architecture Management Office</title>
-  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" href="/favicon.ico?v=20260826-1" sizes="any">
+  <link rel="icon" type="image/png" href="/assets/amo-icon.png?v=20260826-1" sizes="128x128">
+  <link rel="apple-touch-icon" href="/assets/amo-icon.png?v=20260826-1">
   <link rel="stylesheet" href="/app.css">
   <link rel="stylesheet" href="/app-theme.css">
   <link rel="stylesheet" href="/client/workspace/workspace-switcher.css">
@@ -28,7 +30,6 @@
         <div id="scopeSelector"></div>
       </div>
       <section class="target-client-content" aria-labelledby="demand-heading">
-        <div class="migration-note"><strong>Dark launch.</strong> This is the strategic `/demand` implementation. The legacy Demand tab remains the primary navigation target until parity and acceptance are proven.</div>
         <div id="demandFilters"></div>
         <div class="demand-filter-summary"><div id="demandFilterChips"></div><div id="demandCount"></div></div>
         <div id="demandAppState" class="demand-app-state">Loading Demand…</div>

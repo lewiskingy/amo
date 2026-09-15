@@ -11,21 +11,24 @@ export class DemandQueryService{
     this.demands=demands;this.workPackages=workPackages;this.allocations=allocations;this.people=people;this.today=today;
     this.controls=new DemandControlService({allocations,workPackages,actuals,today});
   }
-  workPackagesFor(id,{show='all',control=''}={}){
+  workPackageMatchesSearch(workPackage,search){const needle=lower(search);return !needle||lower(`${workPackage.id} ${workPackage.title} ${workPackage.azureDevOpsWorkItemId}`).includes(needle)}
+  workPackagesFor(id,{show='all',control='',search='',filterSearch=false}={}){
     let rows=this.controls.workPackagesFor(id);
     if(show==='active')rows=rows.filter(w=>!TERMINAL_WORK_PACKAGE_STATES.has(clean(w.status)));
-    if(control==='work-item-missing')rows=rows.filter(w=>DemandControlRules.workItemRequired(w,this.today())&&!clean(w.azureDevOpsWorkItemId));
+    if(control==='work-item-missing')rows=rows.filter(DemandControlRules.workItemMissing);
+    if(filterSearch&&clean(search))rows=rows.filter(w=>this.workPackageMatchesSearch(w,search));
     return rows;
   }
   allocationsFor(id){return this.controls.allocationsFor(id)}
   ownerName(id){return this.people.find(p=>p.id===id)?.name||id||'Unallocated'}
   controlPosition(demand){return this.controls.controlPosition(demand)}
+  workPackageControlPosition(workPackage){return {workItemMissing:this.controls.workItemMissing(workPackage)}}
   matchesControl(demand,control){return this.controls.matches(demand,control)}
+  demandMatchesSearch(demand,search){const needle=lower(search);return !needle||lower(`${demand.id} ${demand.title} ${demand.projectNumber} ${demand.businessArea} ${demand.initiative} ${this.ownerName(demand.ownerId)}`).includes(needle)}
   matchesSearch(demand,filters={}){
-    const needle=lower(filters.search);if(!needle)return true;
-    const demandHay=lower(`${demand.id} ${demand.title} ${demand.projectNumber} ${demand.businessArea} ${demand.initiative} ${this.ownerName(demand.ownerId)}`);
-    if(demandHay.includes(needle))return true;
-    return this.workPackagesFor(demand.id,{show:filters.show||'active'}).some(w=>lower(`${w.id} ${w.title} ${w.azureDevOpsWorkItemId}`).includes(needle));
+    if(!clean(filters.search))return true;
+    if(this.demandMatchesSearch(demand,filters.search))return true;
+    return this.workPackagesFor(demand.id,{show:filters.show||'active'}).some(w=>this.workPackageMatchesSearch(w,filters.search));
   }
   query(filters={},scope={mode:'all'}){
     return this.demands.filter(d=>{
