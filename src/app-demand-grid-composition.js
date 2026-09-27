@@ -31,7 +31,7 @@
     try{
       const result=coreRenderGrid.apply(this,arguments);
       context.table=document.getElementById('demandTable');
-      context.rows=typeof gridRows==='function'?gridRows('demand'):[];
+      context.rows=typeof window.AmoCanonicalGridRows==='function'?window.AmoCanonicalGridRows('demand'):[];
       runAfter(context);
       return result
     }finally{
